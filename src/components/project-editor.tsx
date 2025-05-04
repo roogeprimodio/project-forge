@@ -37,46 +37,45 @@ interface ProjectEditorProps {
 export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const [projects, setProjects] = useLocalStorage<Project[]>('projects', []);
   const { toast } = useToast();
-  const [activeSectionIndex, setActiveSectionIndex] = useState<number | null | -1>(-1); // Start with details (-1)
+  const [activeSectionIndex, setActiveSectionIndex] = useState<number | null | -1>(null); // Use null initially
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false); // State for summarization loading
   const [isGeneratingToc, setIsGeneratingToc] = useState(false); // State for ToC generation
   const [isGeneratingOutline, setIsGeneratingOutline] = useState(false); // State for Outline generation
   const [customSectionName, setCustomSectionName] = useState('');
-  const [isProjectFound, setIsProjectFound] = useState<boolean | null>(null); // Track if project is found
+  const [isProjectFound, setIsProjectFound] = useState<boolean | null>(null); // Track if project is found: null (loading), true (found), false (not found)
   const router = useRouter(); // Initialize useRouter
 
   // Find the current project based on projectId
   const project = useMemo(() => {
-     const foundProject = projects.find(p => p.id === projectId);
-     // Use effect hook cannot be used directly inside useMemo,
-     // so we'll set the isProjectFound state in a separate useEffect.
-     return foundProject;
+     // Ensure projects is an array before using .find()
+     return Array.isArray(projects) ? projects.find(p => p.id === projectId) : undefined;
    }, [projects, projectId]);
 
    // Effect to check if project exists and handle redirection/state update
    useEffect(() => {
-     if (projects && projects.length > 0) { // Only check once projects are loaded
-       const projectExists = projects.some(p => p.id === projectId);
+     // Only proceed if projects state has been initialized (is not the initial empty array anymore)
+     // and isProjectFound is still in its initial loading state (null)
+     if (projects !== undefined && isProjectFound === null) {
+       const projectExists = Array.isArray(projects) && projects.some(p => p.id === projectId);
        setIsProjectFound(projectExists);
 
-       if (!projectExists) {
-         toast({
-           variant: "destructive",
-           title: "Project Not Found",
-           description: "The requested project could not be loaded or doesn't exist.",
-         });
-         // No automatic redirect here, show the "Not Found" message instead.
-       } else {
-         // Project found, initialize activeSectionIndex if needed
-         if (activeSectionIndex === null) {
-           setActiveSectionIndex(-1); // Default to Project Details
-         }
+       if (projectExists) {
+          // Project found, initialize activeSectionIndex if it's still null
+          if (activeSectionIndex === null) {
+            setActiveSectionIndex(-1); // Default to Project Details
+          }
        }
+       // No 'else' needed here: if !projectExists, isProjectFound is set to false,
+       // and the component will render the "Not Found" message automatically.
+     } else if (isProjectFound === true && !project) {
+        // Case: Project was found previously, but now it's gone (e.g., deleted in another tab)
+        setIsProjectFound(false);
+        // Optionally show a toast, though the 'Not Found' screen is usually sufficient
+        // toast({ ... });
      }
-     // If projects is empty array initially, isProjectFound remains null (loading state)
-     // If projects becomes empty later (e.g., deleted in another tab), this effect will run again.
-   }, [projectId, projects, router, toast, activeSectionIndex]); // Add dependencies
+   }, [projectId, projects, isProjectFound, activeSectionIndex]); // Dependencies for checking existence and initialization
+
 
   const updateProject = useCallback((updatedProjectData: Partial<Project>) => {
     setProjects((prevProjects = []) => // Ensure prevProjects is an array
@@ -165,6 +164,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
    };
 
   const handleGenerateSection = async (index: number) => {
+    // Ensure project exists before proceeding
     if (!project || index < 0 || index >= project.sections.length || isGenerating || isSummarizing || isGeneratingToc || isGeneratingOutline) return;
 
     const section = project.sections[index];
@@ -185,13 +185,24 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         throw new Error(result.error);
       }
 
-      const updatedSections = [...project.sections];
-      updatedSections[index] = {
-        ...section,
-        content: result.reportSectionContent,
-        lastGenerated: new Date().toISOString(),
-      };
-      updateProject({ sections: updatedSections });
+      // Re-fetch the project state in case it changed during generation (less likely with local storage)
+      // This ensures we update the *current* project state
+      setProjects(currentProjects => {
+        const projectToUpdate = currentProjects?.find(p => p.id === projectId);
+        if (!projectToUpdate || index >= projectToUpdate.sections.length) return currentProjects; // Safety check
+
+        const updatedSections = [...projectToUpdate.sections];
+         updatedSections[index] = {
+           ...updatedSections[index], // Use the section from the re-fetched project state
+           content: result.reportSectionContent,
+           lastGenerated: new Date().toISOString(),
+         };
+
+         return currentProjects.map(p =>
+            p.id === projectId ? { ...projectToUpdate, sections: updatedSections, updatedAt: new Date().toISOString() } : p
+          );
+      });
+
 
       toast({
         title: "Section Generated",
@@ -211,6 +222,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   };
 
   const handleSummarizeSection = async (index: number) => {
+      // Ensure project exists
       if (!project || index < 0 || index >= project.sections.length || isGenerating || isSummarizing || isGeneratingToc || isGeneratingOutline) return;
 
       const section = project.sections[index];
@@ -227,7 +239,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
       try {
           const result = await summarizeSectionAction({
-              projectTitle: project.title,
+              projectTitle: project.title, // Safe to use project.title here as we checked project existence
               sectionText: section.content,
           });
 
@@ -259,6 +271,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   };
 
   const handleGenerateToc = async () => {
+    // Ensure project exists
     if (!project || isGenerating || isSummarizing || isGeneratingToc || isGeneratingOutline) return;
 
     if (!project.sections || project.sections.length === 0) {
@@ -273,7 +286,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     setIsGeneratingToc(true);
 
     try {
-        // Concatenate content from all sections EXCEPT any existing ToC section
+        // Use project details safely after checking existence
         const reportContent = project.sections
             .filter(s => s.name !== TOC_SECTION_NAME) // Exclude existing ToC
             .map(s => `## ${s.name}\n\n${s.content}`) // Add section headings for context
@@ -297,40 +310,50 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
         const tocContent = result.tableOfContents;
         const now = new Date().toISOString();
-        let tocSectionIndex = project.sections.findIndex(s => s.name === TOC_SECTION_NAME);
 
-        let updatedSections = [...project.sections];
-        let sectionAdded = false;
+        // Re-fetch project state before updating
+        setProjects(currentProjects => {
+            const projectToUpdate = currentProjects?.find(p => p.id === projectId);
+            if (!projectToUpdate) return currentProjects; // Safety check
 
-        if (tocSectionIndex > -1) {
-            // Update existing ToC section
-            updatedSections[tocSectionIndex] = {
-                ...updatedSections[tocSectionIndex],
-                content: tocContent,
-                lastGenerated: now,
-            };
-        } else {
-            // Add new ToC section at the beginning
-            const newTocSection: ProjectSection = {
-                name: TOC_SECTION_NAME,
-                prompt: "Table of Contents generated by AI.", // Default prompt
-                content: tocContent,
-                lastGenerated: now,
-            };
-            updatedSections.unshift(newTocSection); // Add to the beginning
-            tocSectionIndex = 0; // New index is 0
-            sectionAdded = true;
-        }
+            let tocSectionIndex = projectToUpdate.sections.findIndex(s => s.name === TOC_SECTION_NAME);
+            let updatedSections = [...projectToUpdate.sections];
+            let sectionAdded = false;
 
-        updateProject({ sections: updatedSections });
+            if (tocSectionIndex > -1) {
+                // Update existing ToC section
+                updatedSections[tocSectionIndex] = {
+                    ...updatedSections[tocSectionIndex],
+                    content: tocContent,
+                    lastGenerated: now,
+                };
+            } else {
+                // Add new ToC section at the beginning
+                const newTocSection: ProjectSection = {
+                    name: TOC_SECTION_NAME,
+                    prompt: "Table of Contents generated by AI.", // Default prompt
+                    content: tocContent,
+                    lastGenerated: now,
+                };
+                updatedSections.unshift(newTocSection); // Add to the beginning
+                tocSectionIndex = 0; // New index is 0
+                sectionAdded = true;
+            }
 
-        toast({
-            title: "Table of Contents Generated",
-            description: `The "${TOC_SECTION_NAME}" section has been ${sectionAdded ? 'added' : 'updated'}.`,
+             toast({
+                title: "Table of Contents Generated",
+                description: `The "${TOC_SECTION_NAME}" section has been ${sectionAdded ? 'added' : 'updated'}.`,
+             });
+
+            // Optional: Navigate to the ToC section after generation
+            // Note: Direct state update here might be risky if many updates happen concurrently
+            // Consider using a separate effect or a post-update callback if navigation is critical
+            setActiveSectionIndex(tocSectionIndex);
+
+            return currentProjects.map(p =>
+                p.id === projectId ? { ...projectToUpdate, sections: updatedSections, updatedAt: now } : p
+            );
         });
-
-        // Optional: Navigate to the ToC section after generation
-        setActiveSectionIndex(tocSectionIndex);
 
 
     } catch (error) {
@@ -346,6 +369,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   };
 
   const handleGenerateOutline = async () => {
+      // Ensure project exists
       if (!project || isGenerating || isSummarizing || isGeneratingToc || isGeneratingOutline) return;
 
       if (!project.projectContext || !project.projectContext.trim()) {
@@ -362,7 +386,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
       try {
           const result = await generateOutlineAction({
-              projectTitle: project.title,
+              projectTitle: project.title, // Safe to use project properties
               projectContext: project.projectContext,
           });
 
@@ -375,6 +399,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
           }
 
           // Add the suggested sections to the project
+          // addMultipleSections internally checks for project existence again, which is fine
           addMultipleSections(result.suggestedSections);
 
           // No separate toast here, addMultipleSections handles it
@@ -393,6 +418,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
   // Placeholder for future "Save Online" functionality
   const handleSaveOnline = () => {
+     // Ensure project exists
      if (!project) return;
      // 1. Implement authentication if not already done.
      // 2. Send project data to a backend API (e.g., Firestore).
@@ -407,13 +433,20 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
    // Navigate to the export page
    const handleNavigateToExport = () => {
+     // Ensure project exists before navigating
      if (project) {
        router.push(`/project/${projectId}/export`);
+     } else {
+        toast({
+            variant: "destructive",
+            title: "Navigation Error",
+            description: "Could not find project data to export.",
+        });
      }
    };
 
 
-   // Render loading state while checking if project exists
+   // Render loading state while checking if project exists (isProjectFound is null)
    if (isProjectFound === null) {
      return (
        <div className="flex flex-col items-center justify-center min-h-screen text-center p-4">
@@ -423,7 +456,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
      );
    }
 
-   // Render "Not Found" message if project doesn't exist
+   // Render "Not Found" message if project doesn't exist (isProjectFound is false)
    if (!isProjectFound) {
      return (
        <div className="flex flex-col items-center justify-center min-h-screen text-center p-4">
@@ -439,13 +472,13 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
      );
    }
 
-   // Project found, render the editor (ensure project is not null here)
+   // Project found (isProjectFound is true), but still check if `project` object is available before rendering
    if (!project) {
-       // This should theoretically not be reached if isProjectFound is true,
-       // but adding a safeguard.
+       // This state should be very temporary or indicate an unexpected issue if isProjectFound was true
        return (
          <div className="flex flex-col items-center justify-center min-h-screen text-center p-4">
-           <p className="text-lg text-muted-foreground">An unexpected error occurred loading the project.</p>
+            <Loader2 className="h-16 w-16 animate-spin text-primary mb-4" />
+           <p className="text-lg text-muted-foreground">Finalizing project data...</p>
             <Button onClick={() => router.push('/')} className="mt-4">
                 <Home className="mr-2 h-4 w-4" /> Go to Dashboard
             </Button>
@@ -453,6 +486,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
        );
    }
 
+   // --- Project is guaranteed to exist from here ---
 
   const activeSection = activeSectionIndex !== null && activeSectionIndex >= 0 && activeSectionIndex < project.sections.length
     ? project.sections[activeSectionIndex]
@@ -690,7 +724,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                          </Button>
                      </CardFooter>
                 </Card>
-            ) : activeSectionIndex !== null && activeSection ? ( // Ensure index is valid
+            ) : activeSectionIndex !== null && activeSection ? ( // Ensure index is valid and activeSection exists
               // Render Section Editor
               <div className="space-y-6">
                  {/* Only show prompt card if it's not the ToC section */}
