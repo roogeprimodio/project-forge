@@ -184,7 +184,10 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
       // Use functional update to ensure we're working with the latest state
       setProjects(currentProjects => {
-        const projectToUpdate = currentProjects?.find(p => p.id === projectId);
+        // Handle case where currentProjects might be undefined initially
+        if (!currentProjects) return [];
+
+        const projectToUpdate = currentProjects.find(p => p.id === projectId);
         if (!projectToUpdate || index >= projectToUpdate.sections.length) return currentProjects;
 
         const updatedSections = [...projectToUpdate.sections];
@@ -270,7 +273,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
         // Use functional update for safety
         setProjects(currentProjects => {
-            const projectToUpdate = currentProjects?.find(p => p.id === projectId);
+             if (!currentProjects) return [];
+            const projectToUpdate = currentProjects.find(p => p.id === projectId);
             if (!projectToUpdate) return currentProjects;
 
             let tocSectionIndex = projectToUpdate.sections.findIndex(s => s.name === TOC_SECTION_NAME);
