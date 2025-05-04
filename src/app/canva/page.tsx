@@ -544,6 +544,17 @@ export default function CanvaPage() {
         handlePointerMove(touch.clientX, touch.clientY);
     }, [draggingNoteId, handlePointerMove]);
 
+    // --- Single Click Note Selection ---
+    // Define handleNoteClick BEFORE handlePointerUp which uses it
+    const handleNoteClick = useCallback((id: string) => {
+        // Only select if not dragging and not editing
+        const note = notes.find(n => n.id === id);
+        if (!isDraggingRef.current && !note?.isEditing) {
+            setSelectedNoteId(id);
+            handleCloseContextMenu(); // Close menu if open
+        }
+    }, [notes]); // Added notes dependency
+
 
   // --- Universal Up Handler (Mouse & Touch) ---
   const handlePointerUp = useCallback((e: Event) => { // Accept event for context menu check
@@ -630,12 +641,16 @@ export default function CanvaPage() {
   };
 
   // Close context menu & deselect note if clicking outside
-  const handleCloseContextMenuAndDeselect = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+  const handleCloseContextMenuAndDeselect = useCallback((e?: React.MouseEvent<HTMLDivElement>) => { // Make event optional
      // Prevent closing if the click is on a note itself (handled by note's onClick)
-     const target = e.target as Element;
-     if (target.closest('[data-note-id]')) { // Add data-note-id attribute to StickyNote div if needed
-         return;
+     if (e) {
+        const target = e.target as Element;
+        // Check if the click target or its ancestor is a sticky note
+        if (target.closest('.absolute[style^="left"]')) { // Basic check for sticky note div
+            return;
+        }
      }
+
     setContextMenu(null);
     setSelectedNoteId(null); // Deselect note
   }, []);
@@ -697,15 +712,6 @@ export default function CanvaPage() {
        );
     };
 
-  // --- Single Click Note Selection ---
-  const handleNoteClick = useCallback((id: string) => {
-      // Only select if not dragging and not editing
-      const note = notes.find(n => n.id === id);
-      if (!isDraggingRef.current && !note?.isEditing) {
-          setSelectedNoteId(id);
-          handleCloseContextMenu(); // Close menu if open
-      }
-  }, [notes]);
 
 
   // Change color for new notes
