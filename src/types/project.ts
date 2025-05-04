@@ -9,8 +9,13 @@ export interface Project {
   id: string;
   title: string;
   projectContext: string; // Added field to store initial project context
-  teamDetails: string; // Simple string for now, can be expanded later
-  collegeInfo: string; // Simple string
+  teamDetails: string; // Simple string for now, represents team members & enrollments. TODO: Refactor to Array<{name: string, enrollment: string}>
+  instituteName: string; // Replaced collegeInfo
+  teamId?: string; // Optional team ID
+  subject?: string; // e.g., Design Engineering - 1A
+  semester?: string; // e.g., 5
+  branch?: string; // e.g., Computer Engineering
+  guideName?: string; // Name of the faculty guide
   sections: ProjectSection[];
   createdAt: Date | string;
   updatedAt: Date | string;

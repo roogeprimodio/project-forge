@@ -17,6 +17,8 @@ import type { GenerateProjectOutlineOutput } from '@/ai/flows/generate-project-o
 export async function generateSectionAction(input: GenerateReportSectionInput): Promise<GenerateReportSectionOutput | { error: string }> {
   try {
     console.log("Generating section with input:", input);
+    // Ensure all expected fields are passed, mapping from potential Project structure if needed
+    // Directly passing input as it matches the flow schema now.
     const result = await generateReportSection(input);
     console.log("Generation result:", result);
     return result;

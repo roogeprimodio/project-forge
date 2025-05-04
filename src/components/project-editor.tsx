@@ -20,6 +20,7 @@ import { useToast } from '@/hooks/use-toast';
 import { generateSectionAction, summarizeSectionAction, generateTocAction, generateOutlineAction } from '@/app/actions';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils'; // Import cn
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"; // Ensure Sheet components are imported
 
 interface ProjectEditorProps {
   projectId: string;
@@ -184,7 +185,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
        setIsProjectFound(projectExists);
 
        if (projectExists && activeSectionIndex === null) {
-           setActiveSectionIndex(-1);
+           setActiveSectionIndex(-1); // Default to project details if project exists
        } else if (!projectExists && isProjectFound !== false) {
            // Only show toast and redirect if we newly detect the project is missing
            setIsProjectFound(false); // Set definitively to false
@@ -299,7 +300,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         sectionName: section.name,
         prompt: section.prompt,
         teamDetails: project.teamDetails,
-        collegeInfo: project.collegeInfo,
+        collegeInfo: project.instituteName, // Use instituteName now
       });
 
       if ('error' in result) throw new Error(result.error);
@@ -501,25 +502,28 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     <div className="flex h-full"> {/* Use full height */}
       {/* --- Local Project Sidebar --- */}
       <div className={cn(
-          "transition-all duration-300 ease-in-out overflow-hidden",
-           isLocalSidebarOpen ? "w-64" : "w-0" // Adjust width based on state
+          "transition-all duration-300 ease-in-out overflow-y-auto overflow-x-hidden", // Added y-auto, x-hidden
+           isLocalSidebarOpen ? "w-64 border-r" : "w-0 border-r-0" // Adjust width and border based on state
          )}
          aria-hidden={!isLocalSidebarOpen}
          >
-         <ProjectSidebarContent
-            project={project}
-            activeSectionIndex={activeSectionIndex}
-            setActiveSectionIndex={setActiveSectionIndex}
-            addSection={addSection}
-            customSectionName={customSectionName}
-            setCustomSectionName={setCustomSectionName}
-            handleGenerateOutline={handleGenerateOutline}
-            isGeneratingOutline={isGeneratingOutline}
-            isGenerating={isGenerating}
-            isSummarizing={isSummarizing}
-            isGeneratingToc={isGeneratingToc}
-            handleSaveOnline={handleSaveOnline}
-         />
+         {/* Only render content if open to prevent visual glitches when collapsed */}
+         {isLocalSidebarOpen && (
+             <ProjectSidebarContent
+                project={project}
+                activeSectionIndex={activeSectionIndex}
+                setActiveSectionIndex={setActiveSectionIndex}
+                addSection={addSection}
+                customSectionName={customSectionName}
+                setCustomSectionName={setCustomSectionName}
+                handleGenerateOutline={handleGenerateOutline}
+                isGeneratingOutline={isGeneratingOutline}
+                isGenerating={isGenerating}
+                isSummarizing={isSummarizing}
+                isGeneratingToc={isGeneratingToc}
+                handleSaveOnline={handleSaveOnline}
+             />
+         )}
       </div>
 
         {/* --- Main Content Area --- */}
@@ -574,7 +578,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                         <CardTitle className="text-glow-primary">Project Details</CardTitle>
                         <CardDescription>Edit general information about your project. Providing context helps the AI generate a relevant outline and content.</CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-4">
+                    <CardContent className="space-y-6">
                          <div>
                             <Label htmlFor="projectTitleMain">Project Title *</Label>
                             <Input
@@ -597,27 +601,82 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                             />
                             <p className="text-xs text-muted-foreground mt-1">This context is used by the AI to generate the initial project outline.</p>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <Label htmlFor="teamDetails">Team Details</Label>
-                                <Textarea
-                                    id="teamDetails"
-                                    value={project.teamDetails}
-                                    onChange={(e) => handleProjectDetailChange('teamDetails', e.target.value)}
-                                    placeholder="Enter team member names and IDs, one per line"
-                                    className="mt-1 min-h-[80px] focus-visible:glow-primary"
-                                />
-                            </div>
-                             <div>
-                                <Label htmlFor="collegeInfo">College Information</Label>
+                                <Label htmlFor="instituteName">Institute Name</Label>
                                 <Input
-                                    id="collegeInfo"
-                                    value={project.collegeInfo}
-                                    onChange={(e) => handleProjectDetailChange('collegeInfo', e.target.value)}
-                                    placeholder="Enter College Name"
+                                    id="instituteName"
+                                    value={project.instituteName || ''}
+                                    onChange={(e) => handleProjectDetailChange('instituteName', e.target.value)}
+                                    placeholder="e.g., L. D. College of Engineering"
                                     className="mt-1 focus-visible:glow-primary"
                                 />
                             </div>
+                            <div>
+                                <Label htmlFor="branch">Branch</Label>
+                                <Input
+                                    id="branch"
+                                    value={project.branch || ''}
+                                    onChange={(e) => handleProjectDetailChange('branch', e.target.value)}
+                                    placeholder="e.g., Computer Engineering"
+                                    className="mt-1 focus-visible:glow-primary"
+                                />
+                            </div>
+                             <div>
+                                <Label htmlFor="semester">Semester</Label>
+                                <Input
+                                    id="semester"
+                                    value={project.semester || ''}
+                                    onChange={(e) => handleProjectDetailChange('semester', e.target.value)}
+                                    placeholder="e.g., 5"
+                                    type="number" // Use number type for semester if appropriate
+                                    className="mt-1 focus-visible:glow-primary"
+                                />
+                            </div>
+                            <div>
+                                <Label htmlFor="subject">Subject</Label>
+                                <Input
+                                    id="subject"
+                                    value={project.subject || ''}
+                                    onChange={(e) => handleProjectDetailChange('subject', e.target.value)}
+                                    placeholder="e.g., Design Engineering - 1A"
+                                    className="mt-1 focus-visible:glow-primary"
+                                />
+                            </div>
+                        </div>
+                        <Separator />
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                             <div>
+                                <Label htmlFor="teamId">Team ID</Label>
+                                <Input
+                                    id="teamId"
+                                    value={project.teamId || ''}
+                                    onChange={(e) => handleProjectDetailChange('teamId', e.target.value)}
+                                    placeholder="Enter Team ID"
+                                    className="mt-1 focus-visible:glow-primary"
+                                />
+                            </div>
+                            <div>
+                                <Label htmlFor="guideName">Faculty Guide Name</Label>
+                                <Input
+                                    id="guideName"
+                                    value={project.guideName || ''}
+                                    onChange={(e) => handleProjectDetailChange('guideName', e.target.value)}
+                                    placeholder="Enter Guide's Name"
+                                    className="mt-1 focus-visible:glow-primary"
+                                />
+                            </div>
+                         </div>
+                         <div>
+                            <Label htmlFor="teamDetails">Team Details (Members & Enrollment)</Label>
+                            <Textarea
+                                id="teamDetails"
+                                value={project.teamDetails}
+                                onChange={(e) => handleProjectDetailChange('teamDetails', e.target.value)}
+                                placeholder="Enter team member names and enrollment numbers, one per line (e.g., John Doe - 123456789)"
+                                className="mt-1 min-h-[100px] focus-visible:glow-primary"
+                            />
+                            <p className="text-xs text-muted-foreground mt-1">This information will be used in the generated report sections and title page.</p>
                         </div>
                     </CardContent>
                      <CardFooter className="flex justify-end">
