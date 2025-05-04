@@ -24,19 +24,24 @@ export default function DashboardPage() {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    setProjects((prevProjects) => [...prevProjects, newProject]);
+    // Use functional update to ensure we have the latest projects array
+    setProjects((prevProjects = []) => [...prevProjects, newProject]);
     // Navigate to the newly created project's page
     router.push(`/project/${newProjectId}`);
   };
 
   const handleDeleteProject = (id: string) => {
+    // Find project details *before* filtering for the toast message
     const projectToDelete = projects.find(p => p.id === id);
-    setProjects((prevProjects) => prevProjects.filter((project) => project.id !== id));
+
+    // Use functional update for safe state transition
+    setProjects((prevProjects = []) => prevProjects.filter((project) => project.id !== id));
+
     // Show a toast notification after deletion
     toast({
       title: "Project Deleted",
       description: `"${projectToDelete?.title || 'Untitled Project'}" has been removed.`,
-      variant: "destructive", // Optional: Use destructive variant for deletion confirmation
+      variant: "destructive",
     });
   };
 
@@ -44,18 +49,10 @@ export default function DashboardPage() {
       <main className="min-h-screen bg-background">
          {/* Add a header/navbar later if needed */}
          <ProjectList
-            projects={projects}
+            projects={projects || []} // Ensure projects is always an array
             onCreateProject={handleCreateProject}
             onDeleteProject={handleDeleteProject}
          />
       </main>
   );
 }
-
-// Simple UUID generation function as fallback if uuid library is not preferred
-// function generateUUID() {
-//   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-//     var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-//     return v.toString(16);
-//   });
-// }
