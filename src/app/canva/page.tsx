@@ -544,8 +544,13 @@ export default function CanvaPage() {
         handlePointerMove(touch.clientX, touch.clientY);
     }, [draggingNoteId, handlePointerMove]);
 
+
+  // Close context menu only
+  const handleCloseContextMenu = () => {
+     setContextMenu(null);
+  };
+
     // --- Single Click Note Selection ---
-    // Define handleNoteClick BEFORE handlePointerUp which uses it
     const handleNoteClick = useCallback((id: string) => {
         // Only select if not dragging and not editing
         const note = notes.find(n => n.id === id);
@@ -553,7 +558,7 @@ export default function CanvaPage() {
             setSelectedNoteId(id);
             handleCloseContextMenu(); // Close menu if open
         }
-    }, [notes]); // Added notes dependency
+    }, [notes, handleCloseContextMenu]); // Added notes, handleCloseContextMenu dependencies
 
 
   // --- Universal Up Handler (Mouse & Touch) ---
@@ -593,7 +598,7 @@ export default function CanvaPage() {
       // We mainly need to ensure drag end doesn't trigger a click.
 
 
-  }, [draggingNoteId, handleNoteClick]); // Added handleNoteClick
+  }, [draggingNoteId]); // Removed handleNoteClick dependency
 
 
    // Stop dragging (Mouse)
@@ -655,10 +660,6 @@ export default function CanvaPage() {
     setSelectedNoteId(null); // Deselect note
   }, []);
 
-  // Close context menu only
-  const handleCloseContextMenu = () => {
-     setContextMenu(null);
-  };
 
   // Delete a note
   const handleDeleteNote = (id: string) => {
@@ -1033,3 +1034,5 @@ const renderCommonInfoOnCanvas = (info: typeof commonHeaderInfo) => (
          <p><strong>Semester:</strong> {info.semester}</p>
      </div>
 );
+
+    
