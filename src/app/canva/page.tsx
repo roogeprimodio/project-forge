@@ -85,6 +85,7 @@ interface StickyNoteData {
 const StickyNote = React.memo(({
     note,
     onDragStart,
+    onTouchStart, // Add touch start handler prop
     onContextMenu,
     onTextChange,
     onDoubleClick,
@@ -92,6 +93,7 @@ const StickyNote = React.memo(({
 }: {
     note: StickyNoteData;
     onDragStart: (e: React.MouseEvent<HTMLDivElement>, id: string) => void;
+    onTouchStart: (e: React.TouchEvent<HTMLDivElement>, id: string) => void; // Add touch start handler prop
     onContextMenu: (e: React.MouseEvent<HTMLDivElement>, id: string) => void;
     onTextChange: (id: string, text: string) => void;
     onDoubleClick: (id: string) => void; // For initiating edit
@@ -109,7 +111,7 @@ const StickyNote = React.memo(({
     return (
         <div
             className={cn(
-                `absolute p-2 shadow-md rounded text-sm text-black cursor-grab active:cursor-grabbing border border-gray-400/50 flex flex-col`,
+                `absolute p-2 shadow-md rounded text-sm text-black cursor-grab active:cursor-grabbing border border-gray-400/50 flex flex-col touch-none`, // Added touch-none
                 note.color
             )}
             style={{
@@ -120,6 +122,7 @@ const StickyNote = React.memo(({
                 cursor: note.isEditing ? 'text' : 'grab', // Change cursor when editing
             }}
             onMouseDown={(e) => !note.isEditing && onDragStart(e, note.id)} // Only drag if not editing
+            onTouchStart={(e) => !note.isEditing && onTouchStart(e, note.id)} // Add touch start handler
             onContextMenu={(e) => onContextMenu(e, note.id)}
             onDoubleClick={(e) => {
                 e.stopPropagation(); // Prevent drag start on double click
@@ -134,6 +137,7 @@ const StickyNote = React.memo(({
                     onChange={(e) => onTextChange(note.id, e.target.value)}
                     onBlur={() => onBlur(note.id)}
                     onMouseDown={(e) => e.stopPropagation()} // Prevent drag when clicking textarea
+                    onTouchStart={(e) => e.stopPropagation()} // Prevent drag when touching textarea
                 />
             ) : (
                  // Display text, handle overflow
@@ -148,10 +152,11 @@ StickyNote.displayName = 'StickyNote'; // Add display name
 
 
 // Placeholder for Canvas Backgrounds - Updated with new types and sections
-const CanvasBackground = ({ type, notes, onDragStart, onContextMenu, onNoteTextChange, onNoteDoubleClick, onNoteBlur }: {
+const CanvasBackground = ({ type, notes, onDragStart, onTouchStart, onContextMenu, onNoteTextChange, onNoteDoubleClick, onNoteBlur }: {
     type: CanvasType;
     notes: StickyNoteData[];
     onDragStart: (e: React.MouseEvent<HTMLDivElement>, id: string) => void;
+    onTouchStart: (e: React.TouchEvent<HTMLDivElement>, id: string) => void; // Add touch handler
     onContextMenu: (e: React.MouseEvent<HTMLDivElement>, id: string) => void;
     onNoteTextChange: (id: string, text: string) => void;
     onNoteDoubleClick: (id: string) => void;
@@ -222,6 +227,7 @@ const CanvasBackground = ({ type, notes, onDragStart, onContextMenu, onNoteTextC
                         key={note.id}
                         note={note}
                         onDragStart={onDragStart}
+                        onTouchStart={onTouchStart} // Pass touch handler
                         onContextMenu={onContextMenu}
                         onTextChange={onNoteTextChange}
                         onDoubleClick={onNoteDoubleClick}
@@ -272,6 +278,7 @@ const CanvasBackground = ({ type, notes, onDragStart, onContextMenu, onNoteTextC
                     key={note.id}
                     note={note}
                     onDragStart={onDragStart}
+                    onTouchStart={onTouchStart} // Pass touch handler
                     onContextMenu={onContextMenu}
                     onTextChange={onNoteTextChange}
                     onDoubleClick={onNoteDoubleClick}
@@ -293,6 +300,7 @@ export default function CanvaPage() {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; noteId: string } | null>(null);
   const [currentNoteColor, setCurrentNoteColor] = useState('bg-yellow-200'); // Default color for new notes
   const canvasRef = useRef<HTMLDivElement>(null);
+  const longPressTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Ref for long press timeout
 
   // Placeholder Project/Common Info (Replace with actual data fetching if linked to a project)
   const commonHeaderInfo = {
@@ -325,7 +333,7 @@ export default function CanvaPage() {
     setNotes(prevNotes => [...prevNotes, newNote]);
   };
 
-  // Start dragging a note
+   // --- Drag and Drop Logic (Mouse) ---
   const handleDragStart = (e: React.MouseEvent<HTMLDivElement>, id: string) => {
     e.preventDefault(); // Prevent default browser drag behavior
     const noteElement = e.currentTarget;
@@ -338,45 +346,115 @@ export default function CanvaPage() {
     setDragOffset({ x: startX - noteX, y: startY - noteY });
   };
 
-  // Handle mouse move for dragging
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!draggingNoteId || !canvasRef.current) return;
+  // --- Drag and Drop Logic (Touch with Long Press) ---
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>, id: string) => {
+    // Don't prevent default here initially, allow potential scroll
+    const noteElement = e.currentTarget;
+    const touch = e.touches[0];
+    const startX = touch.clientX;
+    const startY = touch.clientY;
+    const noteX = noteElement.offsetLeft;
+    const noteY = noteElement.offsetTop;
 
-    const canvasBounds = canvasRef.current.getBoundingClientRect();
-    let newX = e.clientX - dragOffset.x - canvasBounds.left + canvasRef.current.scrollLeft;
-    let newY = e.clientY - dragOffset.y - canvasBounds.top + canvasRef.current.scrollTop;
+    // Set a timeout for long press (e.g., 500ms)
+    longPressTimeoutRef.current = setTimeout(() => {
+        // If timeout finishes, initiate drag
+        setDraggingNoteId(id);
+        setDragOffset({ x: startX - noteX, y: startY - noteY });
+        // Optionally, provide haptic feedback here if possible
+        longPressTimeoutRef.current = null; // Clear the ref
+        // Prevent scrolling *after* long press detected
+        // This might need refinement depending on exact desired behavior
+    }, 500); // 500ms for long press
+  };
 
-    // Optional: Keep note within canvas bounds (adjust as needed)
-    // newX = Math.max(0, Math.min(newX, canvasBounds.width - noteWidth));
-    // newY = Math.max(0, Math.min(newY, canvasBounds.height - noteHeight));
+   // --- Universal Move Handler (Mouse & Touch) ---
+   const handlePointerMove = useCallback((clientX: number, clientY: number) => {
+       if (!draggingNoteId || !canvasRef.current) return;
 
-    setNotes(prevNotes =>
-      prevNotes.map(note =>
-        note.id === draggingNoteId ? { ...note, x: newX, y: newY } : note
-      )
-    );
-  }, [draggingNoteId, dragOffset]);
+       const canvasBounds = canvasRef.current.getBoundingClientRect();
+       let newX = clientX - dragOffset.x - canvasBounds.left + canvasRef.current.scrollLeft;
+       let newY = clientY - dragOffset.y - canvasBounds.top + canvasRef.current.scrollTop;
 
-  // Stop dragging
-  const handleMouseUp = useCallback(() => {
-    setDraggingNoteId(null);
-  }, []);
+       // Optional: Keep note within canvas bounds (adjust as needed)
+       // const noteWidth = notes.find(n => n.id === draggingNoteId)?.width || 96;
+       // const noteHeight = notes.find(n => n.id === draggingNoteId)?.height || 96;
+       // newX = Math.max(0, Math.min(newX, canvasRef.current.scrollWidth - noteWidth));
+       // newY = Math.max(0, Math.min(newY, canvasRef.current.scrollHeight - noteHeight));
 
-  // Add mouse move and mouse up listeners to the window
+       setNotes(prevNotes =>
+         prevNotes.map(note =>
+           note.id === draggingNoteId ? { ...note, x: newX, y: newY } : note
+         )
+       );
+   }, [draggingNoteId, dragOffset]);
+
+
+   // Handle mouse move for dragging
+   const handleMouseMove = useCallback((e: MouseEvent) => {
+       handlePointerMove(e.clientX, e.clientY);
+   }, [handlePointerMove]);
+
+   // Handle touch move for dragging (only if dragging started)
+    const handleTouchMove = useCallback((e: TouchEvent) => {
+        if (!draggingNoteId) return; // Only move if dragging is active
+        // Prevent scroll while dragging
+        e.preventDefault();
+        const touch = e.touches[0];
+        handlePointerMove(touch.clientX, touch.clientY);
+    }, [draggingNoteId, handlePointerMove]);
+
+
+  // --- Universal Up Handler (Mouse & Touch) ---
+  const handlePointerUp = useCallback(() => {
+      // Clear long press timeout if it exists (user lifted finger before long press duration)
+      if (longPressTimeoutRef.current) {
+          clearTimeout(longPressTimeoutRef.current);
+          longPressTimeoutRef.current = null;
+      }
+      // Stop dragging
+      if (draggingNoteId) {
+          setDraggingNoteId(null);
+      }
+  }, [draggingNoteId]); // Depend on draggingNoteId
+
+    // Stop dragging (Mouse)
+   const handleMouseUp = useCallback(() => {
+       handlePointerUp();
+   }, [handlePointerUp]);
+
+   // Stop dragging (Touch)
+   const handleTouchEnd = useCallback(() => {
+       handlePointerUp();
+   }, [handlePointerUp]);
+
+  // Add mouse/touch move and up listeners to the window
   useEffect(() => {
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('touchmove', handleTouchMove, { passive: false }); // Use passive: false to allow preventDefault
+    window.addEventListener('touchend', handleTouchEnd);
+    window.addEventListener('touchcancel', handleTouchEnd); // Handle cancel event too
 
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleTouchEnd);
+      window.removeEventListener('touchcancel', handleTouchEnd);
+      // Clear timeout on unmount
+      if (longPressTimeoutRef.current) {
+          clearTimeout(longPressTimeoutRef.current);
+      }
     };
-  }, [handleMouseMove, handleMouseUp]);
+  }, [handleMouseMove, handleMouseUp, handleTouchMove, handleTouchEnd]);
 
 
   // Handle right-click context menu
   const handleContextMenu = (e: React.MouseEvent<HTMLDivElement>, id: string) => {
     e.preventDefault();
+    // Don't show context menu while dragging
+    if (draggingNoteId) return;
     setContextMenu({ x: e.clientX, y: e.clientY, noteId: id });
   };
 
@@ -412,6 +490,8 @@ export default function CanvaPage() {
 
    // Set editing flag on double click
    const handleNoteDoubleClick = (id: string) => {
+     // Don't allow edit if dragging was just active
+     if (draggingNoteId) return;
      setNotes(prevNotes =>
        prevNotes.map(note =>
          note.id === id ? { ...note, isEditing: true } : { ...note, isEditing: false } // Start editing this note, stop others
@@ -487,6 +567,7 @@ export default function CanvaPage() {
                 type={selectedCanvas}
                 notes={notes}
                 onDragStart={handleDragStart}
+                onTouchStart={handleTouchStart} // Pass touch handler
                 onContextMenu={handleContextMenu}
                 onNoteTextChange={handleNoteTextChange}
                 onNoteDoubleClick={handleNoteDoubleClick}
@@ -528,7 +609,7 @@ export default function CanvaPage() {
                 <Redo className="h-4 w-4" />
             </Button>
         </div>
-         <p className="text-xs text-muted-foreground text-center mt-2">Tip: Double-click a note to edit text. Right-click for options.</p>
+         <p className="text-xs text-muted-foreground text-center mt-2">Tip: Double-click a note to edit text. Right-click for options (or long-press on mobile - coming soon!).</p>
       </aside>
 
       {/* Context Menu */}
