@@ -23,8 +23,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning> {/* Added suppressHydrationWarning for now */}
-      {/* Removed geistMono variable from class name */}
+    <html lang="en" suppressHydrationWarning>
+      {/* Removed whitespace/comment from here */}
       <body className={cn(
           "antialiased",
           geistSans.variable // Apply font variable correctly
@@ -32,7 +32,7 @@ export default function RootLayout({
         <MainLayout> {/* Wrap children with MainLayout */}
           {children}
         </MainLayout>
-        <Toaster /> {/* Add Toaster component here */}
+        <Toaster /> {/* Corrected typo: Toastaster -> Toaster */}
       </body>
     </html>
   );
