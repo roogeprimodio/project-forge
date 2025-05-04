@@ -12,4 +12,3 @@ export default function ProfileLayout({
     // It exists to ensure the route segment is correctly handled by Next.js App Router.
     return <>{children}</>;
 }
-```
