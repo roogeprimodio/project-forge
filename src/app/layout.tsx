@@ -2,6 +2,8 @@ import type {Metadata} from 'next';
 import {Geist} from 'next/font/google'; // Removed Geist_Mono as it's not explicitly used
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster"; // Import Toaster
+import { MainLayout } from '@/components/main-layout'; // Import MainLayout
+import { cn } from '@/lib/utils'; // Import cn utility
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -21,10 +23,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning> {/* Added suppressHydrationWarning for now */}
       {/* Removed geistMono variable from class name */}
-      <body className={`${geistSans.variable} antialiased`}>
-        {children}
+      <body className={cn(
+          "antialiased",
+          geistSans.variable // Apply font variable correctly
+        )}>
+        <MainLayout> {/* Wrap children with MainLayout */}
+          {children}
+        </MainLayout>
         <Toaster /> {/* Add Toaster component here */}
       </body>
     </html>

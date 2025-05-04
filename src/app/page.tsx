@@ -25,7 +25,7 @@ export default function DashboardPage() {
 
   const handleCreateProject = (newProject: Project) => {
     // Use functional update to ensure we have the latest projects array
-    setProjects((prevProjects = []) => [...prevProjects, newProject]);
+    setProjects((prevProjects = []) => [...(prevProjects || []), newProject]); // Ensure prevProjects is an array
     // Navigate to the newly created project's page
     router.push(`/project/${newProject.id}`);
     toast({
@@ -49,34 +49,31 @@ export default function DashboardPage() {
     });
   };
 
+  // Removed the <main> and outer container, assuming MainLayout provides structure
   return (
-      <main className="min-h-screen bg-background">
-         {/* Add a header/navbar later if needed */}
-         <div className="container mx-auto p-4 md:p-8">
-             <div className="flex justify-between items-center mb-6">
-               <h1 className="text-2xl md:text-3xl font-bold text-primary text-glow-primary">Your Projects</h1>
-                {/* Use the Dialog component */}
-               <CreateProjectDialog onCreateProject={handleCreateProject}>
-                   <Button size="lg" className="hover:glow-primary focus-visible:glow-primary">
-                     <PlusCircle className="mr-2" /> Create New Project
-                   </Button>
-               </CreateProjectDialog>
-             </div>
+      <div className="p-4 md:p-8"> {/* Add padding directly */}
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-2xl md:text-3xl font-bold text-primary text-glow-primary">Your Projects</h1>
+             {/* Use the Dialog component */}
+            <CreateProjectDialog onCreateProject={handleCreateProject}>
+                <Button size="lg" className="hover:glow-primary focus-visible:glow-primary">
+                  <PlusCircle className="mr-2" /> Create New Project
+                </Button>
+            </CreateProjectDialog>
+          </div>
 
-             {/* Conditionally render ProjectList or a loading state */}
-             {!hasMounted ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  <p className="ml-3 text-muted-foreground">Loading projects...</p>
-                </div>
-             ) : (
-                <ProjectList
-                  projects={projects || []} // Ensure projects is always an array
-                  onDeleteProject={handleDeleteProject}
-                />
-             )}
-         </div>
-      </main>
+          {/* Conditionally render ProjectList or a loading state */}
+          {!hasMounted ? (
+             <div className="flex items-center justify-center py-12">
+               <Loader2 className="h-8 w-8 animate-spin text-primary" />
+               <p className="ml-3 text-muted-foreground">Loading projects...</p>
+             </div>
+          ) : (
+             <ProjectList
+               projects={projects || []} // Ensure projects is always an array
+               onDeleteProject={handleDeleteProject}
+             />
+          )}
+      </div>
   );
 }
-

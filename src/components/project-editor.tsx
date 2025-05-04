@@ -3,18 +3,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import {
-  SidebarProvider,
-  Sidebar,
-  SidebarHeader,
-  SidebarContent,
-  SidebarFooter,
-  SidebarTrigger,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
-  SidebarInset,
-} from '@/components/ui/sidebar';
+// Removed Sidebar imports as it's now global
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -22,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { BookOpen, Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, List, Download, Lightbulb, FileText, Cloud, CloudOff, Home } from 'lucide-react';
+import { BookOpen, Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, List, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu } from 'lucide-react'; // Added Menu for potential use
 import Link from 'next/link';
 import type { Project, ProjectSection } from '@/types/project';
 import { COMMON_SECTIONS, TOC_SECTION_NAME } from '@/types/project';
@@ -35,51 +24,180 @@ interface ProjectEditorProps {
   projectId: string;
 }
 
+// New component for the local sidebar content (details, sections, add)
+function ProjectSidebarContent({
+    project,
+    activeSectionIndex,
+    setActiveSectionIndex,
+    addSection,
+    customSectionName,
+    setCustomSectionName,
+    handleGenerateOutline,
+    isGeneratingOutline,
+    isGenerating,
+    isSummarizing,
+    isGeneratingToc,
+    handleSaveOnline
+}: {
+    project: Project;
+    activeSectionIndex: number | null | -1;
+    setActiveSectionIndex: (index: number | -1) => void;
+    addSection: (name: string) => void;
+    customSectionName: string;
+    setCustomSectionName: (name: string) => void;
+    handleGenerateOutline: () => void;
+    isGeneratingOutline: boolean;
+    isGenerating: boolean;
+    isSummarizing: boolean;
+    isGeneratingToc: boolean;
+    handleSaveOnline: () => void;
+}) {
+     return (
+        <div className="flex flex-col h-full border-r bg-card"> {/* Use Card background */}
+            <div className="p-4 border-b">
+                 <Input
+                        id="projectTitleSidebar"
+                        value={project.title}
+                        readOnly // Title editing now in main area
+                        className="h-8 text-base font-semibold bg-transparent border-0 shadow-none focus-visible:ring-0 p-0 truncate"
+                        placeholder="Project Title"
+                        aria-label="Project Title (Readonly)"
+                    />
+            </div>
+             <ScrollArea className="flex-1 px-2 py-2">
+                 {/* Simplified menu structure */}
+                 <nav className="flex flex-col gap-1">
+                     <Button
+                         variant={activeSectionIndex === -1 ? "secondary" : "ghost"}
+                         size="sm"
+                         onClick={() => setActiveSectionIndex(-1)}
+                         className="justify-start"
+                         aria-current={activeSectionIndex === -1 ? "page" : undefined}
+                     >
+                         <Settings className="mr-2 h-4 w-4" />
+                         Project Details
+                     </Button>
+                     <Separator className="my-2" />
+                      <p className="px-2 text-xs font-semibold text-muted-foreground mb-1">SECTIONS</p>
+                       {project.sections?.map((section, index) => (
+                         <Button
+                             key={`${section.name}-${index}`}
+                             variant={activeSectionIndex === index ? "secondary" : "ghost"}
+                             size="sm"
+                             onClick={() => setActiveSectionIndex(index)}
+                             className="justify-start truncate"
+                             aria-current={activeSectionIndex === index ? "page" : undefined}
+                         >
+                             {section.name === TOC_SECTION_NAME ? <List className="mr-2 h-4 w-4 flex-shrink-0"/> : <FileText className="mr-2 h-4 w-4 flex-shrink-0"/>}
+                             <span className="truncate">{section.name}</span>
+                         </Button>
+                     ))}
+
+                     {/* Add Standard Sections */}
+                     <div className="mt-4 px-2">
+                         <p className="text-xs font-semibold text-muted-foreground mb-2">Add Standard Section</p>
+                         <div className="flex flex-col gap-1">
+                             {COMMON_SECTIONS
+                              .filter(cs => cs !== TOC_SECTION_NAME)
+                              .filter(cs => !project.sections?.some(s => s.name.toLowerCase() === cs.toLowerCase()))
+                              .map(sectionName => (
+                                 <Button key={sectionName} variant="ghost" size="sm" className="justify-start text-muted-foreground hover:text-foreground" onClick={() => addSection(sectionName)}>
+                                     {sectionName}
+                                 </Button>
+                             ))}
+                             {COMMON_SECTIONS.filter(cs => cs !== TOC_SECTION_NAME).every(cs => project.sections?.some(s => s.name.toLowerCase() === cs.toLowerCase())) && (
+                                  <p className="text-xs text-muted-foreground">All standard sections added.</p>
+                             )}
+                         </div>
+                      </div>
+
+                      {/* Add Custom Section */}
+                       <div className="mt-4 px-2">
+                         <p className="text-xs font-semibold text-muted-foreground mb-2">Add Custom Section</p>
+                         <div className="flex gap-2">
+                             <Input
+                                 value={customSectionName}
+                                 onChange={(e) => setCustomSectionName(e.target.value)}
+                                 placeholder="Section Name"
+                                 className="h-8"
+                             />
+                             <Button size="sm" onClick={() => addSection(customSectionName)} disabled={!customSectionName.trim()}>Add</Button>
+                         </div>
+                       </div>
+                 </nav>
+             </ScrollArea>
+             <div className="p-4 border-t space-y-2">
+                 <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleGenerateOutline}
+                    disabled={isGeneratingOutline || isGenerating || isSummarizing || isGeneratingToc || !project.projectContext?.trim()}
+                    className="w-full hover:glow-accent focus-visible:glow-accent"
+                    title={!project.projectContext?.trim() ? "Add project context in Project Details first" : "Generate section outline based on project context"}
+                >
+                    {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
+                    {isGeneratingOutline ? 'Generating Outline...' : 'Generate Outline'}
+                </Button>
+                 <Button
+                     variant="outline"
+                     size="sm"
+                     onClick={handleSaveOnline}
+                     disabled={project.storageType === 'cloud'}
+                     className="w-full mt-2 hover:glow-accent focus-visible:glow-accent"
+                     title={project.storageType === 'cloud' ? "Project is saved online" : "Save project to the cloud (requires login - coming soon)"}
+                 >
+                     {project.storageType === 'cloud' ? <Cloud className="mr-2 h-4 w-4 text-green-500" /> : <CloudOff className="mr-2 h-4 w-4" />}
+                     {project.storageType === 'cloud' ? 'Saved Online' : 'Save Online'}
+                 </Button>
+                 <p className="text-xs text-muted-foreground text-center mt-2">
+                     Changes are saved automatically {project.storageType === 'local' ? 'locally' : 'to the cloud'}.
+                 </p>
+             </div>
+        </div>
+     );
+}
+
+
 export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const [projects, setProjects] = useLocalStorage<Project[]>('projects', []);
   const { toast } = useToast();
-  const [activeSectionIndex, setActiveSectionIndex] = useState<number | null | -1>(null); // -1 for Project Details, null for initial/loading
+  const [activeSectionIndex, setActiveSectionIndex] = useState<number | null | -1>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [isGeneratingToc, setIsGeneratingToc] = useState(false);
   const [isGeneratingOutline, setIsGeneratingOutline] = useState(false);
   const [customSectionName, setCustomSectionName] = useState('');
-  const [isProjectFound, setIsProjectFound] = useState<boolean | null>(null); // null: checking, true: found, false: not found
+  const [isProjectFound, setIsProjectFound] = useState<boolean | null>(null);
+  const [isLocalSidebarOpen, setIsLocalSidebarOpen] = useState(true); // State for local sidebar visibility
   const router = useRouter();
 
   // Derived state: current project
   const project = useMemo(() => {
-    // Ensure projects is an array before using .find()
     return Array.isArray(projects) ? projects.find(p => p.id === projectId) : undefined;
   }, [projects, projectId]);
 
    // Effect to check if project exists and set initial state
    useEffect(() => {
-     // Only run if projects data is loaded (not initial undefined)
      if (projects !== undefined) {
        const projectExists = Array.isArray(projects) && projects.some(p => p.id === projectId);
-       setIsProjectFound(projectExists); // Set to true or false
+       setIsProjectFound(projectExists);
 
        if (projectExists && activeSectionIndex === null) {
-           // If project found and no section is active, default to Project Details
            setActiveSectionIndex(-1);
        } else if (!projectExists && isProjectFound !== false) {
-           // If project not found, ensure state is set to false if not already
-           // (Handles edge case where project might be deleted after initial load)
            toast({
                variant: "destructive",
                title: "Project Not Found",
                description: `Project with ID ${projectId} seems missing. Returning to dashboard.`,
            });
-           // Redirect back home after a delay to allow toast to be seen
            const timer = setTimeout(() => router.push('/'), 2000);
-           return () => clearTimeout(timer); // Cleanup timer on unmount
+           return () => clearTimeout(timer);
        }
      }
-   }, [projectId, projects, isProjectFound, activeSectionIndex, toast, router]); // Depend on projects array itself
+   }, [projectId, projects, isProjectFound, activeSectionIndex, toast, router]);
 
   const updateProject = useCallback((updatedProjectData: Partial<Project>) => {
-    setProjects((prevProjects = []) => // Ensure prevProjects is an array
+    setProjects((prevProjects = []) =>
       (prevProjects || []).map(p =>
         p.id === projectId ? { ...p, ...updatedProjectData, updatedAt: new Date().toISOString() } : p
       )
@@ -102,7 +220,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
   const handleProjectDetailChange = (field: keyof Project, value: string) => {
     if (!project) return;
-    if (field === 'storageType') return; // Prevent changing storageType directly
+    if (field === 'storageType') return;
     updateProject({ [field]: value });
   };
 
@@ -125,7 +243,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     };
     const updatedSections = [...project.sections, newSection];
     updateProject({ sections: updatedSections });
-    setActiveSectionIndex(updatedSections.length - 1); // Activate the newly added section
+    setActiveSectionIndex(updatedSections.length - 1);
     setCustomSectionName('');
     toast({
       title: "Section Added",
@@ -139,8 +257,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
        const existingSectionNamesLower = new Set(project.sections.map(s => s.name.toLowerCase()));
        const newSections: ProjectSection[] = sectionNames
            .map(name => name.trim())
-           .filter(name => name) // Filter out empty names
-           .filter(name => !existingSectionNamesLower.has(name.toLowerCase())) // Filter out duplicates (case-insensitive)
+           .filter(name => name)
+           .filter(name => !existingSectionNamesLower.has(name.toLowerCase()))
            .map(name => ({
                name: name,
                prompt: `Generate the ${name} section for the project titled "${project.title}". Consider the project context: ${project.projectContext || '[No context provided]'}. [Add more specific instructions here if needed]`,
@@ -162,8 +280,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             title: "Sections Added",
             description: `${newSections.length} new sections based on the generated outline have been added.`,
        });
-       // Optionally activate the first new section:
-       // setActiveSectionIndex(project.sections.length);
    }, [project, updateProject, toast]);
 
 
@@ -184,16 +300,11 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
       if ('error' in result) throw new Error(result.error);
 
-      // Use functional update to ensure we're working with the latest state
       setProjects(currentProjects => {
-        // Handle case where currentProjects might be undefined initially
         if (!currentProjects) return [];
-
         return currentProjects.map(p => {
            if (p.id === projectId) {
-                // Ensure the project exists and the index is valid before updating
-                if (!p.sections || index >= p.sections.length) return p; // Return unchanged if invalid
-
+                if (!p.sections || index >= p.sections.length) return p;
                 const updatedSections = [...p.sections];
                 updatedSections[index] = {
                     ...updatedSections[index],
@@ -205,7 +316,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
            return p;
         });
       });
-
 
       toast({
         title: "Section Generated",
@@ -276,10 +386,9 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         const tocContent = result.tableOfContents;
         const now = new Date().toISOString();
 
-        // Use functional update for safety
         setProjects(currentProjects => {
              if (!currentProjects) return [];
-             let tocSectionIndexResult = -1; // To store the index for setActiveSectionIndex outside map
+             let tocSectionIndexResult = -1;
              let sectionAdded = false;
 
              const updatedProjects = currentProjects.map(p => {
@@ -291,17 +400,16 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                         updatedSections[tocSectionIndex] = { ...updatedSections[tocSectionIndex], content: tocContent, lastGenerated: now };
                     } else {
                         const newTocSection: ProjectSection = { name: TOC_SECTION_NAME, prompt: "Table of Contents generated by AI.", content: tocContent, lastGenerated: now };
-                        updatedSections.unshift(newTocSection); // Add to the beginning
+                        updatedSections.unshift(newTocSection);
                         tocSectionIndex = 0;
                         sectionAdded = true;
                     }
-                    tocSectionIndexResult = tocSectionIndex; // Store the index
+                    tocSectionIndexResult = tocSectionIndex;
                     return { ...p, sections: updatedSections, updatedAt: now };
                 }
                 return p;
             });
 
-            // After state update, trigger the UI updates
              requestAnimationFrame(() => {
                  toast({
                      title: "Table of Contents Generated",
@@ -338,7 +446,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
           if ('error' in result) throw new Error(result.error);
           if (!result.suggestedSections?.length) throw new Error("AI did not return any suggested sections.");
 
-          addMultipleSections(result.suggestedSections); // Use the callback version
+          addMultipleSections(result.suggestedSections);
 
       } catch (error) {
           console.error("Outline generation failed:", error);
@@ -346,7 +454,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
       } finally {
           setIsGeneratingOutline(false);
       }
-  }, [project, isGenerating, isSummarizing, isGeneratingToc, isGeneratingOutline, toast, addMultipleSections]); // Added dependencies
+  }, [project, isGenerating, isSummarizing, isGeneratingToc, isGeneratingOutline, toast, addMultipleSections, setActiveSectionIndex]); // Added setActiveSectionIndex
 
 
   const handleSaveOnline = () => {
@@ -365,162 +473,66 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
      }
    };
 
-
    // --- Render Logic ---
 
-   // 1. Initial checking state
    if (isProjectFound === null) {
-     return ( <div className="flex flex-col items-center justify-center min-h-screen text-center p-4"><Loader2 className="h-16 w-16 animate-spin text-primary mb-4" /><p className="text-lg text-muted-foreground">Loading project...</p></div> );
+     return ( <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,60px))] text-center p-4"><Loader2 className="h-16 w-16 animate-spin text-primary mb-4" /><p className="text-lg text-muted-foreground">Loading project...</p></div> );
    }
 
-   // 2. Project explicitly not found
-   if (isProjectFound === false) {
-     return ( <div className="flex flex-col items-center justify-center min-h-screen text-center p-4"><CloudOff className="h-16 w-16 text-destructive mb-4" /><h2 className="text-2xl font-semibold text-destructive mb-2">Project Not Found</h2><p className="text-muted-foreground mb-6">The project with ID <code className="bg-muted px-1 rounded">{projectId}</code> could not be found. It might have been deleted or the link is incorrect.</p><Button onClick={() => router.push('/')}><Home className="mr-2 h-4 w-4" /> Go to Dashboard</Button></div> );
+   if (isProjectFound === false || !project) { // Combine checks for safety
+     // Show the "Not Found" message only if isProjectFound is definitively false
+      if (isProjectFound === false) {
+         return ( <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,60px))] text-center p-4"><CloudOff className="h-16 w-16 text-destructive mb-4" /><h2 className="text-2xl font-semibold text-destructive mb-2">Project Not Found</h2><p className="text-muted-foreground mb-6">The project with ID <code className="bg-muted px-1 rounded">{projectId}</code> could not be found. It might have been deleted or the link is incorrect.</p><Button onClick={() => router.push('/')}><Home className="mr-2 h-4 w-4" /> Go to Dashboard</Button></div> );
+      }
+       // If isProjectFound is null or true but project is missing, show loading
+       return ( <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,60px))] text-center p-4"><Loader2 className="h-16 w-16 animate-spin text-primary mb-4" /><p className="text-lg text-muted-foreground">Finalizing project data...</p><Button onClick={() => router.push('/')} className="mt-4"><Home className="mr-2 h-4 w-4" /> Go to Dashboard</Button></div> );
    }
 
-   // 3. Project found, but `project` object might still be momentarily undefined during hydration/update
-   //    or if `projects` array is updated by the hook listener.
-   if (!project) {
-       // This state indicates `isProjectFound` was true, but the `project` object isn't available *yet*.
-       // Show a more specific loading state.
-       return ( <div className="flex flex-col items-center justify-center min-h-screen text-center p-4"><Loader2 className="h-16 w-16 animate-spin text-primary mb-4" /><p className="text-lg text-muted-foreground">Finalizing project data...</p><Button onClick={() => router.push('/')} className="mt-4"><Home className="mr-2 h-4 w-4" /> Go to Dashboard</Button></div> );
-   }
-
-   // --- Project is guaranteed to exist from here ---
    const activeSection = activeSectionIndex !== null && activeSectionIndex >= 0 && activeSectionIndex < project.sections.length
     ? project.sections[activeSectionIndex]
     : null;
 
-
   return (
-    <SidebarProvider defaultOpen={true}>
-      <div className="flex min-h-screen">
-        {/* --- Sidebar --- */}
-        <Sidebar side="left" collapsible="icon" className="border-r bg-sidebar text-sidebar-foreground">
-          <SidebarHeader className="p-4">
-             <div className="flex items-center justify-between">
-                 <Link href="/" passHref legacyBehavior>
-                    <Button variant="ghost" size="sm" className="text-sidebar-primary hover:bg-sidebar-accent">
-                        <ChevronLeft className="mr-1 h-4 w-4"/> Back
-                    </Button>
-                 </Link>
-                <h2 className="font-semibold text-lg text-sidebar-primary group-data-[state=collapsed]:hidden text-glow-primary">
-                  Project Forge
-                </h2>
-            </div>
-          </SidebarHeader>
-
-           <Separator className="mb-2 bg-sidebar-border" />
-
-          <SidebarContent>
-            <ScrollArea className="h-full px-2">
-                 {/* Project Title Input - visible only when expanded */}
-                 <div className="mb-4 group-data-[state=collapsed]:hidden px-2">
-                    <Label htmlFor="projectTitleSidebar" className="text-xs font-medium text-sidebar-foreground/70">Project Title</Label>
-                    <Input
-                        id="projectTitleSidebar"
-                        value={project.title} // Safely access title
-                        onChange={(e) => handleProjectDetailChange('title', e.target.value)}
-                        className="h-8 mt-1 text-base bg-input text-input-foreground border-sidebar-border focus-visible:ring-sidebar-ring"
-                        placeholder="Enter Project Title"
-                    />
-                 </div>
-
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    onClick={() => setActiveSectionIndex(-1)}
-                    isActive={activeSectionIndex === -1}
-                    tooltip="Project Details"
-                    className="text-sidebar-foreground hover:bg-sidebar-accent data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground"
-                  >
-                    <Settings />
-                    <span className="group-data-[state=collapsed]:hidden">Project Details</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                 <Separator className="my-2 bg-sidebar-border" />
-                <p className="px-4 text-xs font-semibold text-sidebar-foreground/70 mb-1 group-data-[state=collapsed]:hidden">SECTIONS</p>
-                {project.sections?.map((section, index) => ( // Safely map sections
-                  <SidebarMenuItem key={`${section.name}-${index}`}> {/* Use a more stable key if possible */}
-                    <SidebarMenuButton
-                      onClick={() => setActiveSectionIndex(index)}
-                      isActive={activeSectionIndex === index}
-                      tooltip={section.name}
-                      className="text-sidebar-foreground hover:bg-sidebar-accent data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground"
-                    >
-                      {section.name === TOC_SECTION_NAME ? <List /> : <FileText />}
-                      <span className="group-data-[state=collapsed]:hidden">{section.name}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-
-                 {/* Add Standard Sections */}
-                 <div className="mt-4 group-data-[state=collapsed]:hidden px-2">
-                    <p className="text-xs font-semibold text-sidebar-foreground/70 mb-2">Add Standard Section</p>
-                    <div className="flex flex-col gap-1">
-                        {COMMON_SECTIONS
-                         .filter(cs => cs !== TOC_SECTION_NAME)
-                         .filter(cs => !project.sections?.some(s => s.name.toLowerCase() === cs.toLowerCase())) // Safe check
-                         .map(sectionName => (
-                            <Button key={sectionName} variant="ghost" size="sm" className="justify-start text-sidebar-foreground/80 hover:text-sidebar-accent-foreground hover:bg-sidebar-accent" onClick={() => addSection(sectionName)}>
-                                {sectionName}
-                            </Button>
-                        ))}
-                        {COMMON_SECTIONS.filter(cs => cs !== TOC_SECTION_NAME).every(cs => project.sections?.some(s => s.name.toLowerCase() === cs.toLowerCase())) && ( // Safe check
-                             <p className="text-xs text-sidebar-foreground/60">All standard sections added.</p>
-                        )}
-                    </div>
-                 </div>
-
-                 {/* Add Custom Section */}
-                  <div className="mt-4 group-data-[state=collapsed]:hidden px-2">
-                    <p className="text-xs font-semibold text-sidebar-foreground/70 mb-2">Add Custom Section</p>
-                    <div className="flex gap-2">
-                        <Input
-                            value={customSectionName}
-                            onChange={(e) => setCustomSectionName(e.target.value)}
-                            placeholder="Section Name"
-                            className="h-8 bg-input text-input-foreground border-sidebar-border focus-visible:ring-sidebar-ring"
-                        />
-                        <Button size="sm" onClick={() => addSection(customSectionName)} disabled={!customSectionName.trim()} className="bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90">Add</Button>
-                    </div>
-                  </div>
-              </SidebarMenu>
-            </ScrollArea>
-          </SidebarContent>
-           <SidebarFooter className="p-4 border-t border-sidebar-border group-data-[state=collapsed]:hidden">
-               <Button
-                   variant="outline"
-                   size="sm"
-                   onClick={handleGenerateOutline}
-                   disabled={isGeneratingOutline || isGenerating || isSummarizing || isGeneratingToc || !project.projectContext?.trim()} // Safe check
-                   className="w-full hover:glow-accent focus-visible:glow-accent"
-                   title={!project.projectContext?.trim() ? "Add project context in Project Details first" : "Generate section outline based on project context"} // Safe check
-               >
-                   {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
-                   {isGeneratingOutline ? 'Generating Outline...' : 'Generate Outline'}
-               </Button>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleSaveOnline}
-                    disabled={project.storageType === 'cloud'} // Safe check
-                    className="w-full mt-2 hover:glow-accent focus-visible:glow-accent"
-                    title={project.storageType === 'cloud' ? "Project is saved online" : "Save project to the cloud (requires login - coming soon)"} // Safe check
-                >
-                    {project.storageType === 'cloud' ? <Cloud className="mr-2 h-4 w-4 text-green-500" /> : <CloudOff className="mr-2 h-4 w-4" />}
-                    {project.storageType === 'cloud' ? 'Saved Online' : 'Save Online'}
-                </Button>
-                <p className="text-xs text-sidebar-foreground/70 text-center mt-2">
-                    Changes are saved automatically {project.storageType === 'local' ? 'locally' : 'to the cloud'}.
-                </p>
-           </SidebarFooter>
-        </Sidebar>
+    // Removed SidebarProvider and outer div
+    <div className="flex h-full"> {/* Use full height */}
+      {/* --- Local Project Sidebar --- */}
+      <div className={cn(
+          "transition-all duration-300 ease-in-out overflow-hidden",
+           isLocalSidebarOpen ? "w-64" : "w-0" // Adjust width based on state
+         )}
+         aria-hidden={!isLocalSidebarOpen}
+         >
+         <ProjectSidebarContent
+            project={project}
+            activeSectionIndex={activeSectionIndex}
+            setActiveSectionIndex={setActiveSectionIndex}
+            addSection={addSection}
+            customSectionName={customSectionName}
+            setCustomSectionName={setCustomSectionName}
+            handleGenerateOutline={handleGenerateOutline}
+            isGeneratingOutline={isGeneratingOutline}
+            isGenerating={isGenerating}
+            isSummarizing={isSummarizing}
+            isGeneratingToc={isGeneratingToc}
+            handleSaveOnline={handleSaveOnline}
+         />
+      </div>
 
         {/* --- Main Content Area --- */}
-        <SidebarInset className="flex-1 flex flex-col bg-background">
-           <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/95 backdrop-blur-sm px-4 lg:h-[60px] lg:px-6">
-               <SidebarTrigger className="md:hidden text-foreground" />
+       <div className="flex-1 flex flex-col overflow-hidden"> {/* Allow main content to scroll */}
+            {/* Sticky Header for Main Content */}
+           <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/95 backdrop-blur-sm px-4 lg:px-6 flex-shrink-0">
+                {/* Button to toggle local sidebar */}
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setIsLocalSidebarOpen(!isLocalSidebarOpen)}
+                    className="text-foreground"
+                    aria-label={isLocalSidebarOpen ? "Collapse project menu" : "Expand project menu"}
+                >
+                    <Menu className="h-5 w-5" />
+                </Button>
+
                <h1 className="flex-1 text-lg font-semibold md:text-xl text-primary truncate text-glow-primary">
                 {activeSectionIndex === -1 ? 'Project Details' : activeSection?.name ?? project.title ?? 'Project'}
                </h1>
@@ -532,9 +544,9 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                    variant="outline"
                    size="sm"
                    onClick={handleGenerateToc}
-                   disabled={isGeneratingToc || isGenerating || isSummarizing || isGeneratingOutline || !project.sections || project.sections.filter(s => s.name !== TOC_SECTION_NAME).length === 0} // Safe check
+                   disabled={isGeneratingToc || isGenerating || isSummarizing || isGeneratingOutline || !project.sections || project.sections.filter(s => s.name !== TOC_SECTION_NAME).length === 0}
                    className="hover:glow-accent focus-visible:glow-accent"
-                   title={!project.sections || project.sections.filter(s => s.name !== TOC_SECTION_NAME).length === 0 ? "Add sections before generating ToC" : "Generate Table of Contents"} // Safe check
+                   title={!project.sections || project.sections.filter(s => s.name !== TOC_SECTION_NAME).length === 0 ? "Add sections before generating ToC" : "Generate Table of Contents"}
                >
                    {isGeneratingToc ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <List className="mr-2 h-4 w-4" />}
                    {isGeneratingToc ? 'Generating ToC...' : 'Generate ToC'}
@@ -550,7 +562,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                </Button>
            </header>
 
-          <ScrollArea className="flex-1 p-4 md:p-6">
+          <ScrollArea className="flex-1 p-4 md:p-6"> {/* Make content scrollable */}
             {activeSectionIndex === -1 ? (
                 // Project Details Form
                 <Card className="shadow-md">
@@ -559,37 +571,34 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                         <CardDescription>Edit general information about your project. Providing context helps the AI generate a relevant outline and content.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                         {/* Title */}
                          <div>
                             <Label htmlFor="projectTitleMain">Project Title *</Label>
                             <Input
                                 id="projectTitleMain"
-                                value={project.title} // Safe access
+                                value={project.title}
                                 onChange={(e) => handleProjectDetailChange('title', e.target.value)}
                                 placeholder="Enter Project Title"
                                 className="mt-1 focus-visible:glow-primary"
-                                required // Basic HTML required validation
+                                required
                             />
                         </div>
-                        {/* Context */}
                         <div>
                             <Label htmlFor="projectContext">Project Context</Label>
                             <Textarea
                                 id="projectContext"
-                                value={project.projectContext} // Safe access
+                                value={project.projectContext}
                                 onChange={(e) => handleProjectDetailChange('projectContext', e.target.value)}
                                 placeholder="Briefly describe your project, its goals, scope, and key features or technologies involved. This helps the AI generate a relevant outline and content."
                                 className="mt-1 min-h-[120px] focus-visible:glow-primary"
                             />
                             <p className="text-xs text-muted-foreground mt-1">This context is used by the AI to generate the initial project outline.</p>
                         </div>
-                        {/* Team & College Info in a Grid */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <Label htmlFor="teamDetails">Team Details</Label>
                                 <Textarea
                                     id="teamDetails"
-                                    value={project.teamDetails} // Safe access
+                                    value={project.teamDetails}
                                     onChange={(e) => handleProjectDetailChange('teamDetails', e.target.value)}
                                     placeholder="Enter team member names and IDs, one per line"
                                     className="mt-1 min-h-[80px] focus-visible:glow-primary"
@@ -599,7 +608,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                                 <Label htmlFor="collegeInfo">College Information</Label>
                                 <Input
                                     id="collegeInfo"
-                                    value={project.collegeInfo} // Safe access
+                                    value={project.collegeInfo}
                                     onChange={(e) => handleProjectDetailChange('collegeInfo', e.target.value)}
                                     placeholder="Enter College Name"
                                     className="mt-1 focus-visible:glow-primary"
@@ -612,9 +621,9 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                              variant="default"
                              size="sm"
                              onClick={handleGenerateOutline}
-                             disabled={isGeneratingOutline || isGenerating || isSummarizing || isGeneratingToc || !project.projectContext?.trim()} // Safe check
+                             disabled={isGeneratingOutline || isGenerating || isSummarizing || isGeneratingToc || !project.projectContext?.trim()}
                              className="hover:glow-primary focus-visible:glow-primary"
-                             title={!project.projectContext?.trim() ? "Add project context above first" : "Generate section outline based on project context"} // Safe check
+                             title={!project.projectContext?.trim() ? "Add project context above first" : "Generate section outline based on project context"}
                          >
                              {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
                              {isGeneratingOutline ? 'Generating Outline...' : 'Generate Section Outline'}
@@ -666,7 +675,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                            value={activeSection.content}
                            onChange={(e) => handleSectionContentChange(activeSectionIndex, e.target.value)}
                            placeholder={activeSection.name === TOC_SECTION_NAME ? "Table of Contents will appear here." : "Generated content will appear here. You can also write manually."}
-                           className="min-h-[400px] text-base focus-visible:glow-primary" // Increased min-height
+                           className="min-h-[400px] text-base focus-visible:glow-primary"
                          />
                     </CardContent>
                      {activeSection.name !== TOC_SECTION_NAME && (
@@ -687,7 +696,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             ) : (
                // Initial State - No Section Selected or Empty Project
                <div className="flex items-center justify-center h-full">
-                    {project.sections && project.sections.length > 0 ? ( // Safe check
+                    {project.sections && project.sections.length > 0 ? (
                        <p className="text-muted-foreground text-lg">Select a section from the sidebar or add a new one.</p>
                     ) : (
                        <Card className="text-center py-8 px-6 max-w-md mx-auto shadow-md">
@@ -703,9 +712,9 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                                     variant="default"
                                     size="sm"
                                     onClick={handleGenerateOutline}
-                                    disabled={isGeneratingOutline || isGenerating || isSummarizing || isGeneratingToc || !project.projectContext?.trim()} // Safe check
+                                    disabled={isGeneratingOutline || isGenerating || isSummarizing || isGeneratingToc || !project.projectContext?.trim()}
                                     className="hover:glow-primary focus-visible:glow-primary"
-                                    title={!project.projectContext?.trim() ? "Add project context in Project Details first" : "Generate section outline based on project context"} // Safe check
+                                    title={!project.projectContext?.trim() ? "Add project context in Project Details first" : "Generate section outline based on project context"}
                                 >
                                     {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
                                     {isGeneratingOutline ? 'Generating Outline...' : 'Generate Outline'}
@@ -717,9 +726,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                </div>
             )}
           </ScrollArea>
-        </SidebarInset>
-      </div>
-    </SidebarProvider>
+        </div> {/* End Main Content Area */}
+    </div>
   );
 }
-
+```
