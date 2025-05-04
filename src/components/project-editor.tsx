@@ -12,10 +12,10 @@ import { Separator } from '@/components/ui/separator';
 import { BookOpen, Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, List, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles } from 'lucide-react'; // Replaced MessageSquareQuestion with MessageSquareQuote
 import Link from 'next/link';
 import type { Project, ProjectSection } from '@/types/project';
-import { COMMON_SECTIONS, TOC_SECTION_NAME } from '@/types/project';
+import { COMMON_SECTIONS } from '@/types/project'; // Removed TOC_SECTION_NAME import
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { useToast } from '@/hooks/use-toast';
-import { generateSectionAction, summarizeSectionAction, generateTocAction, generateOutlineAction, suggestImprovementsAction } from '@/app/actions'; // Added suggestImprovementsAction
+import { generateSectionAction, summarizeSectionAction, generateOutlineAction, suggestImprovementsAction } from '@/app/actions'; // Removed generateTocAction, added generateOutlineAction
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger, SheetClose } from "@/components/ui/sheet";
@@ -38,15 +38,15 @@ function ProjectSidebarContent({
     addSection,
     customSectionName,
     setCustomSectionName,
-    handleGenerateOutline,
+    handleGenerateOutlineClick, // Renamed prop
     isGeneratingOutline,
     isGenerating,
     isSummarizing,
-    isGeneratingToc,
+    // Removed isGeneratingToc
     handleSaveOnline,
-    canUndo, // Added prop
-    handleUndo, // Added prop
-    onCloseSheet // Added prop to close the sheet on mobile
+    canUndo,
+    handleUndo,
+    onCloseSheet
 }: {
     project: Project;
     activeSectionIndex: number | null | -1;
@@ -54,15 +54,15 @@ function ProjectSidebarContent({
     addSection: (name: string) => void;
     customSectionName: string;
     setCustomSectionName: (name: string) => void;
-    handleGenerateOutline: () => void;
+    handleGenerateOutlineClick: () => void; // Renamed prop type
     isGeneratingOutline: boolean;
     isGenerating: boolean;
     isSummarizing: boolean;
-    isGeneratingToc: boolean;
+    // Removed isGeneratingToc prop type
     handleSaveOnline: () => void;
-    canUndo: boolean; // Added type
-    handleUndo: () => void; // Added type
-    onCloseSheet?: () => void; // Optional close handler
+    canUndo: boolean;
+    handleUndo: () => void;
+    onCloseSheet?: () => void;
 }) {
      const handleSectionClick = (index: number | -1) => {
         setActiveSectionIndex(index);
@@ -116,7 +116,8 @@ function ProjectSidebarContent({
                              className="justify-start truncate"
                              aria-current={activeSectionIndex === index ? "page" : undefined}
                          >
-                             {section.name === TOC_SECTION_NAME ? <List className="mr-2 h-4 w-4 flex-shrink-0"/> : <FileText className="mr-2 h-4 w-4 flex-shrink-0"/>}
+                             {/* Removed specific icon for ToC */}
+                             <FileText className="mr-2 h-4 w-4 flex-shrink-0"/>
                              <span className="truncate">{section.name}</span>
                          </Button>
                      ))}
@@ -126,14 +127,14 @@ function ProjectSidebarContent({
                          <p className="text-xs font-semibold text-muted-foreground mb-2">Add Standard Section</p>
                          <div className="flex flex-col gap-1">
                              {COMMON_SECTIONS
-                              .filter(cs => cs !== TOC_SECTION_NAME)
+                              // Removed ToC filter
                               .filter(cs => !project.sections?.some(s => s.name.toLowerCase() === cs.toLowerCase()))
                               .map(sectionName => (
                                  <Button key={sectionName} variant="ghost" size="sm" className="justify-start text-muted-foreground hover:text-foreground" onClick={() => addSection(sectionName)}>
                                      {sectionName}
                                  </Button>
                              ))}
-                             {COMMON_SECTIONS.filter(cs => cs !== TOC_SECTION_NAME).every(cs => project.sections?.some(s => s.name.toLowerCase() === cs.toLowerCase())) && (
+                             {COMMON_SECTIONS.every(cs => project.sections?.some(s => s.name.toLowerCase() === cs.toLowerCase())) && ( // Removed ToC filter
                                   <p className="text-xs text-muted-foreground">All standard sections added.</p>
                              )}
                          </div>
@@ -158,13 +159,13 @@ function ProjectSidebarContent({
                  <Button
                     variant="outline"
                     size="sm"
-                    onClick={handleGenerateOutline}
-                    disabled={isGeneratingOutline || isGenerating || isSummarizing || isGeneratingToc || !project.projectContext?.trim()}
+                    onClick={handleGenerateOutlineClick} // Use renamed handler
+                    disabled={isGeneratingOutline || isGenerating || isSummarizing /* || isGeneratingToc */ || !project.projectContext?.trim()} // Removed isGeneratingToc
                     className="w-full hover:glow-accent focus-visible:glow-accent"
                     title={!project.projectContext?.trim() ? "Add project context in Project Details first" : "Generate section outline based on project context"}
                 >
                     {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
-                    {isGeneratingOutline ? 'Generating Outline...' : 'Generate Outline'}
+                    {isGeneratingOutline ? 'Generating Outline...' : 'Generate/Update Outline'} {/* Updated text */}
                 </Button>
                  <Button
                      variant="outline"
@@ -192,7 +193,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const [activeSectionIndex, setActiveSectionIndex] = useState<number | null | -1>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
-  const [isGeneratingToc, setIsGeneratingToc] = useState(false);
+  // Removed isGeneratingToc state
   const [isGeneratingOutline, setIsGeneratingOutline] = useState(false);
   const [isSuggesting, setIsSuggesting] = useState(false); // State for suggestion generation
   const [suggestionInput, setSuggestionInput] = useState(''); // State for suggestion text input
@@ -202,7 +203,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const [isLocalSidebarOpen, setIsLocalSidebarOpen] = useState(true); // State for local sidebar visibility (desktop)
   const [isMobileSheetOpen, setIsMobileSheetOpen] = useState(false); // State for mobile sheet visibility
   const [hasMounted, setHasMounted] = useState(false); // Track hydration
-  const [showTocContextAlert, setShowTocContextAlert] = useState(false); // State for context warning dialog
+  const [showOutlineContextAlert, setShowOutlineContextAlert] = useState(false); // Renamed from showTocContextAlert
   const router = useRouter();
 
   // Undo/Redo state
@@ -388,40 +389,78 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
      setIsMobileSheetOpen(false); // Close mobile sheet after adding
   };
 
-   const addMultipleSections = useCallback((sectionNames: string[]) => {
-       if (!project) return;
+  // Renamed: addMultipleSections to setSectionsFromOutline
+  const setSectionsFromOutline = useCallback((newSectionNames: string[]) => {
+    if (!project) return;
 
-       const existingSectionNamesLower = new Set(project.sections.map(s => s.name.toLowerCase()));
-       const newSections: ProjectSection[] = sectionNames
-           .map(name => name.trim())
-           .filter(name => name)
-           .filter(name => !existingSectionNamesLower.has(name.toLowerCase()))
-           .map(name => ({
-               name: name,
-               prompt: `Generate the ${name} section for the project titled "${project.title}". Consider the project context: ${project.projectContext || '[No context provided]'}. [Add more specific instructions here if needed]`,
-               content: '',
-               lastGenerated: undefined,
-           }));
+    const existingSectionsMap = new Map(project.sections.map(s => [s.name.toLowerCase(), s]));
+    const updatedSections: ProjectSection[] = [];
+    let addedCount = 0;
+    let preservedCount = 0;
+    let sectionOrderChanged = false;
 
-       if (newSections.length === 0) {
-            toast({
-                title: "No New Sections Added",
-                description: "The suggested sections might already exist or were empty.",
+    newSectionNames.forEach((name, index) => {
+        const trimmedName = name.trim();
+        if (!trimmedName) return; // Skip empty names
+
+        const existingSection = existingSectionsMap.get(trimmedName.toLowerCase());
+
+        if (existingSection) {
+            // Preserve existing section, update its order
+            updatedSections.push(existingSection);
+            existingSectionsMap.delete(trimmedName.toLowerCase()); // Mark as used
+            if (project.sections[index]?.name.toLowerCase() !== trimmedName.toLowerCase()) {
+                sectionOrderChanged = true; // Check if order changed
+            }
+            preservedCount++;
+        } else {
+            // Add new section
+            updatedSections.push({
+                name: trimmedName,
+                prompt: `Generate the ${trimmedName} section for the project titled "${project.title}". Consider the project context: ${project.projectContext || '[No context provided]'}. [Add more specific instructions here if needed]`,
+                content: '',
+                lastGenerated: undefined,
             });
-           return;
-       }
+            addedCount++;
+            sectionOrderChanged = true; // Adding is a change in order/content
+        }
+    });
 
-       updateProject(prev => ({ ...prev, sections: [...prev.sections, ...newSections] }));
-       toast({
-            title: "Sections Added",
-            description: `${newSections.length} new sections based on the generated outline have been added.`,
-       });
-        setIsMobileSheetOpen(false); // Close mobile sheet after adding
-   }, [project, updateProject, toast]);
+     // Check if any sections were removed (not present in new outline but existed before)
+     const sectionsRemoved = existingSectionsMap.size > 0;
+
+    if (addedCount === 0 && !sectionOrderChanged && !sectionsRemoved) {
+        toast({
+            title: "Outline Unchanged",
+            description: "The generated outline matches the current section structure.",
+        });
+        return;
+    }
+
+    updateProject(prev => ({
+        ...prev,
+        sections: updatedSections, // Replace sections entirely with the new ordered list
+    }));
+
+    let toastDescription = "Project sections have been updated based on the generated outline.";
+    if (addedCount > 0) toastDescription += ` ${addedCount} new section(s) added.`;
+    if (preservedCount > 0) toastDescription += ` ${preservedCount} existing section(s) preserved.`;
+    if (sectionsRemoved) toastDescription += ` Some sections were removed.`;
+    if (sectionOrderChanged && addedCount === 0 && !sectionsRemoved) toastDescription = "Section order has been updated based on the generated outline.";
+
+    toast({
+        title: "Project Outline Updated",
+        description: toastDescription,
+        duration: 7000, // Longer duration for more info
+    });
+    setActiveSectionIndex(0); // Go to the first section after update
+    setIsMobileSheetOpen(false); // Close mobile sheet after adding/updating
+
+}, [project, updateProject, toast, setActiveSectionIndex]);
 
 
   const handleGenerateSection = async (index: number) => {
-    if (!project || index < 0 || index >= project.sections.length || isGenerating || isSummarizing || isGeneratingToc || isGeneratingOutline || isSuggesting) return;
+    if (!project || index < 0 || index >= project.sections.length || isGenerating || isSummarizing /*|| isGeneratingToc */|| isGeneratingOutline || isSuggesting) return; // Removed isGeneratingToc
 
     const section = project.sections[index];
     setIsGenerating(true);
@@ -480,7 +519,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   };
 
   const handleSummarizeSection = async (index: number) => {
-      if (!project || index < 0 || index >= project.sections.length || isGenerating || isSummarizing || isGeneratingToc || isGeneratingOutline || isSuggesting) return;
+      if (!project || index < 0 || index >= project.sections.length || isGenerating || isSummarizing /* || isGeneratingToc */|| isGeneratingOutline || isSuggesting) return; // Removed isGeneratingToc
 
       const section = project.sections[index];
       if (!section.content?.trim()) {
@@ -504,154 +543,51 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
       }
   };
 
-  // Function to extract section names from ToC Markdown (simple example)
-  const extractSectionsFromToc = (tocContent: string): string[] => {
-    const lines = tocContent.split('\n');
-    const sections: string[] = [];
-    const sectionRegex = /^\s*[\*\-]\s*(.+)/; // Matches lines starting with * or - (markdown list items)
+  // Removed function extractSectionsFromToc
 
-    lines.forEach(line => {
-      const match = line.match(sectionRegex);
-      if (match && match[1]) {
-        // Basic cleaning: remove potential page numbers or extra formatting
-        const sectionName = match[1].replace(/\s+\(\d+\)$/, '').trim();
-        if (sectionName) {
-          sections.push(sectionName);
-        }
-      }
-    });
-    return sections;
-  };
+  // Renamed: proceedWithTocGeneration to proceedWithOutlineGeneration
+  const proceedWithOutlineGeneration = useCallback(async () => {
+    if (!project || isGenerating || isSummarizing /* || isGeneratingToc */ || isGeneratingOutline || isSuggesting) return; // Removed isGeneratingToc
 
-  const proceedWithTocGeneration = useCallback(async () => {
-    if (!project || isGenerating || isSummarizing || isGeneratingToc || isGeneratingOutline || isSuggesting) return;
-
-    const contentSections = project.sections.filter(s => s.name !== TOC_SECTION_NAME);
-     if (contentSections.length === 0) {
-         toast({ variant: "destructive", title: "Cannot Generate ToC", description: "Add some content sections first." });
-         return;
-     }
-
-    setIsGeneratingToc(true);
+    setIsGeneratingOutline(true);
     try {
-        const reportContent = contentSections
-            .map(s => `## ${s.name}\n\n${s.content}`)
-            .join('\n\n---\n\n');
+        const result = await generateOutlineAction({ projectTitle: project.title, projectContext: project.projectContext || '' });
+        if ('error' in result) throw new Error(result.error);
 
-        if (!reportContent.trim()) {
-             toast({ variant: "destructive", title: "Cannot Generate ToC", description: "No content found in project sections." });
-             setIsGeneratingToc(false);
+        if (!result.suggestedSections?.length) {
+             toast({ variant: "destructive", title: "Outline Generation Failed", description: "AI did not return any suggested sections." });
+             setIsGeneratingOutline(false);
              return;
         }
 
-        const result = await generateTocAction({ reportContent });
-        if ('error' in result) throw new Error(result.error);
-
-        const tocContent = result.tableOfContents;
-        const now = new Date().toISOString();
-        const extractedSections = extractSectionsFromToc(tocContent);
-
-        // --- Update Project State ---
-        updateProject(prev => {
-            let tocSectionIndex = prev.sections.findIndex(s => s.name === TOC_SECTION_NAME);
-            let updatedSections = [...prev.sections];
-            let sectionAdded = false;
-
-            // 1. Update or Add ToC Section
-            if (tocSectionIndex > -1) {
-                updatedSections[tocSectionIndex] = { ...updatedSections[tocSectionIndex], content: tocContent, lastGenerated: now };
-            } else {
-                const newTocSection: ProjectSection = { name: TOC_SECTION_NAME, prompt: "Table of Contents generated by AI.", content: tocContent, lastGenerated: now };
-                updatedSections.unshift(newTocSection);
-                tocSectionIndex = 0;
-                sectionAdded = true;
-            }
-
-            // 2. Add missing sections based on ToC
-            const existingSectionNamesLower = new Set(updatedSections.map(s => s.name.toLowerCase()));
-            const missingSections = extractedSections
-                .map(name => name.trim())
-                .filter(name => name && !existingSectionNamesLower.has(name.toLowerCase()))
-                .map(name => ({
-                    name: name,
-                    prompt: `Generate the ${name} section for the project titled "${prev.title}". Consider the project context: ${prev.projectContext || '[No context provided]'}. [Add more specific instructions here if needed]`,
-                    content: '',
-                    lastGenerated: undefined,
-                }));
-
-            if (missingSections.length > 0) {
-                 // Insert missing sections after the ToC section
-                 updatedSections.splice(tocSectionIndex + 1, 0, ...missingSections);
-                toast({
-                     title: "Sections Added",
-                     description: `${missingSections.length} missing sections were added based on the generated ToC.`,
-                 });
-            }
-
-             // 3. Schedule UI Updates (Toast and Active Index)
-             requestAnimationFrame(() => {
-                 toast({
-                     title: "Table of Contents Generated",
-                     description: `The "${TOC_SECTION_NAME}" section has been ${sectionAdded ? 'added' : 'updated'}.`,
-                 });
-                 setActiveSectionIndex(tocSectionIndex);
-                 setIsMobileSheetOpen(false); // Close mobile sheet after generating
-             });
-
-            return { ...prev, sections: updatedSections, updatedAt: now };
-        });
-
+        // Use the new handler to update sections based on the outline
+        setSectionsFromOutline(result.suggestedSections);
 
     } catch (error) {
-        console.error("Table of Contents generation failed:", error);
-        toast({ variant: "destructive", title: "ToC Generation Failed", description: error instanceof Error ? error.message : "Could not generate Table of Contents." });
+        console.error("Outline generation failed:", error);
+        toast({ variant: "destructive", title: "Outline Generation Failed", description: error instanceof Error ? error.message : "Could not generate project outline." });
     } finally {
-        setIsGeneratingToc(false);
+        setIsGeneratingOutline(false);
     }
-  }, [project, isGenerating, isSummarizing, isGeneratingToc, isGeneratingOutline, isSuggesting, updateProject, toast, setActiveSectionIndex]); // Added isSuggesting, updateProject
+}, [project, isGenerating, isSummarizing, /* isGeneratingToc, */ isGeneratingOutline, isSuggesting, updateProject, toast, setActiveSectionIndex, setSectionsFromOutline]); // Added dependencies
 
 
-    const handleGenerateTocClick = () => {
-        if (!project || isGenerating || isSummarizing || isGeneratingToc || isGeneratingOutline || isSuggesting) return;
+    // Renamed: handleGenerateTocClick to handleGenerateOutlineClick
+    const handleGenerateOutlineClick = () => {
+        if (!project || isGenerating || isSummarizing /* || isGeneratingToc */ || isGeneratingOutline || isSuggesting) return; // Removed isGeneratingToc
 
         const contextLength = project.projectContext?.trim().length || 0;
 
         if (contextLength < MIN_CONTEXT_LENGTH) {
-            setShowTocContextAlert(true); // Open the confirmation dialog
+            setShowOutlineContextAlert(true); // Open the confirmation dialog
         } else {
-            proceedWithTocGeneration(); // Context is sufficient, proceed directly
+            proceedWithOutlineGeneration(); // Context is sufficient, proceed directly
         }
     };
 
-  const handleGenerateOutline = useCallback(async () => {
-      if (!project || isGenerating || isSummarizing || isGeneratingToc || isGeneratingOutline || isSuggesting) return;
-
-      if (!project.projectContext?.trim()) {
-          toast({ variant: "destructive", title: "Cannot Generate Outline", description: "Please provide some project context in Project Details first." });
-          setActiveSectionIndex(-1);
-          setIsMobileSheetOpen(false); // Close mobile sheet
-          return;
-      }
-
-      setIsGeneratingOutline(true);
-      try {
-          const result = await generateOutlineAction({ projectTitle: project.title, projectContext: project.projectContext });
-          if ('error' in result) throw new Error(result.error);
-          if (!result.suggestedSections?.length) throw new Error("AI did not return any suggested sections.");
-
-          addMultipleSections(result.suggestedSections);
-
-      } catch (error) {
-          console.error("Outline generation failed:", error);
-          toast({ variant: "destructive", title: "Outline Generation Failed", description: error instanceof Error ? error.message : "Could not generate project outline." });
-      } finally {
-          setIsGeneratingOutline(false);
-      }
-  }, [project, isGenerating, isSummarizing, isGeneratingToc, isGeneratingOutline, isSuggesting, toast, addMultipleSections, setActiveSectionIndex]); // Added isSuggesting, setActiveSectionIndex
-
-    // --- AI Suggestions ---
+  // --- AI Suggestions ---
    const handleGetSuggestions = async () => {
-     if (!project || isGenerating || isSummarizing || isGeneratingToc || isGeneratingOutline || isSuggesting) return;
+     if (!project || isGenerating || isSummarizing /* || isGeneratingToc */ || isGeneratingOutline || isSuggesting) return; // Removed isGeneratingToc
 
      setIsSuggesting(true);
      setSuggestions(null); // Clear previous suggestions
@@ -743,11 +679,11 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             addSection={addSection}
             customSectionName={customSectionName}
             setCustomSectionName={setCustomSectionName}
-            handleGenerateOutline={handleGenerateOutline}
+            handleGenerateOutlineClick={handleGenerateOutlineClick} // Use renamed prop
             isGeneratingOutline={isGeneratingOutline}
             isGenerating={isGenerating}
             isSummarizing={isSummarizing}
-            isGeneratingToc={isGeneratingToc}
+            // Removed isGeneratingToc
             handleSaveOnline={handleSaveOnline}
             canUndo={canUndo} // Pass undo state
             handleUndo={handleUndo} // Pass undo handler
@@ -772,11 +708,11 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
               addSection={addSection}
               customSectionName={customSectionName}
               setCustomSectionName={setCustomSectionName}
-              handleGenerateOutline={handleGenerateOutline}
+              handleGenerateOutlineClick={handleGenerateOutlineClick} // Use renamed prop
               isGeneratingOutline={isGeneratingOutline}
               isGenerating={isGenerating}
               isSummarizing={isSummarizing}
-              isGeneratingToc={isGeneratingToc}
+              // Removed isGeneratingToc
               handleSaveOnline={handleSaveOnline}
               canUndo={canUndo} // Pass undo state
               handleUndo={handleUndo} // Pass undo handler
@@ -799,17 +735,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
               {project.storageType === 'local' ? <CloudOff className="h-4 w-4" /> : <Cloud className="h-4 w-4 text-green-500" />}
               <span>{project.storageType === 'local' ? 'Local' : 'Cloud'}</span>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleGenerateTocClick} // Use the new click handler
-              disabled={isGeneratingToc || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting || !project.sections || project.sections.filter(s => s.name !== TOC_SECTION_NAME).length === 0}
-              className="hover:glow-accent focus-visible:glow-accent"
-              title={!project.sections || project.sections.filter(s => s.name !== TOC_SECTION_NAME).length === 0 ? "Add sections before generating ToC" : "Generate Table of Contents (updates sections)"}
-            >
-              {isGeneratingToc ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <List className="mr-2 h-4 w-4" />}
-              {isGeneratingToc ? 'Generating ToC...' : 'Generate ToC'}
-            </Button>
+            {/* Removed Generate ToC Button */}
             <Button
               variant="outline"
               size="sm"
@@ -850,7 +776,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                       placeholder="Briefly describe your project, its goals, scope, and key features or technologies involved. This helps the AI generate a relevant outline and content."
                       className="mt-1 min-h-[120px] focus-visible:glow-primary"
                     />
-                    <p className="text-xs text-muted-foreground mt-1">This context is used by the AI to generate the initial project outline and can influence the Table of Contents generation.</p>
+                    <p className="text-xs text-muted-foreground mt-1">This context is used by the AI to generate the project outline.</p> {/* Updated description */}
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -934,20 +860,20 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                   <Button
                     variant="default"
                     size="sm"
-                    onClick={handleGenerateOutline}
-                    disabled={isGeneratingOutline || isGenerating || isSummarizing || isGeneratingToc || isSuggesting || !project.projectContext?.trim()}
+                    onClick={handleGenerateOutlineClick} // Use renamed handler
+                    disabled={isGeneratingOutline || isGenerating || isSummarizing /*|| isGeneratingToc*/ || isSuggesting || !project.projectContext?.trim()} // Removed isGeneratingToc
                     className="hover:glow-primary focus-visible:glow-primary"
                     title={!project.projectContext?.trim() ? "Add project context above first" : "Generate section outline based on project context"}
                   >
                     {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
-                    {isGeneratingOutline ? 'Generating Section Outline...' : 'Generate Section Outline'}
+                    {isGeneratingOutline ? 'Generating Outline...' : 'Generate/Update Outline'} {/* Updated text */}
                   </Button>
                 </CardFooter>
               </Card>
             ) : activeSection ? (
               // Section Editor
               <div className="space-y-6">
-                {activeSection.name !== TOC_SECTION_NAME && (
+                {/* Removed conditional check for TOC_SECTION_NAME */}
                   <Card className="shadow-md">
                     <CardHeader>
                       <CardTitle className="text-primary text-glow-primary">{activeSection.name} - AI Prompt</CardTitle>
@@ -966,21 +892,20 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                           className="mt-1 min-h-[100px] font-mono text-sm focus-visible:glow-primary"
                         />
                       </div>
-                      <Button onClick={() => handleGenerateSection(activeSectionIndex)} disabled={isGenerating || isSummarizing || isGeneratingToc || isGeneratingOutline || isSuggesting} className="hover:glow-primary focus-visible:glow-primary">
+                      <Button onClick={() => handleGenerateSection(activeSectionIndex)} disabled={isGenerating || isSummarizing /* || isGeneratingToc */ || isGeneratingOutline || isSuggesting} className="hover:glow-primary focus-visible:glow-primary"> {/* Removed isGeneratingToc */}
                         {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
                         {isGenerating ? 'Generating...' : 'Generate Content'}
                       </Button>
                     </CardContent>
                   </Card>
-                )}
+
 
                 <Card className="shadow-md mb-6"> {/* Added margin-bottom */}
                   <CardHeader>
                     <CardTitle>{activeSection.name} - Content</CardTitle>
                     <CardDescription>
-                      {activeSection.name === TOC_SECTION_NAME
-                        ? "This Table of Contents was generated by the AI. Generating it again may add missing sections based on its content. You can manually edit it below."
-                        : "Edit the generated or existing content below."}
+                      {/* Removed TOC-specific description */}
+                      Edit the generated or existing content below.
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -988,23 +913,23 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                       id={`section-content-${activeSectionIndex}`}
                       value={activeSection.content}
                       onChange={(e) => handleSectionContentChange(activeSectionIndex, e.target.value)}
-                      placeholder={activeSection.name === TOC_SECTION_NAME ? "Table of Contents will appear here." : "Generated content will appear here. You can also write manually."}
+                      placeholder={"Generated content will appear here. You can also write manually."} // Simplified placeholder
                       className="min-h-[400px] text-base focus-visible:glow-primary"
                     />
                   </CardContent>
-                  {activeSection.name !== TOC_SECTION_NAME && (
+                  {/* Removed conditional check for TOC_SECTION_NAME */}
                     <CardFooter className="flex justify-end">
                       <Button
                         variant="outline"
                         onClick={() => handleSummarizeSection(activeSectionIndex)}
-                        disabled={isSummarizing || isGenerating || isGeneratingToc || isGeneratingOutline || isSuggesting || !activeSection.content?.trim()}
+                        disabled={isSummarizing || isGenerating /* || isGeneratingToc */ || isGeneratingOutline || isSuggesting || !activeSection.content?.trim()} // Removed isGeneratingToc
                         className="hover:glow-accent focus-visible:glow-accent"
                       >
                         {isSummarizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ScrollText className="mr-2 h-4 w-4" />}
                         {isSummarizing ? 'Summarizing...' : 'Summarize'}
                       </Button>
                     </CardFooter>
-                  )}
+
                 </Card>
               </div>
             ) : (
@@ -1021,17 +946,17 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="mt-4 space-y-4">
-                      <p>Go to <Button variant="link" className="p-0 h-auto text-base" onClick={() => setActiveSectionIndex(-1)}>Project Details</Button> and provide some context, then click "Generate Section Outline" below or in the details section.</p>
+                      <p>Go to <Button variant="link" className="p-0 h-auto text-base" onClick={() => setActiveSectionIndex(-1)}>Project Details</Button> and provide some context, then click "Generate/Update Outline" below or in the details section.</p> {/* Updated text */}
                       <Button
                         variant="default"
                         size="sm"
-                        onClick={handleGenerateOutline}
-                        disabled={isGeneratingOutline || isGenerating || isSummarizing || isGeneratingToc || isSuggesting || !project.projectContext?.trim()}
+                        onClick={handleGenerateOutlineClick} // Use renamed handler
+                        disabled={isGeneratingOutline || isGenerating || isSummarizing /* || isGeneratingToc */ || isSuggesting || !project.projectContext?.trim()} // Removed isGeneratingToc
                         className="hover:glow-primary focus-visible:glow-primary"
                         title={!project.projectContext?.trim() ? "Add project context in Project Details first" : "Generate section outline based on project context"}
                       >
                         {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
-                        {isGeneratingOutline ? 'Generating Outline...' : 'Generate Outline'}
+                        {isGeneratingOutline ? 'Generating Outline...' : 'Generate/Update Outline'} {/* Updated text */}
                       </Button>
                       <p className="text-xs text-muted-foreground mt-3">Alternatively, you can add standard or custom sections manually using the sidebar.</p>
                     </CardContent>
@@ -1061,7 +986,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                     </div>
                     <Button
                         onClick={handleGetSuggestions}
-                        disabled={isSuggesting || isGenerating || isSummarizing || isGeneratingToc || isGeneratingOutline}
+                        disabled={isSuggesting || isGenerating || isSummarizing /* || isGeneratingToc */ || isGeneratingOutline} // Removed isGeneratingToc
                         className="hover:glow-primary focus-visible:glow-primary"
                     >
                         {isSuggesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquareQuote className="mr-2 h-4 w-4" />} {/* Use MessageSquareQuote */}
@@ -1110,20 +1035,20 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
           </ScrollArea>
         </div> {/* End Main Content Area */}
 
-        {/* Context Warning Dialog for ToC Generation */}
-        <AlertDialog open={showTocContextAlert} onOpenChange={setShowTocContextAlert}>
+        {/* Context Warning Dialog for Outline Generation */}
+        <AlertDialog open={showOutlineContextAlert} onOpenChange={setShowOutlineContextAlert}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Project Context May Be Limited</AlertDialogTitle>
               <AlertDialogDescription>
-                The project context provided is quite short. Generating a Table of Contents might be less accurate, and it might not identify all necessary sections.
+                The project context provided is quite short. Generating an outline might be less accurate.
                 Consider adding more details to the "Project Context" field in Project Details for better results.
-                Do you want to proceed with generation anyway?
+                Do you want to proceed with outline generation anyway?
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={proceedWithTocGeneration}>Generate Anyway</AlertDialogAction>
+              <AlertDialogAction onClick={proceedWithOutlineGeneration}>Generate Anyway</AlertDialogAction> {/* Use renamed handler */}
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>

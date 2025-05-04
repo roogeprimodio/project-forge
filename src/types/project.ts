@@ -22,10 +22,9 @@ export interface Project {
   storageType: 'local' | 'cloud'; // Added to indicate where the project is stored
 }
 
-// Special name for the Table of Contents section
-export const TOC_SECTION_NAME = "Table of Contents";
+// Removed TOC_SECTION_NAME constant
 
-// Predefined common sections, excluding the special ToC section
+// Predefined common sections
 export const COMMON_SECTIONS = [
   "Introduction",
   "Literature Review",
