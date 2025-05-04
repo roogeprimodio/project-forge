@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { BookOpen, Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, List, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu } from 'lucide-react'; // Added Menu
+import { BookOpen, Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, List, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu } from 'lucide-react';
 import Link from 'next/link';
 import type { Project, ProjectSection } from '@/types/project';
 import { COMMON_SECTIONS, TOC_SECTION_NAME } from '@/types/project';
@@ -17,9 +17,9 @@ import { useLocalStorage } from '@/hooks/use-local-storage';
 import { useToast } from '@/hooks/use-toast';
 import { generateSectionAction, summarizeSectionAction, generateTocAction, generateOutlineAction } from '@/app/actions';
 import { useRouter } from 'next/navigation';
-import { cn } from '@/lib/utils'; // Import cn
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet"; // Sheet components for potential mobile use - Added SheetTrigger
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"; // Import AlertDialog components
+import { cn } from '@/lib/utils';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger, SheetClose } from "@/components/ui/sheet";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 interface ProjectEditorProps {
   projectId: string;
@@ -41,7 +41,8 @@ function ProjectSidebarContent({
     isGenerating,
     isSummarizing,
     isGeneratingToc,
-    handleSaveOnline
+    handleSaveOnline,
+    onCloseSheet // Added prop to close the sheet on mobile
 }: {
     project: Project;
     activeSectionIndex: number | null | -1;
@@ -55,7 +56,13 @@ function ProjectSidebarContent({
     isSummarizing: boolean;
     isGeneratingToc: boolean;
     handleSaveOnline: () => void;
+    onCloseSheet?: () => void; // Optional close handler
 }) {
+     const handleSectionClick = (index: number | -1) => {
+        setActiveSectionIndex(index);
+        onCloseSheet?.(); // Close sheet on selection (mobile)
+     };
+
      return (
         <div className="flex flex-col h-full border-r bg-card"> {/* Use Card background */}
             <div className="p-4 border-b">
@@ -74,7 +81,7 @@ function ProjectSidebarContent({
                      <Button
                          variant={activeSectionIndex === -1 ? "secondary" : "ghost"}
                          size="sm"
-                         onClick={() => setActiveSectionIndex(-1)}
+                         onClick={() => handleSectionClick(-1)} // Use handler
                          className="justify-start"
                          aria-current={activeSectionIndex === -1 ? "page" : undefined}
                      >
@@ -88,7 +95,7 @@ function ProjectSidebarContent({
                              key={`${section.name}-${index}`}
                              variant={activeSectionIndex === index ? "secondary" : "ghost"}
                              size="sm"
-                             onClick={() => setActiveSectionIndex(index)}
+                             onClick={() => handleSectionClick(index)} // Use handler
                              className="justify-start truncate"
                              aria-current={activeSectionIndex === index ? "page" : undefined}
                          >
@@ -172,7 +179,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const [isGeneratingOutline, setIsGeneratingOutline] = useState(false);
   const [customSectionName, setCustomSectionName] = useState('');
   const [isProjectFound, setIsProjectFound] = useState<boolean | null>(null);
-  const [isLocalSidebarOpen, setIsLocalSidebarOpen] = useState(true); // State for local sidebar visibility
+  const [isLocalSidebarOpen, setIsLocalSidebarOpen] = useState(true); // State for local sidebar visibility (desktop)
+  const [isMobileSheetOpen, setIsMobileSheetOpen] = useState(false); // State for mobile sheet visibility
   const [hasMounted, setHasMounted] = useState(false); // Track hydration
   const [showTocContextAlert, setShowTocContextAlert] = useState(false); // State for context warning dialog
   const router = useRouter();
@@ -264,6 +272,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
       title: "Section Added",
       description: `"${name.trim()}" section has been added.`,
     });
+     setIsMobileSheetOpen(false); // Close mobile sheet after adding
   };
 
    const addMultipleSections = useCallback((sectionNames: string[]) => {
@@ -295,6 +304,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             title: "Sections Added",
             description: `${newSections.length} new sections based on the generated outline have been added.`,
        });
+        setIsMobileSheetOpen(false); // Close mobile sheet after adding
    }, [project, updateProject, toast]);
 
 
@@ -445,6 +455,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                  });
                  if (tocSectionIndexResult !== -1) {
                     setActiveSectionIndex(tocSectionIndexResult);
+                    setIsMobileSheetOpen(false); // Close mobile sheet after generating
                  }
              });
 
@@ -478,6 +489,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
       if (!project.projectContext?.trim()) {
           toast({ variant: "destructive", title: "Cannot Generate Outline", description: "Please provide some project context in Project Details first." });
           setActiveSectionIndex(-1);
+          setIsMobileSheetOpen(false); // Close mobile sheet
           return;
       }
 
@@ -535,34 +547,20 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
   return (
     // Main container for the editor layout
-    <div className="flex h-full"> {/* Use full height */}
+    <div className="flex h-full relative"> {/* Use full height and relative positioning for floating button */}
+
       {/* --- Local Project Sidebar (Drawer on Mobile) --- */}
-       {/* Wrap SheetTrigger and SheetContent in Sheet */}
-      <Sheet>
-        <SheetTrigger asChild>
-          <Button
-              variant="ghost"
-              size="icon"
-              className="md:hidden fixed top-3 left-2 z-20 text-foreground" // Position trigger visually
-              aria-label="Open project menu"
-          >
-              <Menu className="h-5 w-5" />
-          </Button>
-        </SheetTrigger>
-        <SheetContent side="left" className="p-0 w-64 bg-card"> {/* Apply card background */}
+      <Sheet open={isMobileSheetOpen} onOpenChange={setIsMobileSheetOpen}>
+        {/* The SheetTrigger is now the floating button */}
+        <SheetContent side="left" className="p-0 w-64 bg-card md:hidden"> {/* Hide on desktop */}
             <SheetHeader className="sr-only">
                 <SheetTitle>Project Menu</SheetTitle>
                 <SheetDescription>Navigate project sections and details</SheetDescription>
             </SheetHeader>
-            {/* Render sidebar content inside the sheet */}
             <ProjectSidebarContent
                 project={project}
                 activeSectionIndex={activeSectionIndex}
-                setActiveSectionIndex={(index) => {
-                    setActiveSectionIndex(index);
-                    // Close sheet on selection if needed (optional)
-                    // Consider using SheetClose inside the button onClick if direct closing is needed
-                }}
+                setActiveSectionIndex={setActiveSectionIndex}
                 addSection={addSection}
                 customSectionName={customSectionName}
                 setCustomSectionName={setCustomSectionName}
@@ -572,13 +570,14 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 isSummarizing={isSummarizing}
                 isGeneratingToc={isGeneratingToc}
                 handleSaveOnline={handleSaveOnline}
+                onCloseSheet={() => setIsMobileSheetOpen(false)} // Pass close handler
             />
         </SheetContent>
       </Sheet>
 
       {/* Desktop Static Sidebar */}
       <div className={cn(
-          "hidden md:block transition-all duration-300 ease-in-out overflow-y-auto overflow-x-hidden", // Hide on mobile (use Sheet instead)
+          "hidden md:block transition-all duration-300 ease-in-out overflow-y-auto overflow-x-hidden", // Hide on mobile
            isLocalSidebarOpen ? "w-64 border-r" : "w-0 border-r-0" // Adjust width and border based on state
          )}
          aria-hidden={!isLocalSidebarOpen}
@@ -598,6 +597,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 isSummarizing={isSummarizing}
                 isGeneratingToc={isGeneratingToc}
                 handleSaveOnline={handleSaveOnline}
+                // No onCloseSheet needed for desktop
              />
          )}
       </div>
@@ -606,17 +606,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
        <div className="flex-1 flex flex-col overflow-hidden"> {/* Allow main content to scroll */}
             {/* Sticky Header for Main Content */}
            <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/95 backdrop-blur-sm px-4 lg:px-6 flex-shrink-0">
-                {/* Removed Mobile Sheet Trigger from here as it's now outside with Sheet */}
-                {/* Desktop Sidebar Toggle Button */}
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setIsLocalSidebarOpen(!isLocalSidebarOpen)}
-                    className="hidden md:flex text-foreground" // Hide on mobile
-                    aria-label={isLocalSidebarOpen ? "Collapse project menu" : "Expand project menu"}
-                >
-                    <Menu className="h-5 w-5" />
-                </Button>
+                {/* Global Sidebar Trigger (only if needed, usually handled by MainLayout) */}
+                {/* <SheetTrigger asChild><Button>Global Menu</Button></SheetTrigger> */}
 
                <h1 className="flex-1 text-lg font-semibold md:text-xl text-primary truncate text-glow-primary">
                 {activeSectionIndex === -1 ? 'Project Details' : activeSection?.name ?? project.title ?? 'Project'}
@@ -647,7 +638,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                </Button>
            </header>
 
-          <ScrollArea className="flex-1 p-4 md:p-6"> {/* Make content scrollable */}
+          <ScrollArea className="flex-1 p-4 md:p-6 relative"> {/* Make content scrollable & relative for floating button */}
             {activeSectionIndex === -1 ? (
                 // Project Details Form
                 <Card className="shadow-md">
@@ -865,6 +856,32 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                     )}
                </div>
             )}
+
+            {/* Floating Action Button (FAB) for Sidebar Toggle */}
+            <div className="absolute bottom-6 right-6 z-20">
+                {/* Mobile: Sheet Trigger */}
+                <SheetTrigger asChild>
+                    <Button
+                        variant="default" // Use default style for FAB
+                        size="icon"
+                        className="rounded-full w-14 h-14 shadow-lg md:hidden hover:glow-primary focus-visible:glow-primary"
+                        aria-label="Open project menu"
+                    >
+                        <Menu className="h-6 w-6" />
+                    </Button>
+                </SheetTrigger>
+
+                {/* Desktop: Static Sidebar Toggle */}
+                 <Button
+                    variant="default" // Use default style for FAB
+                    size="icon"
+                    onClick={() => setIsLocalSidebarOpen(!isLocalSidebarOpen)}
+                    className="hidden md:flex rounded-full w-14 h-14 shadow-lg hover:glow-primary focus-visible:glow-primary"
+                    aria-label={isLocalSidebarOpen ? "Collapse project menu" : "Expand project menu"}
+                 >
+                    <Menu className="h-6 w-6" />
+                 </Button>
+            </div>
           </ScrollArea>
         </div> {/* End Main Content Area */}
 
