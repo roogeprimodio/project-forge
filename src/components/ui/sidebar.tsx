@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
-import { Sheet, SheetContent } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet" // Added SheetHeader, SheetTitle, SheetDescription
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Tooltip,
@@ -199,7 +199,7 @@ const Sidebar = React.forwardRef<
           <SheetContent
             data-sidebar="sidebar"
             data-mobile="true"
-            className="w-[--sidebar-width] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
+            className="w-[--sidebar-width] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden" // Remove default SheetContent padding
             style={
               {
                 "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
@@ -207,7 +207,15 @@ const Sidebar = React.forwardRef<
             }
             side={side}
           >
-            <div className="flex h-full w-full flex-col">{children}</div>
+            {/* Add SheetHeader for accessibility */}
+            <SheetHeader className="sr-only">
+                <SheetTitle>Project Navigation</SheetTitle>
+                <SheetDescription>Navigate between project details and report sections.</SheetDescription>
+            </SheetHeader>
+            <div className="flex h-full w-full flex-col">
+                 {/* Apply padding/structure inside this div if needed, as SheetContent padding is removed */}
+                {children}
+            </div>
           </SheetContent>
         </Sheet>
       )
