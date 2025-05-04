@@ -4,7 +4,7 @@ import type React from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { PlusCircle, Trash2 } from 'lucide-react';
+import { PlusCircle, Trash2, Cloud, CloudOff } from 'lucide-react'; // Added Cloud, CloudOff icons
 import type { Project } from '@/types/project';
 import { format } from 'date-fns';
 import { useToast } from "@/hooks/use-toast"; // Import useToast to ensure it's available if needed, although delete is handled in parent
@@ -47,7 +47,13 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, onDeleteProj
           {projects.map((project) => (
             <Card key={project.id} className="flex flex-col justify-between transition-shadow duration-200 hover:shadow-lg">
               <CardHeader>
-                <CardTitle className="text-primary truncate">{project.title || 'Untitled Project'}</CardTitle>
+                <div className="flex justify-between items-start">
+                     <CardTitle className="text-primary truncate pr-2">{project.title || 'Untitled Project'}</CardTitle>
+                     <div className="flex items-center gap-1 text-xs text-muted-foreground flex-shrink-0" title={`Stored ${project.storageType === 'local' ? 'Locally' : 'in Cloud'}`}>
+                        {project.storageType === 'local' ? <CloudOff className="h-4 w-4" /> : <Cloud className="h-4 w-4 text-green-500" />}
+                        <span>{project.storageType === 'local' ? 'Local' : 'Cloud'}</span>
+                     </div>
+                </div>
                 <CardDescription>
                   {project.updatedAt ? `Last updated: ${format(new Date(project.updatedAt), 'PPP p')}` : 'Not updated yet'}
                 </CardDescription>
@@ -80,7 +86,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, onDeleteProj
                       <AlertDialogHeader>
                         <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          This action cannot be undone. This will permanently delete the project
+                          This action cannot be undone. This will permanently delete the {project.storageType === 'local' ? 'local' : 'cloud'} project
                           "{project.title || 'Untitled Project'}" and all its data.
                         </AlertDialogDescription>
                       </AlertDialogHeader>

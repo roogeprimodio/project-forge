@@ -21,7 +21,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { BookOpen, Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, List, Download, Lightbulb, FileText } from 'lucide-react'; // Added Lightbulb, FileText icons
+import { BookOpen, Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, List, Download, Lightbulb, FileText, Cloud, CloudOff, Home } from 'lucide-react'; // Added Cloud, CloudOff, Home icons
 import Link from 'next/link';
 import type { Project, ProjectSection } from '@/types/project';
 import { COMMON_SECTIONS, TOC_SECTION_NAME } from '@/types/project'; // Import TOC_SECTION_NAME
@@ -43,23 +43,40 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const [isGeneratingToc, setIsGeneratingToc] = useState(false); // State for ToC generation
   const [isGeneratingOutline, setIsGeneratingOutline] = useState(false); // State for Outline generation
   const [customSectionName, setCustomSectionName] = useState('');
+  const [isProjectFound, setIsProjectFound] = useState<boolean | null>(null); // Track if project is found
   const router = useRouter(); // Initialize useRouter
 
   // Find the current project based on projectId
-  const project = useMemo(() => projects.find(p => p.id === projectId), [projects, projectId]);
+  const project = useMemo(() => {
+     const foundProject = projects.find(p => p.id === projectId);
+     // Use effect hook cannot be used directly inside useMemo,
+     // so we'll set the isProjectFound state in a separate useEffect.
+     return foundProject;
+   }, [projects, projectId]);
 
-  // Effect to initialize activeSectionIndex if project loads/changes
-  useEffect(() => {
-     // Default to Project Details (-1) on initial load or if project not found
-     if (!project || activeSectionIndex === null) {
-         setActiveSectionIndex(-1);
-     } else if (project && project.sections.length > 0 && activeSectionIndex === -1) {
-         // If project details were active, but sections now exist, switch to first section
-         // This prevents staying on details after outline generation
-         // setActiveSectionIndex(0); // Commented out: Keep focus on details unless user clicks section
+   // Effect to check if project exists and handle redirection/state update
+   useEffect(() => {
+     if (projects && projects.length > 0) { // Only check once projects are loaded
+       const projectExists = projects.some(p => p.id === projectId);
+       setIsProjectFound(projectExists);
+
+       if (!projectExists) {
+         toast({
+           variant: "destructive",
+           title: "Project Not Found",
+           description: "The requested project could not be loaded or doesn't exist.",
+         });
+         // No automatic redirect here, show the "Not Found" message instead.
+       } else {
+         // Project found, initialize activeSectionIndex if needed
+         if (activeSectionIndex === null) {
+           setActiveSectionIndex(-1); // Default to Project Details
+         }
+       }
      }
-   }, [project, activeSectionIndex]); // Rerun when project or activeSectionIndex changes
-
+     // If projects is empty array initially, isProjectFound remains null (loading state)
+     // If projects becomes empty later (e.g., deleted in another tab), this effect will run again.
+   }, [projectId, projects, router, toast, activeSectionIndex]); // Add dependencies
 
   const updateProject = useCallback((updatedProjectData: Partial<Project>) => {
     setProjects((prevProjects = []) => // Ensure prevProjects is an array
@@ -85,6 +102,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
   const handleProjectDetailChange = (field: keyof Project, value: string) => {
     if (!project) return;
+    // Prevent changing storageType directly via this handler
+    if (field === 'storageType') return;
     updateProject({ [field]: value });
   };
 
@@ -372,6 +391,19 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
       }
   };
 
+  // Placeholder for future "Save Online" functionality
+  const handleSaveOnline = () => {
+     if (!project) return;
+     // 1. Implement authentication if not already done.
+     // 2. Send project data to a backend API (e.g., Firestore).
+     // 3. Update the project's storageType to 'cloud'.
+     // updateProject({ storageType: 'cloud' });
+     toast({
+         title: "Save Online (Coming Soon)",
+         description: "This feature will allow you to save your project to the cloud.",
+     });
+  };
+
 
    // Navigate to the export page
    const handleNavigateToExport = () => {
@@ -381,27 +413,44 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
    };
 
 
-   if (!project) {
-    // Handle case where project is not found (e.g., deleted or invalid ID)
-    useEffect(() => {
-        toast({
-            variant: "destructive",
-            title: "Project Not Found",
-            description: "The requested project could not be loaded. Redirecting to dashboard.",
-        });
-        // Redirect back to dashboard if project is gone
-        const timer = setTimeout(() => {
-          router.push('/');
-        }, 2000); // Redirect after 2 seconds
-        return () => clearTimeout(timer); // Cleanup timer on unmount
-    }, [projectId, router]); // Add router to dependencies
+   // Render loading state while checking if project exists
+   if (isProjectFound === null) {
+     return (
+       <div className="flex flex-col items-center justify-center min-h-screen text-center p-4">
+         <Loader2 className="h-16 w-16 animate-spin text-primary mb-4" />
+         <p className="text-lg text-muted-foreground">Loading project...</p>
+       </div>
+     );
+   }
 
-    return (
-        <div className="flex flex-col items-center justify-center min-h-screen text-center p-4">
-            <Loader2 className="h-16 w-16 animate-spin text-primary mb-4" />
-            <p className="text-lg text-muted-foreground">Loading project or redirecting...</p>
-        </div>
-    );
+   // Render "Not Found" message if project doesn't exist
+   if (!isProjectFound) {
+     return (
+       <div className="flex flex-col items-center justify-center min-h-screen text-center p-4">
+         <CloudOff className="h-16 w-16 text-destructive mb-4" />
+         <h2 className="text-2xl font-semibold text-destructive mb-2">Project Not Found</h2>
+         <p className="text-muted-foreground mb-6">
+           The project with ID <code className="bg-muted px-1 rounded">{projectId}</code> could not be found. It might have been deleted or the link is incorrect.
+         </p>
+         <Button onClick={() => router.push('/')}>
+           <Home className="mr-2 h-4 w-4" /> Go to Dashboard
+         </Button>
+       </div>
+     );
+   }
+
+   // Project found, render the editor (ensure project is not null here)
+   if (!project) {
+       // This should theoretically not be reached if isProjectFound is true,
+       // but adding a safeguard.
+       return (
+         <div className="flex flex-col items-center justify-center min-h-screen text-center p-4">
+           <p className="text-lg text-muted-foreground">An unexpected error occurred loading the project.</p>
+            <Button onClick={() => router.push('/')} className="mt-4">
+                <Home className="mr-2 h-4 w-4" /> Go to Dashboard
+            </Button>
+         </div>
+       );
    }
 
 
@@ -520,8 +569,20 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                    {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
                    {isGeneratingOutline ? 'Generating Outline...' : 'Generate Outline'}
                </Button>
+                 {/* Save Online Button Placeholder */}
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSaveOnline}
+                    disabled={project.storageType === 'cloud'} // Disable if already saved online
+                    className="w-full mt-2 hover:glow-accent focus-visible:glow-accent"
+                    title={project.storageType === 'cloud' ? "Project is saved online" : "Save project to the cloud (requires login - coming soon)"}
+                >
+                    {project.storageType === 'cloud' ? <Cloud className="mr-2 h-4 w-4" /> : <CloudOff className="mr-2 h-4 w-4" />}
+                    {project.storageType === 'cloud' ? 'Saved Online' : 'Save Online'}
+                </Button>
                 <p className="text-xs text-sidebar-foreground/70 text-center mt-2">
-                    Changes are saved automatically.
+                    Changes are saved automatically {project.storageType === 'local' ? 'locally' : 'to the cloud'}.
                 </p>
            </SidebarFooter>
         </Sidebar>
@@ -533,13 +594,18 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                <h1 className="flex-1 text-lg font-semibold md:text-xl text-primary truncate text-glow-primary">
                 {activeSectionIndex === -1 ? 'Project Details' : activeSection?.name ?? project.title ?? 'Project'}
                </h1>
+               {/* Storage Indicator */}
+               <div className="flex items-center gap-1 text-xs text-muted-foreground ml-auto mr-2" title={`Project stored ${project.storageType === 'local' ? 'locally' : 'in the cloud'}`}>
+                 {project.storageType === 'local' ? <CloudOff className="h-4 w-4" /> : <Cloud className="h-4 w-4 text-green-500" />}
+                 <span>{project.storageType === 'local' ? 'Local' : 'Cloud'}</span>
+               </div>
                {/* Generate ToC Button */}
                <Button
                    variant="outline"
                    size="sm"
                    onClick={handleGenerateToc}
                    disabled={isGeneratingToc || isGenerating || isSummarizing || isGeneratingOutline || project.sections.filter(s => s.name !== TOC_SECTION_NAME).length === 0}
-                   className="hover:glow-accent focus-visible:glow-accent ml-2" // Add some margin if needed
+                   className="hover:glow-accent focus-visible:glow-accent" // Removed ml-2
                    title={project.sections.filter(s => s.name !== TOC_SECTION_NAME).length === 0 ? "Add sections before generating ToC" : "Generate Table of Contents"}
                >
                    {isGeneratingToc ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <List className="mr-2 h-4 w-4" />}
@@ -550,7 +616,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                    variant="outline"
                    size="sm"
                    onClick={handleNavigateToExport}
-                   className="hover:glow-accent focus-visible:glow-accent ml-auto" // Moved to the right
+                   className="hover:glow-accent focus-visible:glow-accent ml-2" // Added margin back here
                >
                    <Download className="mr-2 h-4 w-4" />
                    Export Report

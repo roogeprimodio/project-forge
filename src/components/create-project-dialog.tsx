@@ -48,6 +48,7 @@ export function CreateProjectDialog({ onCreateProject, children }: CreateProject
       sections: [], // Start with no sections, outline will be generated later
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      storageType: 'local', // Default to local storage
     };
     onCreateProject(newProject);
     setIsOpen(false); // Close dialog on success

@@ -14,6 +14,7 @@ export interface Project {
   sections: ProjectSection[];
   createdAt: Date | string;
   updatedAt: Date | string;
+  storageType: 'local' | 'cloud'; // Added to indicate where the project is stored
 }
 
 // Special name for the Table of Contents section
