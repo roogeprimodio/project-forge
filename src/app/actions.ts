@@ -4,6 +4,8 @@ import { generateReportSection, GenerateReportSectionInput } from '@/ai/flows/ge
 import type { GenerateReportSectionOutput } from '@/ai/flows/generate-report-section';
 import { summarizeReportSection, SummarizeReportSectionInput } from '@/ai/flows/summarize-report-section';
 import type { SummarizeReportSectionOutput } from '@/ai/flows/summarize-report-section';
+import { generateTableOfContents, GenerateTableOfContentsInput } from '@/ai/flows/generate-table-of-contents';
+import type { GenerateTableOfContentsOutput } from '@/ai/flows/generate-table-of-contents';
 
 
 /**
@@ -44,5 +46,22 @@ export async function summarizeSectionAction(input: SummarizeReportSectionInput)
   }
 }
 
-
-// Add other server actions (like generate TOC) here later if needed
+/**
+ * Server action to generate a table of contents using the AI flow.
+ * Handles potential errors during the AI call.
+ */
+export async function generateTocAction(input: GenerateTableOfContentsInput): Promise<GenerateTableOfContentsOutput | { error: string }> {
+  try {
+    console.log("Generating Table of Contents with input content length:", input.reportContent.length);
+    if (!input.reportContent || input.reportContent.trim().length === 0) {
+      return { error: "Report content is empty, cannot generate Table of Contents." };
+    }
+    const result = await generateTableOfContents(input);
+    console.log("Table of Contents generation result:", { tocLength: result.tableOfContents.length });
+    return result;
+  } catch (error) {
+    console.error("Error generating Table of Contents:", error);
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred during Table of Contents generation.";
+    return { error: errorMessage };
+  }
+}

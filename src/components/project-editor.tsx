@@ -21,13 +21,13 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { BookOpen, Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText } from 'lucide-react'; // Added ScrollText
+import { BookOpen, Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, List } from 'lucide-react'; // Added List icon
 import Link from 'next/link';
 import type { Project, ProjectSection } from '@/types/project';
-import { COMMON_SECTIONS } from '@/types/project';
+import { COMMON_SECTIONS, TOC_SECTION_NAME } from '@/types/project'; // Import TOC_SECTION_NAME
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { useToast } from '@/hooks/use-toast';
-import { generateSectionAction, summarizeSectionAction } from '@/app/actions'; // Added summarizeSectionAction
+import { generateSectionAction, summarizeSectionAction, generateTocAction } from '@/app/actions'; // Added generateTocAction
 
 interface ProjectEditorProps {
   projectId: string;
@@ -39,6 +39,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const [activeSectionIndex, setActiveSectionIndex] = useState<number | null | -1>(-1); // Start with details (-1)
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false); // State for summarization loading
+  const [isGeneratingToc, setIsGeneratingToc] = useState(false); // State for ToC generation
   const [customSectionName, setCustomSectionName] = useState('');
 
   // Find the current project based on projectId
@@ -102,7 +103,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   };
 
   const handleGenerateSection = async (index: number) => {
-    if (!project || index < 0 || index >= project.sections.length) return;
+    if (!project || index < 0 || index >= project.sections.length || isGenerating || isSummarizing || isGeneratingToc) return;
 
     const section = project.sections[index];
     setIsGenerating(true);
@@ -146,7 +147,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   };
 
   const handleSummarizeSection = async (index: number) => {
-      if (!project || index < 0 || index >= project.sections.length) return;
+      if (!project || index < 0 || index >= project.sections.length || isGenerating || isSummarizing || isGeneratingToc) return;
 
       const section = project.sections[index];
       if (!section.content || section.content.trim() === '') {
@@ -181,16 +182,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
               duration: 9000, // Longer duration for reading summary
           });
 
-          // Optional: Update section content with summary?
-          // const updatedSections = [...project.sections];
-          // updatedSections[index] = {
-          //   ...section,
-          //   content: result.summary, // Replace content with summary
-          //   // Or add a new field like 'summary': result.summary
-          // };
-          // updateProject({ sections: updatedSections });
-
-
       } catch (error) {
           console.error("Summarization failed:", error);
           toast({
@@ -202,6 +193,91 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
           setIsSummarizing(false);
       }
   };
+
+  const handleGenerateToc = async () => {
+    if (!project || isGenerating || isSummarizing || isGeneratingToc) return;
+
+    if (!project.sections || project.sections.length === 0) {
+       toast({
+         variant: "destructive",
+         title: "Cannot Generate ToC",
+         description: "Add some sections to the project first.",
+       });
+       return;
+    }
+
+    setIsGeneratingToc(true);
+
+    try {
+        // Concatenate content from all sections EXCEPT any existing ToC section
+        const reportContent = project.sections
+            .filter(s => s.name !== TOC_SECTION_NAME) // Exclude existing ToC
+            .map(s => `## ${s.name}\n\n${s.content}`) // Add section headings for context
+            .join('\n\n---\n\n'); // Separate sections clearly
+
+        if (!reportContent.trim()) {
+             toast({
+               variant: "destructive",
+               title: "Cannot Generate ToC",
+               description: "No content found in project sections.",
+             });
+             setIsGeneratingToc(false);
+             return;
+        }
+
+        const result = await generateTocAction({ reportContent });
+
+        if ('error' in result) {
+            throw new Error(result.error);
+        }
+
+        const tocContent = result.tableOfContents;
+        const now = new Date().toISOString();
+        const tocSectionIndex = project.sections.findIndex(s => s.name === TOC_SECTION_NAME);
+
+        let updatedSections = [...project.sections];
+
+        if (tocSectionIndex > -1) {
+            // Update existing ToC section
+            updatedSections[tocSectionIndex] = {
+                ...updatedSections[tocSectionIndex],
+                content: tocContent,
+                lastGenerated: now,
+            };
+        } else {
+            // Add new ToC section at the beginning
+            const newTocSection: ProjectSection = {
+                name: TOC_SECTION_NAME,
+                prompt: "Table of Contents generated by AI.", // Default prompt
+                content: tocContent,
+                lastGenerated: now,
+            };
+            updatedSections.unshift(newTocSection); // Add to the beginning
+        }
+
+        updateProject({ sections: updatedSections });
+
+        toast({
+            title: "Table of Contents Generated",
+            description: `The "${TOC_SECTION_NAME}" section has been ${tocSectionIndex > -1 ? 'updated' : 'added'}.`,
+        });
+
+        // Optional: Navigate to the ToC section after generation
+        setActiveSectionIndex(tocSectionIndex > -1 ? tocSectionIndex : 0);
+
+
+    } catch (error) {
+        console.error("Table of Contents generation failed:", error);
+        toast({
+            variant: "destructive",
+            title: "ToC Generation Failed",
+            description: error instanceof Error ? error.message : "Could not generate Table of Contents.",
+        });
+    } finally {
+        setIsGeneratingToc(false);
+    }
+  };
+
 
 
    if (!project) {
@@ -279,7 +355,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                       tooltip={section.name}
                       className="text-sidebar-foreground hover:bg-sidebar-accent data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground"
                     >
-                      <BookOpen />
+                      {/* Use List icon for Table of Contents */}
+                      {section.name === TOC_SECTION_NAME ? <List /> : <BookOpen />}
                       <span className="group-data-[state=collapsed]:hidden">{section.name}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -289,7 +366,10 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                  <div className="mt-4 group-data-[state=collapsed]:hidden px-2">
                     <p className="text-xs font-semibold text-sidebar-foreground/70 mb-2">Add Standard Section</p>
                     <div className="flex flex-col gap-1">
-                        {COMMON_SECTIONS.filter(cs => !project.sections.some(s => s.name === cs)).map(sectionName => (
+                        {COMMON_SECTIONS
+                         .filter(cs => cs !== TOC_SECTION_NAME) // Exclude ToC from standard add
+                         .filter(cs => !project.sections.some(s => s.name === cs))
+                         .map(sectionName => (
                             <Button key={sectionName} variant="ghost" size="sm" className="justify-start text-sidebar-foreground/80 hover:text-sidebar-accent-foreground hover:bg-sidebar-accent" onClick={() => addSection(sectionName)}>
                                 {sectionName}
                             </Button>
@@ -328,7 +408,17 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                <h1 className="flex-1 text-lg font-semibold md:text-xl text-primary truncate text-glow-primary">
                 {activeSectionIndex === -1 ? 'Project Details' : activeSection?.name ?? project.title ?? 'Project'}
                </h1>
-               {/* Add other header actions like download, etc. here */}
+               {/* Generate ToC Button */}
+               <Button
+                   variant="outline"
+                   size="sm"
+                   onClick={handleGenerateToc}
+                   disabled={isGeneratingToc || isGenerating || isSummarizing}
+                   className="hover:glow-accent focus-visible:glow-accent ml-auto" // Moved to the right
+               >
+                   {isGeneratingToc ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <List className="mr-2 h-4 w-4" />}
+                   {isGeneratingToc ? 'Generating ToC...' : 'Generate ToC'}
+               </Button>
            </header>
 
           {/* Main Content */}
@@ -377,59 +467,70 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             ) : activeSectionIndex !== null && activeSection ? ( // Ensure index is valid
               // Render Section Editor
               <div className="space-y-6">
-                <Card className="shadow-md">
-                    <CardHeader>
-                        <CardTitle className="text-primary text-glow-primary">{activeSection.name}</CardTitle>
-                         {activeSection.lastGenerated && (
-                             <CardDescription>
-                                Last generated: {new Date(activeSection.lastGenerated).toLocaleString()}
-                             </CardDescription>
-                         )}
-                    </CardHeader>
-                     <CardContent className="space-y-4">
-                          <div>
-                              <Label htmlFor={`section-prompt-${activeSectionIndex}`}>Generation Prompt</Label>
-                              <Textarea
-                                id={`section-prompt-${activeSectionIndex}`}
-                                value={activeSection.prompt}
-                                onChange={(e) => handleSectionPromptChange(activeSectionIndex, e.target.value)}
-                                placeholder="Enter instructions for the AI to generate this section..."
-                                className="mt-1 min-h-[100px] font-mono text-sm focus-visible:glow-primary"
-                              />
-                          </div>
-                           <Button onClick={() => handleGenerateSection(activeSectionIndex)} disabled={isGenerating || isSummarizing} className="hover:glow-primary focus-visible:glow-primary">
-                             {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
-                             {isGenerating ? 'Generating...' : 'Generate Content'}
-                           </Button>
-                     </CardContent>
-                </Card>
+                 {/* Only show prompt card if it's not the ToC section */}
+                 {activeSection.name !== TOC_SECTION_NAME && (
+                    <Card className="shadow-md">
+                        <CardHeader>
+                            <CardTitle className="text-primary text-glow-primary">{activeSection.name} - AI Prompt</CardTitle>
+                             {activeSection.lastGenerated && (
+                                 <CardDescription>
+                                    Last generated: {new Date(activeSection.lastGenerated).toLocaleString()}
+                                 </CardDescription>
+                             )}
+                        </CardHeader>
+                         <CardContent className="space-y-4">
+                              <div>
+                                  <Label htmlFor={`section-prompt-${activeSectionIndex}`}>Generation Prompt</Label>
+                                  <Textarea
+                                    id={`section-prompt-${activeSectionIndex}`}
+                                    value={activeSection.prompt}
+                                    onChange={(e) => handleSectionPromptChange(activeSectionIndex, e.target.value)}
+                                    placeholder="Enter instructions for the AI to generate this section..."
+                                    className="mt-1 min-h-[100px] font-mono text-sm focus-visible:glow-primary"
+                                  />
+                              </div>
+                               <Button onClick={() => handleGenerateSection(activeSectionIndex)} disabled={isGenerating || isSummarizing || isGeneratingToc} className="hover:glow-primary focus-visible:glow-primary">
+                                 {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
+                                 {isGenerating ? 'Generating...' : 'Generate Content'}
+                               </Button>
+                         </CardContent>
+                    </Card>
+                 )}
+
 
                  <Card className="shadow-md">
                     <CardHeader>
-                        <CardTitle>Section Content</CardTitle>
-                        <CardDescription>Edit the generated or existing content below.</CardDescription>
+                        <CardTitle>{activeSection.name} - Content</CardTitle>
+                        <CardDescription>
+                          {activeSection.name === TOC_SECTION_NAME
+                            ? "This Table of Contents was generated by the AI. You can manually edit it below."
+                            : "Edit the generated or existing content below."}
+                        </CardDescription>
                     </CardHeader>
                     <CardContent>
                          <Textarea
                            id={`section-content-${activeSectionIndex}`}
                            value={activeSection.content}
                            onChange={(e) => handleSectionContentChange(activeSectionIndex, e.target.value)}
-                           placeholder="Generated content will appear here. You can also write manually."
+                           placeholder={activeSection.name === TOC_SECTION_NAME ? "Table of Contents will appear here." : "Generated content will appear here. You can also write manually."}
                            className="min-h-[300px] text-base focus-visible:glow-primary" // Increased base text size
                          />
                     </CardContent>
-                     <CardFooter>
-                         {/* Summarize Button */}
-                         <Button
-                             variant="outline"
-                             onClick={() => handleSummarizeSection(activeSectionIndex)}
-                             disabled={isSummarizing || isGenerating || !activeSection.content?.trim()}
-                             className="hover:glow-accent focus-visible:glow-accent"
-                         >
-                           {isSummarizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ScrollText className="mr-2 h-4 w-4" />}
-                           {isSummarizing ? 'Summarizing...' : 'Summarize'}
-                         </Button>
-                     </CardFooter>
+                     {/* Only show footer with summarize button if it's not the ToC section */}
+                     {activeSection.name !== TOC_SECTION_NAME && (
+                         <CardFooter>
+                             {/* Summarize Button */}
+                             <Button
+                                 variant="outline"
+                                 onClick={() => handleSummarizeSection(activeSectionIndex)}
+                                 disabled={isSummarizing || isGenerating || isGeneratingToc || !activeSection.content?.trim()}
+                                 className="hover:glow-accent focus-visible:glow-accent"
+                             >
+                               {isSummarizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ScrollText className="mr-2 h-4 w-4" />}
+                               {isSummarizing ? 'Summarizing...' : 'Summarize'}
+                             </Button>
+                         </CardFooter>
+                      )}
                  </Card>
               </div>
             ) : (
@@ -443,3 +544,40 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     </SidebarProvider>
   );
 }
+
+```</content>
+  </change>
+  <change>
+    <file>src/types/project.ts</file>
+    <description>Add `TOC_SECTION_NAME` constant and exclude it from `COMMON_SECTIONS`.</description>
+    <content><![CDATA[export interface ProjectSection {
+  name: string;
+  prompt: string;
+  content: string;
+  lastGenerated?: Date | string;
+}
+
+export interface Project {
+  id: string;
+  title: string;
+  teamDetails: string; // Simple string for now, can be expanded later
+  collegeInfo: string; // Simple string
+  sections: ProjectSection[];
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
+// Special name for the Table of Contents section
+export const TOC_SECTION_NAME = "Table of Contents";
+
+// Predefined common sections, excluding the special ToC section
+export const COMMON_SECTIONS = [
+  "Introduction",
+  "Literature Review",
+  "Methodology",
+  "Implementation",
+  "Results and Discussion",
+  "Conclusion",
+  "References",
+  "Appendix",
+];

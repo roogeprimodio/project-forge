@@ -15,7 +15,10 @@ export interface Project {
   updatedAt: Date | string;
 }
 
-// Predefined common sections
+// Special name for the Table of Contents section
+export const TOC_SECTION_NAME = "Table of Contents";
+
+// Predefined common sections, excluding the special ToC section
 export const COMMON_SECTIONS = [
   "Introduction",
   "Literature Review",
