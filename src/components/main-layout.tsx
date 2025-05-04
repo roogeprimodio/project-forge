@@ -1,8 +1,9 @@
 // src/components/main-layout.tsx
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react'; // Added useState, useEffect
 import Link from 'next/link';
+import { useRouter } from 'next/navigation'; // To handle logout redirection
 import {
   SidebarProvider,
   Sidebar,
@@ -15,9 +16,10 @@ import {
   SidebarMenuButton,
   SidebarInset,
 } from '@/components/ui/sidebar';
-import { LayoutDashboard, User, Image as ImageIcon, Settings } from 'lucide-react'; // Added ImageIcon as placeholder for Canva
+import { LayoutDashboard, User, Image as ImageIcon, Settings, LogIn, LogOut } from 'lucide-react'; // Added LogIn, LogOut
 import { Button } from '@/components/ui/button';
-import { usePathname } from 'next/navigation'; // To highlight active link
+import { usePathname } from 'next/navigation';
+import { useToast } from '@/hooks/use-toast'; // Added useToast
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -25,7 +27,48 @@ interface MainLayoutProps {
 
 export function MainLayout({ children }: MainLayoutProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { toast } = useToast();
+  const [isLoggedIn, setIsLoggedIn] = useState(false); // Placeholder login state
+  const [hasMounted, setHasMounted] = useState(false);
 
+  useEffect(() => {
+    setHasMounted(true);
+    // Simulate checking login status (replace with real auth check)
+    // For now, assume logged in if not on login/register pages
+    setIsLoggedIn(!(pathname === '/login' || pathname === '/register'));
+  }, [pathname]);
+
+  const handleLogout = () => {
+    // Simulate logout
+    console.log('Logging out...');
+    setIsLoggedIn(false); // Update placeholder state
+    toast({
+        title: 'Logged Out',
+        description: 'You have been successfully logged out.',
+    });
+    router.push('/login'); // Redirect to login page
+  };
+
+  const handleLogin = () => {
+     router.push('/login');
+  }
+
+  // Determine if the sidebar should be shown based on the route
+  const showSidebar = !(pathname === '/login' || pathname === '/register') && hasMounted;
+
+  if (!hasMounted) {
+      // Optional: Render a loading state or null while waiting for mount
+      // This helps prevent hydration mismatches related to login state
+      return null; // Or a loading component
+  }
+
+  if (!showSidebar) {
+      // Render only children if sidebar shouldn't be shown (login/register pages)
+      return <>{children}</>;
+  }
+
+  // Render the full layout with sidebar
   return (
     <SidebarProvider defaultOpen={true}>
       <div className="flex min-h-screen">
@@ -33,16 +76,17 @@ export function MainLayout({ children }: MainLayoutProps) {
         <Sidebar side="left" collapsible="icon" className="border-r bg-sidebar text-sidebar-foreground">
           <SidebarHeader className="p-4">
              <div className="flex items-center justify-between">
-                <h2 className="font-semibold text-lg text-sidebar-primary group-data-[state=collapsed]:hidden text-glow-primary">
-                  Project Forge
-                </h2>
-                {/* Optional: Add a trigger inside header if needed when collapsed */}
+                <Link href="/" passHref legacyBehavior>
+                  <a className="font-semibold text-lg text-sidebar-primary group-data-[state=collapsed]:hidden text-glow-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring rounded">
+                    Project Forge
+                  </a>
+                </Link>
                 <SidebarTrigger className="hidden group-data-[state=collapsed]:flex text-sidebar-foreground" />
             </div>
           </SidebarHeader>
 
-          <SidebarContent>
-            <SidebarMenu>
+          <SidebarContent className="flex-1 flex flex-col"> {/* Ensure content takes available space */}
+            <SidebarMenu className="flex-1"> {/* Make menu flexible */}
               <SidebarMenuItem>
                 <Link href="/" passHref legacyBehavior>
                     <SidebarMenuButton
@@ -80,14 +124,27 @@ export function MainLayout({ children }: MainLayoutProps) {
                     </SidebarMenuButton>
                  </Link>
               </SidebarMenuItem>
+              {/* Add other menu items here */}
             </SidebarMenu>
           </SidebarContent>
 
-           <SidebarFooter className="p-4 border-t border-sidebar-border group-data-[state=collapsed]:hidden">
-                {/* Example Footer Content */}
-                <Button variant="ghost" size="sm" className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
-                    <Settings className="mr-2"/> Settings
-                </Button>
+           <SidebarFooter className="p-4 border-t border-sidebar-border">
+                {/* Show Logout if logged in, Login otherwise */}
+                {isLoggedIn ? (
+                    <Button variant="ghost" size="sm" onClick={handleLogout} className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-data-[state=collapsed]:justify-center group-data-[state=collapsed]:px-0 group-data-[state=collapsed]:aspect-square" title="Log Out">
+                        <LogOut />
+                        <span className="group-data-[state=collapsed]:hidden ml-2">Log Out</span>
+                    </Button>
+                 ) : (
+                     <Button variant="ghost" size="sm" onClick={handleLogin} className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-data-[state=collapsed]:justify-center group-data-[state=collapsed]:px-0 group-data-[state=collapsed]:aspect-square" title="Log In">
+                        <LogIn />
+                        <span className="group-data-[state=collapsed]:hidden ml-2">Log In</span>
+                    </Button>
+                 )}
+                {/* Example Settings Button (visible when expanded) */}
+                 <Button variant="ghost" size="sm" className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground mt-2 group-data-[state=collapsed]:hidden">
+                     <Settings className="mr-2"/> Settings
+                 </Button>
            </SidebarFooter>
         </Sidebar>
 
