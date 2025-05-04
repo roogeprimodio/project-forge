@@ -9,15 +9,16 @@ import type { Project } from '@/types/project';
 import { format } from 'date-fns';
 import { useToast } from "@/hooks/use-toast"; // Import useToast to ensure it's available if needed, although delete is handled in parent
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { CreateProjectDialog } from '@/components/create-project-dialog'; // Import for the empty state button
 
 
 interface ProjectListProps {
   projects: Project[];
-  onCreateProject: () => void;
+  // Removed onCreateProject: () => void; // Creation is handled by dialog on parent page
   onDeleteProject: (id: string) => void;
 }
 
-export const ProjectList: React.FC<ProjectListProps> = ({ projects, onCreateProject, onDeleteProject }) => {
+export const ProjectList: React.FC<ProjectListProps> = ({ projects, onDeleteProject }) => {
    const { toast } = useToast(); // Ensure toast is available if needed locally
 
   const handleDeleteClick = (e: React.MouseEvent, project: Project) => {
@@ -28,24 +29,17 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, onCreateProj
 
 
   return (
-    <div className="container mx-auto p-4 md:p-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl md:text-3xl font-bold text-primary">Your Projects</h1>
-        <Button onClick={onCreateProject} size="lg">
-          <PlusCircle className="mr-2" /> Create New Project
-        </Button>
-      </div>
-
+    <>
       {projects.length === 0 ? (
         <Card className="text-center py-12">
           <CardHeader>
             <CardTitle className="text-xl text-muted-foreground">No projects yet!</CardTitle>
-            <CardDescription>Click "Create New Project" to get started.</CardDescription>
+            <CardDescription>Click "Create New Project" above to get started.</CardDescription>
           </CardHeader>
           <CardContent>
-             <Button onClick={onCreateProject}>
-               <PlusCircle className="mr-2 h-4 w-4" /> Create First Project
-             </Button>
+             {/* The main create button is now in the DashboardPage, this is just a prompt */}
+              {/* We can keep a button here if needed, but it should trigger the same dialog */}
+              {/* For simplicity, removed the button here, directing user to the header button */}
           </CardContent>
         </Card>
       ) : (
@@ -61,6 +55,9 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, onCreateProj
               <CardContent>
                 <p className="text-sm text-muted-foreground">
                   {project.sections?.length || 0} sections
+                </p>
+                 <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
+                  Context: {project.projectContext || 'No context provided'}
                 </p>
               </CardContent>
               <CardFooter className="flex justify-between items-center">
@@ -103,6 +100,6 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, onCreateProj
           ))}
         </div>
       )}
-    </div>
+    </>
   );
 };

@@ -8,6 +8,7 @@ export interface ProjectSection {
 export interface Project {
   id: string;
   title: string;
+  projectContext: string; // Added field to store initial project context
   teamDetails: string; // Simple string for now, can be expanded later
   collegeInfo: string; // Simple string
   sections: ProjectSection[];

@@ -21,14 +21,14 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { BookOpen, Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, List, Download } from 'lucide-react'; // Added List and Download icons
+import { BookOpen, Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, List, Download, Lightbulb, FileText } from 'lucide-react'; // Added Lightbulb, FileText icons
 import Link from 'next/link';
 import type { Project, ProjectSection } from '@/types/project';
 import { COMMON_SECTIONS, TOC_SECTION_NAME } from '@/types/project'; // Import TOC_SECTION_NAME
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { useToast } from '@/hooks/use-toast';
-import { generateSectionAction, summarizeSectionAction, generateTocAction } from '@/app/actions'; // Added generateTocAction
-import { useRouter } from 'next/navigation'; // Import useRouter
+import { generateSectionAction, summarizeSectionAction, generateTocAction, generateOutlineAction } from '@/app/actions'; // Added generateOutlineAction
+import { useRouter } from 'next/navigation';
 
 interface ProjectEditorProps {
   projectId: string;
@@ -41,6 +41,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false); // State for summarization loading
   const [isGeneratingToc, setIsGeneratingToc] = useState(false); // State for ToC generation
+  const [isGeneratingOutline, setIsGeneratingOutline] = useState(false); // State for Outline generation
   const [customSectionName, setCustomSectionName] = useState('');
   const router = useRouter(); // Initialize useRouter
 
@@ -49,16 +50,13 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
   // Effect to initialize activeSectionIndex if project loads/changes
   useEffect(() => {
-     // Only set to 0 if currently null and project has sections
-     if (project && project.sections.length > 0 && activeSectionIndex === null) {
-       setActiveSectionIndex(0);
-     } else if (project && project.sections.length === 0 && activeSectionIndex !== -1) {
-       // If project has no sections, default to project details unless already there
-       setActiveSectionIndex(-1);
-     }
-     // If project becomes undefined (e.g., deleted), reset to -1 (Project Details)
-     if (!project) {
+     // Default to Project Details (-1) on initial load or if project not found
+     if (!project || activeSectionIndex === null) {
          setActiveSectionIndex(-1);
+     } else if (project && project.sections.length > 0 && activeSectionIndex === -1) {
+         // If project details were active, but sections now exist, switch to first section
+         // This prevents staying on details after outline generation
+         // setActiveSectionIndex(0); // Commented out: Keep focus on details unless user clicks section
      }
    }, [project, activeSectionIndex]); // Rerun when project or activeSectionIndex changes
 
@@ -92,9 +90,19 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
   const addSection = (name: string) => {
     if (!project || !name.trim()) return;
+    // Prevent adding duplicate section names
+    if (project.sections.some(s => s.name.toLowerCase() === name.trim().toLowerCase())) {
+        toast({
+            variant: "destructive",
+            title: "Section Exists",
+            description: `A section named "${name.trim()}" already exists.`,
+        });
+        return;
+    }
+
     const newSection: ProjectSection = {
       name: name.trim(),
-      prompt: `Generate the ${name.trim()} section for the project titled "${project.title}". Consider the following details: [Add specific points or requirements here]`,
+      prompt: `Generate the ${name.trim()} section for the project titled "${project.title}". Consider the following details: [Add specific points or requirements here] \n Project Context: ${project.projectContext || 'N/A'}`,
       content: '',
       lastGenerated: undefined,
     };
@@ -104,8 +112,41 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     setCustomSectionName(''); // Clear input
   };
 
+  // Function to add multiple sections, typically from outline generation
+   const addMultipleSections = (sectionNames: string[]) => {
+       if (!project) return;
+
+       const newSections: ProjectSection[] = sectionNames
+           .filter(name => name.trim()) // Ensure names are not empty
+           // Filter out sections that already exist (case-insensitive)
+           .filter(name => !project.sections.some(s => s.name.toLowerCase() === name.trim().toLowerCase()))
+           .map(name => ({
+               name: name.trim(),
+               prompt: `Generate the ${name.trim()} section for the project titled "${project.title}". Consider the project context: ${project.projectContext || '[No context provided]'}. [Add more specific instructions here if needed]`,
+               content: '',
+               lastGenerated: undefined,
+           }));
+
+       if (newSections.length === 0) {
+            toast({
+                title: "No New Sections Added",
+                description: "The suggested sections might already exist in your project.",
+            });
+           return;
+       }
+
+       const updatedSections = [...project.sections, ...newSections];
+       updateProject({ sections: updatedSections });
+       // Optionally, activate the first newly added section
+       // setActiveSectionIndex(project.sections.length);
+       toast({
+            title: "Sections Added",
+            description: `${newSections.length} new sections based on the generated outline have been added.`,
+       });
+   };
+
   const handleGenerateSection = async (index: number) => {
-    if (!project || index < 0 || index >= project.sections.length || isGenerating || isSummarizing || isGeneratingToc) return;
+    if (!project || index < 0 || index >= project.sections.length || isGenerating || isSummarizing || isGeneratingToc || isGeneratingOutline) return;
 
     const section = project.sections[index];
     setIsGenerating(true);
@@ -117,6 +158,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         prompt: section.prompt,
         teamDetails: project.teamDetails,
         collegeInfo: project.collegeInfo,
+        // Pass project context if needed by the prompt, currently not used in generate-report-section.ts prompt template
+        // projectContext: project.projectContext,
       });
 
       if ('error' in result) {
@@ -149,7 +192,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   };
 
   const handleSummarizeSection = async (index: number) => {
-      if (!project || index < 0 || index >= project.sections.length || isGenerating || isSummarizing || isGeneratingToc) return;
+      if (!project || index < 0 || index >= project.sections.length || isGenerating || isSummarizing || isGeneratingToc || isGeneratingOutline) return;
 
       const section = project.sections[index];
       if (!section.content || section.content.trim() === '') {
@@ -197,7 +240,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   };
 
   const handleGenerateToc = async () => {
-    if (!project || isGenerating || isSummarizing || isGeneratingToc) return;
+    if (!project || isGenerating || isSummarizing || isGeneratingToc || isGeneratingOutline) return;
 
     if (!project.sections || project.sections.length === 0) {
        toast({
@@ -235,9 +278,10 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
         const tocContent = result.tableOfContents;
         const now = new Date().toISOString();
-        const tocSectionIndex = project.sections.findIndex(s => s.name === TOC_SECTION_NAME);
+        let tocSectionIndex = project.sections.findIndex(s => s.name === TOC_SECTION_NAME);
 
         let updatedSections = [...project.sections];
+        let sectionAdded = false;
 
         if (tocSectionIndex > -1) {
             // Update existing ToC section
@@ -255,17 +299,19 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 lastGenerated: now,
             };
             updatedSections.unshift(newTocSection); // Add to the beginning
+            tocSectionIndex = 0; // New index is 0
+            sectionAdded = true;
         }
 
         updateProject({ sections: updatedSections });
 
         toast({
             title: "Table of Contents Generated",
-            description: `The "${TOC_SECTION_NAME}" section has been ${tocSectionIndex > -1 ? 'updated' : 'added'}.`,
+            description: `The "${TOC_SECTION_NAME}" section has been ${sectionAdded ? 'added' : 'updated'}.`,
         });
 
         // Optional: Navigate to the ToC section after generation
-        setActiveSectionIndex(tocSectionIndex > -1 ? tocSectionIndex : 0);
+        setActiveSectionIndex(tocSectionIndex);
 
 
     } catch (error) {
@@ -280,6 +326,53 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     }
   };
 
+  const handleGenerateOutline = async () => {
+      if (!project || isGenerating || isSummarizing || isGeneratingToc || isGeneratingOutline) return;
+
+      if (!project.projectContext || !project.projectContext.trim()) {
+          toast({
+              variant: "destructive",
+              title: "Cannot Generate Outline",
+              description: "Please provide some project context in the Project Details section first.",
+          });
+          setActiveSectionIndex(-1); // Navigate to project details
+          return;
+      }
+
+      setIsGeneratingOutline(true);
+
+      try {
+          const result = await generateOutlineAction({
+              projectTitle: project.title,
+              projectContext: project.projectContext,
+          });
+
+          if ('error' in result) {
+              throw new Error(result.error);
+          }
+
+          if (!result.suggestedSections || result.suggestedSections.length === 0) {
+             throw new Error("AI did not return any suggested sections.");
+          }
+
+          // Add the suggested sections to the project
+          addMultipleSections(result.suggestedSections);
+
+          // No separate toast here, addMultipleSections handles it
+
+      } catch (error) {
+          console.error("Outline generation failed:", error);
+          toast({
+              variant: "destructive",
+              title: "Outline Generation Failed",
+              description: error instanceof Error ? error.message : "Could not generate project outline.",
+          });
+      } finally {
+          setIsGeneratingOutline(false);
+      }
+  };
+
+
    // Navigate to the export page
    const handleNavigateToExport = () => {
      if (project) {
@@ -291,21 +384,30 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
    if (!project) {
     // Handle case where project is not found (e.g., deleted or invalid ID)
     useEffect(() => {
-        // Optional: Redirect after a delay or show message
-        // import { useRouter } from 'next/navigation'; const router = useRouter(); router.push('/');
-    }, []);
+        toast({
+            variant: "destructive",
+            title: "Project Not Found",
+            description: "The requested project could not be loaded. Redirecting to dashboard.",
+        });
+        // Redirect back to dashboard if project is gone
+        const timer = setTimeout(() => {
+          router.push('/');
+        }, 2000); // Redirect after 2 seconds
+        return () => clearTimeout(timer); // Cleanup timer on unmount
+    }, [projectId, router]); // Add router to dependencies
+
     return (
         <div className="flex flex-col items-center justify-center min-h-screen text-center p-4">
-            <p className="text-lg text-destructive mb-4">Project not found.</p>
-             <Link href="/" passHref legacyBehavior>
-                 <Button variant="link" className="ml-2">Go to Dashboard</Button>
-             </Link>
+            <Loader2 className="h-16 w-16 animate-spin text-primary mb-4" />
+            <p className="text-lg text-muted-foreground">Loading project or redirecting...</p>
         </div>
     );
    }
 
 
-  const activeSection = activeSectionIndex !== null && activeSectionIndex >= 0 ? project.sections[activeSectionIndex] : null;
+  const activeSection = activeSectionIndex !== null && activeSectionIndex >= 0 && activeSectionIndex < project.sections.length
+    ? project.sections[activeSectionIndex]
+    : null;
 
   return (
     <SidebarProvider defaultOpen={true}>
@@ -364,7 +466,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                       className="text-sidebar-foreground hover:bg-sidebar-accent data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground"
                     >
                       {/* Use List icon for Table of Contents */}
-                      {section.name === TOC_SECTION_NAME ? <List /> : <BookOpen />}
+                      {section.name === TOC_SECTION_NAME ? <List /> : <FileText />} {/* Changed BookOpen to FileText */}
                       <span className="group-data-[state=collapsed]:hidden">{section.name}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -376,12 +478,16 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                     <div className="flex flex-col gap-1">
                         {COMMON_SECTIONS
                          .filter(cs => cs !== TOC_SECTION_NAME) // Exclude ToC from standard add
-                         .filter(cs => !project.sections.some(s => s.name === cs))
+                         .filter(cs => !project.sections.some(s => s.name.toLowerCase() === cs.toLowerCase())) // Case-insensitive check
                          .map(sectionName => (
                             <Button key={sectionName} variant="ghost" size="sm" className="justify-start text-sidebar-foreground/80 hover:text-sidebar-accent-foreground hover:bg-sidebar-accent" onClick={() => addSection(sectionName)}>
                                 {sectionName}
                             </Button>
                         ))}
+                         {/* Show message if all standard sections are added */}
+                        {COMMON_SECTIONS.filter(cs => cs !== TOC_SECTION_NAME).every(cs => project.sections.some(s => s.name.toLowerCase() === cs.toLowerCase())) && (
+                             <p className="text-xs text-sidebar-foreground/60">All standard sections added.</p>
+                        )}
                     </div>
                  </div>
 
@@ -402,8 +508,19 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             </ScrollArea>
           </SidebarContent>
            <SidebarFooter className="p-4 border-t border-sidebar-border group-data-[state=collapsed]:hidden">
-               {/* Add save status or actions here if needed */}
-                <p className="text-xs text-sidebar-foreground/70 text-center">
+                {/* Generate Outline Button */}
+               <Button
+                   variant="outline"
+                   size="sm"
+                   onClick={handleGenerateOutline}
+                   disabled={isGeneratingOutline || isGenerating || isSummarizing || isGeneratingToc || !project.projectContext?.trim()}
+                   className="w-full hover:glow-accent focus-visible:glow-accent"
+                   title={!project.projectContext?.trim() ? "Add project context in Project Details first" : "Generate section outline based on project context"}
+               >
+                   {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
+                   {isGeneratingOutline ? 'Generating Outline...' : 'Generate Outline'}
+               </Button>
+                <p className="text-xs text-sidebar-foreground/70 text-center mt-2">
                     Changes are saved automatically.
                 </p>
            </SidebarFooter>
@@ -421,8 +538,9 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                    variant="outline"
                    size="sm"
                    onClick={handleGenerateToc}
-                   disabled={isGeneratingToc || isGenerating || isSummarizing}
+                   disabled={isGeneratingToc || isGenerating || isSummarizing || isGeneratingOutline || project.sections.filter(s => s.name !== TOC_SECTION_NAME).length === 0}
                    className="hover:glow-accent focus-visible:glow-accent ml-2" // Add some margin if needed
+                   title={project.sections.filter(s => s.name !== TOC_SECTION_NAME).length === 0 ? "Add sections before generating ToC" : "Generate Table of Contents"}
                >
                    {isGeneratingToc ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <List className="mr-2 h-4 w-4" />}
                    {isGeneratingToc ? 'Generating ToC...' : 'Generate ToC'}
@@ -446,7 +564,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 <Card className="shadow-md">
                     <CardHeader>
                         <CardTitle className="text-glow-primary">Project Details</CardTitle>
-                        <CardDescription>Edit general information about your project.</CardDescription>
+                        <CardDescription>Edit general information about your project. Providing context helps the AI.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                          <div>
@@ -457,6 +575,16 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                                 onChange={(e) => handleProjectDetailChange('title', e.target.value)}
                                 placeholder="Enter Project Title"
                                 className="mt-1 focus-visible:glow-primary"
+                            />
+                        </div>
+                        <div>
+                            <Label htmlFor="projectContext">Project Context</Label>
+                            <Textarea
+                                id="projectContext"
+                                value={project.projectContext}
+                                onChange={(e) => handleProjectDetailChange('projectContext', e.target.value)}
+                                placeholder="Briefly describe your project, its goals, scope, and key features or technologies involved. This helps the AI generate a relevant outline and content."
+                                className="mt-1 min-h-[120px] focus-visible:glow-primary"
                             />
                         </div>
                          <div>
@@ -481,6 +609,20 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                         </div>
                         {/* Add API Key input later if needed */}
                     </CardContent>
+                     <CardFooter>
+                        {/* Moved Generate Outline Button Here - more contextual */}
+                         <Button
+                             variant="default" // Make it primary action here
+                             size="sm"
+                             onClick={handleGenerateOutline}
+                             disabled={isGeneratingOutline || isGenerating || isSummarizing || isGeneratingToc || !project.projectContext?.trim()}
+                             className="hover:glow-primary focus-visible:glow-primary"
+                             title={!project.projectContext?.trim() ? "Add project context above first" : "Generate section outline based on project context"}
+                         >
+                             {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
+                             {isGeneratingOutline ? 'Generating Outline...' : 'Generate Section Outline'}
+                         </Button>
+                     </CardFooter>
                 </Card>
             ) : activeSectionIndex !== null && activeSection ? ( // Ensure index is valid
               // Render Section Editor
@@ -507,7 +649,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                                     className="mt-1 min-h-[100px] font-mono text-sm focus-visible:glow-primary"
                                   />
                               </div>
-                               <Button onClick={() => handleGenerateSection(activeSectionIndex)} disabled={isGenerating || isSummarizing || isGeneratingToc} className="hover:glow-primary focus-visible:glow-primary">
+                               <Button onClick={() => handleGenerateSection(activeSectionIndex)} disabled={isGenerating || isSummarizing || isGeneratingToc || isGeneratingOutline} className="hover:glow-primary focus-visible:glow-primary">
                                  {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
                                  {isGenerating ? 'Generating...' : 'Generate Content'}
                                </Button>
@@ -541,7 +683,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                              <Button
                                  variant="outline"
                                  onClick={() => handleSummarizeSection(activeSectionIndex)}
-                                 disabled={isSummarizing || isGenerating || isGeneratingToc || !activeSection.content?.trim()}
+                                 disabled={isSummarizing || isGenerating || isGeneratingToc || isGeneratingOutline || !activeSection.content?.trim()}
                                  className="hover:glow-accent focus-visible:glow-accent"
                              >
                                {isSummarizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ScrollText className="mr-2 h-4 w-4" />}
@@ -553,7 +695,33 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
               </div>
             ) : (
                <div className="flex items-center justify-center h-full">
-                    <p className="text-muted-foreground">Select a section from the sidebar or add a new one.</p>
+                    {project.sections.length > 0 ? (
+                       <p className="text-muted-foreground">Select a section from the sidebar or add a new one.</p>
+                    ) : (
+                       <Card className="text-center py-8 px-6">
+                           <CardHeader>
+                                <CardTitle className="text-lg text-muted-foreground">Project Outline Needed</CardTitle>
+                                <CardDescription>
+                                  Your project doesn't have any sections yet.
+                                </CardDescription>
+                           </CardHeader>
+                            <CardContent>
+                                <p className="mb-4">Go to <Button variant="link" className="p-0 h-auto" onClick={() => setActiveSectionIndex(-1)}>Project Details</Button> and provide some context, then click "Generate Section Outline".</p>
+                                <Button
+                                    variant="default"
+                                    size="sm"
+                                    onClick={handleGenerateOutline}
+                                    disabled={isGeneratingOutline || isGenerating || isSummarizing || isGeneratingToc || !project.projectContext?.trim()}
+                                    className="hover:glow-primary focus-visible:glow-primary"
+                                    title={!project.projectContext?.trim() ? "Add project context in Project Details first" : "Generate section outline based on project context"}
+                                >
+                                    {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
+                                    {isGeneratingOutline ? 'Generating Outline...' : 'Generate Outline'}
+                                </Button>
+                                <p className="text-xs text-muted-foreground mt-3">Alternatively, you can add sections manually using the sidebar.</p>
+                            </CardContent>
+                       </Card>
+                    )}
                </div>
             )}
           </ScrollArea>

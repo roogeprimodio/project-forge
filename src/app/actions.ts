@@ -6,6 +6,8 @@ import { summarizeReportSection, SummarizeReportSectionInput } from '@/ai/flows/
 import type { SummarizeReportSectionOutput } from '@/ai/flows/summarize-report-section';
 import { generateTableOfContents, GenerateTableOfContentsInput } from '@/ai/flows/generate-table-of-contents';
 import type { GenerateTableOfContentsOutput } from '@/ai/flows/generate-table-of-contents';
+import { generateProjectOutline, GenerateProjectOutlineInput } from '@/ai/flows/generate-project-outline'; // Import new flow
+import type { GenerateProjectOutlineOutput } from '@/ai/flows/generate-project-outline'; // Import new flow types
 
 
 /**
@@ -62,6 +64,27 @@ export async function generateTocAction(input: GenerateTableOfContentsInput): Pr
   } catch (error) {
     console.error("Error generating Table of Contents:", error);
     const errorMessage = error instanceof Error ? error.message : "An unknown error occurred during Table of Contents generation.";
+    return { error: errorMessage };
+  }
+}
+
+/**
+ * Server action to generate a project outline using the AI flow.
+ * Handles potential errors during the AI call.
+ */
+export async function generateOutlineAction(input: GenerateProjectOutlineInput): Promise<GenerateProjectOutlineOutput | { error: string }> {
+  try {
+    console.log("Generating project outline with input:", input);
+    if (!input.projectTitle || !input.projectContext) {
+      // Basic validation, more robust checks might be needed
+      return { error: "Project title and context are required to generate an outline." };
+    }
+    const result = await generateProjectOutline(input);
+    console.log("Outline generation result:", result);
+    return result;
+  } catch (error) {
+    console.error("Error generating project outline:", error);
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred during outline generation.";
     return { error: errorMessage };
   }
 }
