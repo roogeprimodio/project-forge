@@ -61,8 +61,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
 
   const updateProject = useCallback((updatedProjectData: Partial<Project>) => {
-    setProjects(prevProjects =>
-      prevProjects.map(p =>
+    setProjects((prevProjects = []) => // Ensure prevProjects is an array
+      (prevProjects || []).map(p =>
         p.id === projectId ? { ...p, ...updatedProjectData, updatedAt: new Date().toISOString() } : p
       )
     );
@@ -226,32 +226,32 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   return (
     <SidebarProvider defaultOpen={true}>
       <div className="flex min-h-screen">
-        <Sidebar side="left" collapsible="icon" className="border-r">
+        <Sidebar side="left" collapsible="icon" className="border-r bg-sidebar text-sidebar-foreground">
           <SidebarHeader className="p-4">
              <div className="flex items-center justify-between">
                  <Link href="/" passHref legacyBehavior>
-                    <Button variant="ghost" size="sm" className="text-primary hover:bg-accent">
+                    <Button variant="ghost" size="sm" className="text-sidebar-primary hover:bg-sidebar-accent">
                         <ChevronLeft className="mr-1 h-4 w-4"/> Back
                     </Button>
                  </Link>
-                <h2 className="font-semibold text-lg text-primary group-data-[state=collapsed]:hidden">
+                <h2 className="font-semibold text-lg text-sidebar-primary group-data-[state=collapsed]:hidden text-glow-primary">
                   Project Forge
                 </h2>
             </div>
           </SidebarHeader>
 
-           <Separator className="mb-2" />
+           <Separator className="mb-2 bg-sidebar-border" />
 
           <SidebarContent>
             <ScrollArea className="h-full px-2">
                  {/* Project Title Input - visible only when expanded */}
                  <div className="mb-4 group-data-[state=collapsed]:hidden px-2">
-                    <Label htmlFor="projectTitleSidebar" className="text-xs font-medium text-muted-foreground">Project Title</Label>
+                    <Label htmlFor="projectTitleSidebar" className="text-xs font-medium text-sidebar-foreground/70">Project Title</Label>
                     <Input
                         id="projectTitleSidebar"
                         value={project.title}
                         onChange={(e) => handleProjectDetailChange('title', e.target.value)}
-                        className="h-8 mt-1 text-base"
+                        className="h-8 mt-1 text-base bg-input text-input-foreground border-sidebar-border focus-visible:ring-sidebar-ring"
                         placeholder="Enter Project Title"
                     />
                  </div>
@@ -263,19 +263,21 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                     onClick={() => setActiveSectionIndex(-1)} // Use -1 for settings/details
                     isActive={activeSectionIndex === -1}
                     tooltip="Project Details"
+                    className="text-sidebar-foreground hover:bg-sidebar-accent data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground"
                   >
                     <Settings />
                     <span className="group-data-[state=collapsed]:hidden">Project Details</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-                 <Separator className="my-2" />
-                <p className="px-4 text-xs font-semibold text-muted-foreground mb-1 group-data-[state=collapsed]:hidden">SECTIONS</p>
+                 <Separator className="my-2 bg-sidebar-border" />
+                <p className="px-4 text-xs font-semibold text-sidebar-foreground/70 mb-1 group-data-[state=collapsed]:hidden">SECTIONS</p>
                 {project.sections.map((section, index) => (
                   <SidebarMenuItem key={index}>
                     <SidebarMenuButton
                       onClick={() => setActiveSectionIndex(index)}
                       isActive={activeSectionIndex === index}
                       tooltip={section.name}
+                      className="text-sidebar-foreground hover:bg-sidebar-accent data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground"
                     >
                       <BookOpen />
                       <span className="group-data-[state=collapsed]:hidden">{section.name}</span>
@@ -285,10 +287,10 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
                  {/* Add Standard Sections */}
                  <div className="mt-4 group-data-[state=collapsed]:hidden px-2">
-                    <p className="text-xs font-semibold text-muted-foreground mb-2">Add Standard Section</p>
+                    <p className="text-xs font-semibold text-sidebar-foreground/70 mb-2">Add Standard Section</p>
                     <div className="flex flex-col gap-1">
                         {COMMON_SECTIONS.filter(cs => !project.sections.some(s => s.name === cs)).map(sectionName => (
-                            <Button key={sectionName} variant="ghost" size="sm" className="justify-start text-muted-foreground" onClick={() => addSection(sectionName)}>
+                            <Button key={sectionName} variant="ghost" size="sm" className="justify-start text-sidebar-foreground/80 hover:text-sidebar-accent-foreground hover:bg-sidebar-accent" onClick={() => addSection(sectionName)}>
                                 {sectionName}
                             </Button>
                         ))}
@@ -297,23 +299,23 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
                  {/* Add Custom Section */}
                   <div className="mt-4 group-data-[state=collapsed]:hidden px-2">
-                    <p className="text-xs font-semibold text-muted-foreground mb-2">Add Custom Section</p>
+                    <p className="text-xs font-semibold text-sidebar-foreground/70 mb-2">Add Custom Section</p>
                     <div className="flex gap-2">
                         <Input
                             value={customSectionName}
                             onChange={(e) => setCustomSectionName(e.target.value)}
                             placeholder="Section Name"
-                            className="h-8"
+                            className="h-8 bg-input text-input-foreground border-sidebar-border focus-visible:ring-sidebar-ring"
                         />
-                        <Button size="sm" onClick={() => addSection(customSectionName)} disabled={!customSectionName.trim()}>Add</Button>
+                        <Button size="sm" onClick={() => addSection(customSectionName)} disabled={!customSectionName.trim()} className="bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90">Add</Button>
                     </div>
                   </div>
               </SidebarMenu>
             </ScrollArea>
           </SidebarContent>
-           <SidebarFooter className="p-4 border-t group-data-[state=collapsed]:hidden">
+           <SidebarFooter className="p-4 border-t border-sidebar-border group-data-[state=collapsed]:hidden">
                {/* Add save status or actions here if needed */}
-                <p className="text-xs text-muted-foreground text-center">
+                <p className="text-xs text-sidebar-foreground/70 text-center">
                     Changes are saved automatically.
                 </p>
            </SidebarFooter>
@@ -322,8 +324,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         <SidebarInset className="flex-1 flex flex-col bg-background">
            {/* Main Content Area Header */}
            <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/95 backdrop-blur-sm px-4 lg:h-[60px] lg:px-6">
-               <SidebarTrigger className="md:hidden" /> {/* Mobile toggle */}
-               <h1 className="flex-1 text-lg font-semibold md:text-xl text-primary truncate">
+               <SidebarTrigger className="md:hidden text-foreground" /> {/* Mobile toggle */}
+               <h1 className="flex-1 text-lg font-semibold md:text-xl text-primary truncate text-glow-primary">
                 {activeSectionIndex === -1 ? 'Project Details' : activeSection?.name ?? project.title ?? 'Project'}
                </h1>
                {/* Add other header actions like download, etc. here */}
@@ -333,9 +335,9 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
           <ScrollArea className="flex-1 p-4 md:p-6">
             {activeSectionIndex === -1 ? (
                 // Render Project Details/Settings Form
-                <Card>
+                <Card className="shadow-md">
                     <CardHeader>
-                        <CardTitle>Project Details</CardTitle>
+                        <CardTitle className="text-glow-primary">Project Details</CardTitle>
                         <CardDescription>Edit general information about your project.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
@@ -346,7 +348,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                                 value={project.title}
                                 onChange={(e) => handleProjectDetailChange('title', e.target.value)}
                                 placeholder="Enter Project Title"
-                                className="mt-1"
+                                className="mt-1 focus-visible:glow-primary"
                             />
                         </div>
                          <div>
@@ -356,7 +358,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                                 value={project.teamDetails}
                                 onChange={(e) => handleProjectDetailChange('teamDetails', e.target.value)}
                                 placeholder="Enter team member names and IDs, one per line"
-                                className="mt-1 min-h-[80px]"
+                                className="mt-1 min-h-[80px] focus-visible:glow-primary"
                             />
                         </div>
                          <div>
@@ -366,7 +368,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                                 value={project.collegeInfo}
                                 onChange={(e) => handleProjectDetailChange('collegeInfo', e.target.value)}
                                 placeholder="Enter College Name"
-                                className="mt-1"
+                                className="mt-1 focus-visible:glow-primary"
                             />
                         </div>
                         {/* Add API Key input later if needed */}
@@ -375,9 +377,9 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             ) : activeSectionIndex !== null && activeSection ? ( // Ensure index is valid
               // Render Section Editor
               <div className="space-y-6">
-                <Card>
+                <Card className="shadow-md">
                     <CardHeader>
-                        <CardTitle className="text-primary">{activeSection.name}</CardTitle>
+                        <CardTitle className="text-primary text-glow-primary">{activeSection.name}</CardTitle>
                          {activeSection.lastGenerated && (
                              <CardDescription>
                                 Last generated: {new Date(activeSection.lastGenerated).toLocaleString()}
@@ -392,17 +394,17 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                                 value={activeSection.prompt}
                                 onChange={(e) => handleSectionPromptChange(activeSectionIndex, e.target.value)}
                                 placeholder="Enter instructions for the AI to generate this section..."
-                                className="mt-1 min-h-[100px] font-mono text-sm"
+                                className="mt-1 min-h-[100px] font-mono text-sm focus-visible:glow-primary"
                               />
                           </div>
-                           <Button onClick={() => handleGenerateSection(activeSectionIndex)} disabled={isGenerating || isSummarizing}>
+                           <Button onClick={() => handleGenerateSection(activeSectionIndex)} disabled={isGenerating || isSummarizing} className="hover:glow-primary focus-visible:glow-primary">
                              {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
                              {isGenerating ? 'Generating...' : 'Generate Content'}
                            </Button>
                      </CardContent>
                 </Card>
 
-                 <Card>
+                 <Card className="shadow-md">
                     <CardHeader>
                         <CardTitle>Section Content</CardTitle>
                         <CardDescription>Edit the generated or existing content below.</CardDescription>
@@ -413,7 +415,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                            value={activeSection.content}
                            onChange={(e) => handleSectionContentChange(activeSectionIndex, e.target.value)}
                            placeholder="Generated content will appear here. You can also write manually."
-                           className="min-h-[300px] text-base" // Increased base text size
+                           className="min-h-[300px] text-base focus-visible:glow-primary" // Increased base text size
                          />
                     </CardContent>
                      <CardFooter>
@@ -422,6 +424,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                              variant="outline"
                              onClick={() => handleSummarizeSection(activeSectionIndex)}
                              disabled={isSummarizing || isGenerating || !activeSection.content?.trim()}
+                             className="hover:glow-accent focus-visible:glow-accent"
                          >
                            {isSummarizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ScrollText className="mr-2 h-4 w-4" />}
                            {isSummarizing ? 'Summarizing...' : 'Summarize'}
