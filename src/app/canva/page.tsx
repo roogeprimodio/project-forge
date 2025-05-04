@@ -50,13 +50,13 @@ const canvasTemplates: { value: CanvasType; label: string; description?: string,
     value: 'mind_map',
     label: 'Mind Mapping Canvas',
     description: 'Visual way to capture related ideas and concepts starting from a central theme.',
-    sections: ["Central Idea"], // Simplified placeholder
+    sections: ["Central Idea", "Branches", "Sub-branches", "Keywords", "Connections"], // Updated sections for mind map
   },
   {
     value: 'user_journey_map',
     label: 'User Journey Canvas',
     description: 'Maps the complete journey a user takes while interacting with a product or service.',
-    sections: ["Phase 1", "Touchpoint", "Actions", "Emotions", "Opportunities"], // Simplified placeholder stages/rows
+    sections: ["Touchpoints", "Actions", "Emotions", "Pain Points", "Opportunities"], // Updated sections for user journey
   },
   {
     value: 'stakeholder_map',
@@ -84,7 +84,8 @@ const CanvasBackground = ({ type }: { type: CanvasType }) => {
         // Provide basic grid layouts as placeholders
         switch (type) {
             case 'aeiou_canvas':
-                return { gridTemplateColumns: 'repeat(3, 1fr)', gridTemplateRows: 'auto auto', height: 'auto', minHeight: '400px', gap: '8px' };
+                // 3 columns top, 2 columns bottom
+                return { display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gridTemplateRows: 'auto auto', height: 'auto', minHeight: '400px', gap: '8px' };
             case 'empathy_map':
                  // 2x3 grid + pain/gain row
                 return { display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: 'auto auto auto auto', height: 'auto', minHeight: '500px', gap: '8px' };
@@ -98,8 +99,8 @@ const CanvasBackground = ({ type }: { type: CanvasType }) => {
                 // Freeform, placeholder for central idea
                 return { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' };
             case 'user_journey_map':
-                // Linear flow, maybe columns per phase/touchpoint
-                return { display: 'grid', gridTemplateColumns: `repeat(${currentTemplate?.sections?.length || 1}, 1fr)`, gridTemplateRows: 'auto', height: 'auto', minHeight: '300px', gap: '8px' };
+                // Linear flow, columns per phase/touchpoint
+                 return { display: 'grid', gridTemplateColumns: `repeat(${currentTemplate?.sections?.length || 1}, 1fr)`, gridTemplateRows: 'auto', height: 'auto', minHeight: '300px', gap: '8px' };
             case 'stakeholder_map':
                 // 2x2 grid
                 return { display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr', height: '400px', gap: '8px' };
@@ -108,34 +109,44 @@ const CanvasBackground = ({ type }: { type: CanvasType }) => {
         }
     };
 
-    const getZones = (): (string | null)[] => {
-        if (!currentTemplate) return [];
+    const getZones = (): { name: string | null; gridSpan?: number }[] => {
+         if (!currentTemplate) return [];
 
-         // Special handling for Empathy Map layout
+         // Special handling for AEIOU layout (3 top, 2 bottom)
+        if (type === 'aeiou_canvas') {
+            const sections = currentTemplate.sections || [];
+            return [
+                { name: sections[0] || null, gridSpan: 2 }, // Activities
+                { name: sections[1] || null, gridSpan: 2 }, // Environments
+                { name: sections[4] || null, gridSpan: 2 }, // Users (Moved to top row)
+                { name: sections[2] || null, gridSpan: 3 }, // Interactions
+                { name: sections[3] || null, gridSpan: 3 }, // Objects
+            ];
+        }
+        // Special handling for Empathy Map layout
         if (type === 'empathy_map') {
             const sections = currentTemplate.sections || [];
             // Arrange Says/Thinks, Does/Feels, Pain/Gain
             return [
-                sections[0] || null, sections[2] || null, // Says, Does
-                sections[1] || null, sections[3] || null, // Thinks, Feels
-                 sections[4] || null, sections[5] || null, // Pain Points, Gains
-                 null, null // Optional extra row space if needed
+                { name: sections[0] || null }, { name: sections[2] || null }, // Says, Does
+                { name: sections[1] || null }, { name: sections[3] || null }, // Thinks, Feels
+                { name: sections[4] || null }, { name: sections[5] || null }, // Pain Points, Gains
             ];
         }
-         // Special handling for Ideation Map layout
+        // Special handling for Ideation Map layout
         if (type === 'ideation_canvas') {
              const sections = currentTemplate.sections || [];
              // Arrange People/Activities, Situations/Props, Solutions spanning bottom
              return [
-                sections[0] || null, sections[1] || null, // People, Activities
-                sections[2] || null, sections[3] || null, // Situations/Context, Props
-                sections[4] || null, null, // Possible Solutions (span 2 cols via CSS later if needed)
+                { name: sections[0] || null }, { name: sections[1] || null }, // People, Activities
+                { name: sections[2] || null }, { name: sections[3] || null }, // Situations/Context, Props
+                { name: sections[4] || null, gridSpan: 2 }, // Possible Solutions (span 2 cols)
              ];
          }
-
-        // Default: Use sections directly
-        return currentTemplate.sections || [];
+         // Default: Use sections directly, assuming single column span
+         return (currentTemplate.sections || []).map(name => ({ name }));
     };
+
 
     if (type === 'none') {
         return <p className="text-muted-foreground">Select a canvas template from the dropdown.</p>;
@@ -147,17 +158,15 @@ const CanvasBackground = ({ type }: { type: CanvasType }) => {
         <div className="relative w-full border-2 border-dashed border-border rounded-lg p-4 bg-muted/10 min-h-[400px] overflow-auto">
              <h3 className="text-center font-semibold text-lg mb-4 text-primary">{currentTemplate?.label}</h3>
              <p className="text-center text-sm text-muted-foreground mb-6">{currentTemplate?.description}</p>
-             <div style={getGridStyle()}>
+             <div className="grid" style={getGridStyle()}>
                  {/* Render zones based on layout */}
                  {zones.map((zone, index) => (
                      <div
-                        key={index}
-                        className={`border border-border/50 p-2 flex items-start justify-center text-xs font-medium text-muted-foreground bg-background min-h-[100px] ${
-                            // Span columns for specific layouts if zone name indicates it
-                            type === 'ideation_canvas' && zone === 'Possible Solutions' ? 'col-span-2' : ''
-                         } ${zone ? '' : 'invisible'}`} // Keep invisible for grid structure
+                        key={`${zone.name}-${index}`}
+                        className={`border border-border/50 p-2 flex items-start justify-center text-xs font-medium text-muted-foreground bg-background min-h-[100px] ${zone.name ? '' : 'invisible'}`}
+                        style={{ gridColumn: zone.gridSpan ? `span ${zone.gridSpan}` : 'span 1' }} // Apply grid span
                      >
-                         {zone}
+                         {zone.name}
                      </div>
                  ))}
              </div>
@@ -178,6 +187,19 @@ export default function CanvaPage() {
   const [selectedCanvas, setSelectedCanvas] = useState<CanvasType>('none');
   // Add state for notes, positions, colors etc. later
 
+  // Placeholder Project/Common Info (Replace with actual data fetching if linked to a project)
+  const commonHeaderInfo = {
+    instituteName: "L. D. College of Engineering, Ahmedabad",
+    projectTitle: "My Awesome Project", // Placeholder
+    teamId: "Team007", // Placeholder
+    teamMembers: [ {name: "Alex Doe", enrollment: "123456789"} ], // Placeholder
+    subject: "Design Engineering - 1A",
+    semester: "5", // Placeholder
+    branch: "Computer Engineering", // Placeholder
+    guideName: "Prof. Guide" // Placeholder
+  };
+
+
   const handleSave = () => { console.log('Save clicked'); /* Implement save logic */ };
   const handleExport = () => { console.log('Export clicked'); /* Implement export logic */ };
   const handleAiSuggest = () => { console.log('AI Suggest clicked'); /* Implement AI suggestion logic */ };
@@ -193,9 +215,17 @@ export default function CanvaPage() {
          {/* Header */}
         <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/95 backdrop-blur-sm px-4 lg:px-6 flex-shrink-0">
           <Paintbrush className="h-5 w-5 text-primary" />
-          <h1 className="flex-1 text-lg font-semibold md:text-xl text-primary truncate text-glow-primary">
-             Canvas Editor
-          </h1>
+          <div className="flex-1 flex flex-col justify-center">
+              <h1 className="text-base font-semibold text-primary truncate text-glow-primary leading-tight">
+                 Canvas Editor
+              </h1>
+               {/* Display Project Title and Subject */}
+               <p className="text-xs text-muted-foreground truncate leading-tight">
+                   {commonHeaderInfo.projectTitle} - {commonHeaderInfo.subject}
+               </p>
+          </div>
+
+          {/* Rest of the header items */}
           <Select
             value={selectedCanvas}
             onValueChange={(value: CanvasType) => setSelectedCanvas(value)}
@@ -260,3 +290,16 @@ export default function CanvaPage() {
   );
 }
 
+// Function to display common header info on the canvas itself (optional)
+// This would need to be called within CanvasBackground or similar
+const renderCommonInfoOnCanvas = (info: typeof commonHeaderInfo) => (
+     <div className="absolute top-4 left-4 bg-background/80 p-2 rounded shadow text-xs max-w-xs pointer-events-none">
+        <p><strong>Institute:</strong> {info.instituteName}</p>
+        <p><strong>Project:</strong> {info.projectTitle}</p>
+        <p><strong>Team ID:</strong> {info.teamId}</p>
+         <p><strong>Subject:</strong> {info.subject}</p>
+         <p><strong>Branch:</strong> {info.branch}</p>
+         <p><strong>Semester:</strong> {info.semester}</p>
+        {/* Add more fields as needed */}
+     </div>
+);
