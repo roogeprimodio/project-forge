@@ -1,15 +1,17 @@
 "use client";
 
-import React, { useState } from 'react';
+import React from 'react';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import type { Project } from '@/types/project';
 import { ProjectList } from '@/components/project-list';
 import { useRouter } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid'; // For generating unique IDs
+import { useToast } from '@/hooks/use-toast'; // Import useToast
 
 export default function DashboardPage() {
   const [projects, setProjects] = useLocalStorage<Project[]>('projects', []);
   const router = useRouter();
+  const { toast } = useToast(); // Get toast function
 
   const handleCreateProject = () => {
     const newProjectId = uuidv4();
@@ -28,8 +30,14 @@ export default function DashboardPage() {
   };
 
   const handleDeleteProject = (id: string) => {
+    const projectToDelete = projects.find(p => p.id === id);
     setProjects((prevProjects) => prevProjects.filter((project) => project.id !== id));
-    // Optionally, show a toast notification
+    // Show a toast notification after deletion
+    toast({
+      title: "Project Deleted",
+      description: `"${projectToDelete?.title || 'Untitled Project'}" has been removed.`,
+      variant: "destructive", // Optional: Use destructive variant for deletion confirmation
+    });
   };
 
   return (
