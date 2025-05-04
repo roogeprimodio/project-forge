@@ -9,26 +9,61 @@ import { Input } from '@/components/ui/input'; // Added for potential use in sid
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Paintbrush, Save, Download, Wand2, StickyNote, Undo, Redo, Palette, PlusCircle } from 'lucide-react';
 
-// Define Canvas Types - Updated
+// Define Canvas Types - Updated based on JSON IDs
 type CanvasType =
-  | 'aeiou_summary'
-  | 'empathy'
-  | 'ideation'
-  | 'product_dev'
+  | 'aeiou_canvas'
+  | 'empathy_map'
+  | 'ideation_canvas'
+  | 'product_development_canvas'
   | 'mind_map'
-  | 'user_journey'
-  | 'stakeholder'
+  | 'user_journey_map'
+  | 'stakeholder_map'
   | 'none';
 
-// Updated canvasTemplates list
-const canvasTemplates: { value: CanvasType; label: string }[] = [
-  { value: 'aeiou_summary', label: 'AEIOU Summary Canvas' },
-  { value: 'empathy', label: 'Empathy Mapping Canvas' },
-  { value: 'ideation', label: 'Ideation Canvas' },
-  { value: 'product_dev', label: 'Product Development Canvas' },
-  { value: 'mind_map', label: 'Mind Mapping Canvas' },
-  { value: 'user_journey', label: 'User Journey Mapping Canvas' },
-  { value: 'stakeholder', label: 'Stakeholder Mapping Canvas' },
+// Updated canvasTemplates list based on JSON
+const canvasTemplates: { value: CanvasType; label: string; description?: string, sections?: string[] }[] = [
+  {
+    value: 'aeiou_canvas',
+    label: 'AEIOU Canvas',
+    description: 'Used for observational research to categorize insights into Activities, Environments, Interactions, Objects, and Users.',
+    sections: ['Activities', 'Environments', 'Interactions', 'Objects', 'Users'],
+  },
+  {
+    value: 'empathy_map',
+    label: 'Empathy Mapping Canvas',
+    description: 'Used to understand users by mapping what they say, think, do, and feel.',
+    sections: ['Says', 'Thinks', 'Does', 'Feels', 'Pain Points', 'Gains'],
+  },
+  {
+    value: 'ideation_canvas',
+    label: 'Ideation Canvas',
+    description: 'Used to brainstorm and organize ideas based on user\'s needs, problems, and possible solutions.',
+    sections: ['People', 'Activities', 'Situations/Context', 'Props', 'Possible Solutions'],
+  },
+  {
+    value: 'product_development_canvas',
+    label: 'Product Development Canvas',
+    description: 'Used to plan and describe the development process of a product idea.',
+    sections: ["Purpose", "People", "Product Experience", "Product Functions", "Product Features", "Components", "Customer Revalidation", "Resources"],
+  },
+  {
+    value: 'mind_map',
+    label: 'Mind Mapping Canvas',
+    description: 'Visual way to capture related ideas and concepts starting from a central theme.',
+    sections: ["Central Idea"], // Simplified placeholder
+  },
+  {
+    value: 'user_journey_map',
+    label: 'User Journey Canvas',
+    description: 'Maps the complete journey a user takes while interacting with a product or service.',
+    sections: ["Phase 1", "Touchpoint", "Actions", "Emotions", "Opportunities"], // Simplified placeholder stages/rows
+  },
+  {
+    value: 'stakeholder_map',
+    label: 'Stakeholder Mapping Canvas',
+    description: 'Used to identify and categorize project stakeholders based on their influence and interest.',
+    sections: ["High Influence - High Interest", "High Influence - Low Interest", "Low Influence - High Interest", "Low Influence - Low Interest"],
+  },
 ];
 
 // Simple Placeholder Sticky Note Component
@@ -41,63 +76,90 @@ const StickyNotePlaceholder = ({ color = 'bg-yellow-200', text = 'Edit me...' }:
     </div>
 );
 
-// Placeholder for Canvas Backgrounds - Updated with new types
+// Placeholder for Canvas Backgrounds - Updated with new types and sections
 const CanvasBackground = ({ type }: { type: CanvasType }) => {
-    const getGridStyle = () => {
+    const currentTemplate = canvasTemplates.find(t => t.value === type);
+
+    const getGridStyle = (): React.CSSProperties => {
+        // Provide basic grid layouts as placeholders
         switch (type) {
-            case 'aeiou_summary': // Assuming similar to old AEIOU for placeholder
-                return { gridTemplateColumns: '1fr 1fr 1fr', gridTemplateRows: '1fr 1fr', height: '400px' };
-            case 'empathy':
-                return { gridTemplateColumns: '1fr 1fr 1fr', gridTemplateRows: '1fr 1fr 1fr', height: '600px' };
-            case 'ideation':
-                return { gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr', height: '400px' };
-            case 'product_dev':
-                return { gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr', height: '400px' };
-            case 'mind_map': // Placeholder - typically freeform, but use a grid for structure now
-                return { gridTemplateColumns: '1fr', gridTemplateRows: 'auto', height: 'auto', minHeight: '400px' };
-            case 'user_journey': // Placeholder - more complex, maybe linear sections
-                return { gridTemplateColumns: 'repeat(4, 1fr)', gridTemplateRows: 'auto', height: 'auto', minHeight: '400px' };
-            case 'stakeholder': // Placeholder - radial or grid
-                 return { gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr', height: '400px' };
+            case 'aeiou_canvas':
+                return { gridTemplateColumns: 'repeat(3, 1fr)', gridTemplateRows: 'auto auto', height: 'auto', minHeight: '400px', gap: '8px' };
+            case 'empathy_map':
+                 // 2x3 grid + pain/gain row
+                return { display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: 'auto auto auto auto', height: 'auto', minHeight: '500px', gap: '8px' };
+            case 'ideation_canvas':
+                // 2x2 grid + solutions row
+                 return { display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: 'auto auto auto', height: 'auto', minHeight: '400px', gap: '8px' };
+            case 'product_development_canvas':
+                 // Complex, maybe 4x2 grid
+                return { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gridTemplateRows: 'auto auto', height: 'auto', minHeight: '400px', gap: '8px' };
+            case 'mind_map':
+                // Freeform, placeholder for central idea
+                return { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' };
+            case 'user_journey_map':
+                // Linear flow, maybe columns per phase/touchpoint
+                return { display: 'grid', gridTemplateColumns: `repeat(${currentTemplate?.sections?.length || 1}, 1fr)`, gridTemplateRows: 'auto', height: 'auto', minHeight: '300px', gap: '8px' };
+            case 'stakeholder_map':
+                // 2x2 grid
+                return { display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr', height: '400px', gap: '8px' };
             default:
                 return {};
         }
     };
 
-    const getZones = () => {
-        switch (type) {
-            case 'aeiou_summary':
-                return ['Activities', 'Environments', 'Interactions', 'Objects', 'Users', 'Summary']; // Adjusted for Summary
-            case 'empathy':
-                return ['SAY', 'DO', '', 'THINK', 'FEEL', '', 'Pain', 'Gain', ''];
-            case 'ideation':
-                return ['People', 'Activities', 'Situations / Contexts', 'Props / Tools'];
-            case 'product_dev':
-                 return ['Features', 'User Needs', 'Metrics', 'Risks'];
-            case 'mind_map':
-                 return ['Central Idea']; // Placeholder
-            case 'user_journey':
-                 return ['Phase 1', 'Phase 2', 'Phase 3', 'Phase 4']; // Placeholder
-            case 'stakeholder':
-                 return ['Internal', 'External', 'Key Players', 'Keep Informed']; // Placeholder
-            default:
-                return [];
+    const getZones = (): (string | null)[] => {
+        if (!currentTemplate) return [];
+
+         // Special handling for Empathy Map layout
+        if (type === 'empathy_map') {
+            const sections = currentTemplate.sections || [];
+            // Arrange Says/Thinks, Does/Feels, Pain/Gain
+            return [
+                sections[0] || null, sections[2] || null, // Says, Does
+                sections[1] || null, sections[3] || null, // Thinks, Feels
+                 sections[4] || null, sections[5] || null, // Pain Points, Gains
+                 null, null // Optional extra row space if needed
+            ];
         }
+         // Special handling for Ideation Map layout
+        if (type === 'ideation_canvas') {
+             const sections = currentTemplate.sections || [];
+             // Arrange People/Activities, Situations/Props, Solutions spanning bottom
+             return [
+                sections[0] || null, sections[1] || null, // People, Activities
+                sections[2] || null, sections[3] || null, // Situations/Context, Props
+                sections[4] || null, null, // Possible Solutions (span 2 cols via CSS later if needed)
+             ];
+         }
+
+        // Default: Use sections directly
+        return currentTemplate.sections || [];
     };
 
     if (type === 'none') {
         return <p className="text-muted-foreground">Select a canvas template from the dropdown.</p>;
     }
 
+    const zones = getZones();
+
     return (
         <div className="relative w-full border-2 border-dashed border-border rounded-lg p-4 bg-muted/10 min-h-[400px] overflow-auto">
-             <h3 className="text-center font-semibold text-lg mb-4 text-primary">{canvasTemplates.find(t => t.value === type)?.label}</h3>
-             <div className="grid gap-2" style={getGridStyle()}>
-                {getZones().map((zone, index) => (
-                     <div key={index} className={`border border-border/50 p-2 flex items-center justify-center text-xs text-muted-foreground bg-background ${zone ? '' : 'invisible'}`}>
-                        {zone}
-                    </div>
-                ))}
+             <h3 className="text-center font-semibold text-lg mb-4 text-primary">{currentTemplate?.label}</h3>
+             <p className="text-center text-sm text-muted-foreground mb-6">{currentTemplate?.description}</p>
+             <div style={getGridStyle()}>
+                 {/* Render zones based on layout */}
+                 {zones.map((zone, index) => (
+                     <div
+                        key={index}
+                        className={`border border-border/50 p-2 flex items-start justify-center text-xs font-medium text-muted-foreground bg-background min-h-[100px] ${
+                            // Span columns for specific layouts if zone name indicates it
+                            type === 'ideation_canvas' && zone === 'Possible Solutions' ? 'col-span-2' : ''
+                         } ${zone ? '' : 'invisible'}`} // Keep invisible for grid structure
+                     >
+                         {zone}
+                     </div>
+                 ))}
              </div>
              {/* Placeholder sticky notes - Implement drag/drop later */}
              {type !== 'none' && (
@@ -138,7 +200,7 @@ export default function CanvaPage() {
             value={selectedCanvas}
             onValueChange={(value: CanvasType) => setSelectedCanvas(value)}
           >
-            <SelectTrigger className="w-[230px] ml-auto"> {/* Increased width */}
+            <SelectTrigger className="w-[250px] ml-auto"> {/* Increased width slightly */}
               <SelectValue placeholder="Select Canvas Type" />
             </SelectTrigger>
             <SelectContent>
@@ -197,3 +259,4 @@ export default function CanvaPage() {
     </div>
   );
 }
+
