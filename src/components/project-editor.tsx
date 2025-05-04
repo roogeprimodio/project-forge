@@ -19,10 +19,14 @@ import { generateSectionAction, summarizeSectionAction, generateTocAction, gener
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils'; // Import cn
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"; // Sheet components for potential mobile use
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"; // Import AlertDialog components
 
 interface ProjectEditorProps {
   projectId: string;
 }
+
+// Minimum character length considered "sufficient" for context
+const MIN_CONTEXT_LENGTH = 50;
 
 // New component for the local sidebar content (details, sections, add)
 function ProjectSidebarContent({
@@ -170,6 +174,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const [isProjectFound, setIsProjectFound] = useState<boolean | null>(null);
   const [isLocalSidebarOpen, setIsLocalSidebarOpen] = useState(true); // State for local sidebar visibility
   const [hasMounted, setHasMounted] = useState(false); // Track hydration
+  const [showTocContextAlert, setShowTocContextAlert] = useState(false); // State for context warning dialog
   const router = useRouter();
 
   // Mark as mounted on client
@@ -382,14 +387,14 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
       }
   };
 
-  const handleGenerateToc = async () => {
+  const proceedWithTocGeneration = useCallback(async () => {
     if (!project || isGenerating || isSummarizing || isGeneratingToc || isGeneratingOutline) return;
 
     const contentSections = project.sections.filter(s => s.name !== TOC_SECTION_NAME);
-    if (contentSections.length === 0) {
-       toast({ variant: "destructive", title: "Cannot Generate ToC", description: "Add some content sections first." });
-       return;
-    }
+     if (contentSections.length === 0) {
+         toast({ variant: "destructive", title: "Cannot Generate ToC", description: "Add some content sections first." });
+         return;
+     }
 
     setIsGeneratingToc(true);
     try {
@@ -452,7 +457,20 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     } finally {
         setIsGeneratingToc(false);
     }
-  };
+  }, [project, isGenerating, isSummarizing, isGeneratingToc, isGeneratingOutline, setProjects, toast, setActiveSectionIndex, projectId]); // Added dependencies
+
+
+    const handleGenerateTocClick = () => {
+        if (!project || isGenerating || isSummarizing || isGeneratingToc || isGeneratingOutline) return;
+
+        const contextLength = project.projectContext?.trim().length || 0;
+
+        if (contextLength < MIN_CONTEXT_LENGTH) {
+            setShowTocContextAlert(true); // Open the confirmation dialog
+        } else {
+            proceedWithTocGeneration(); // Context is sufficient, proceed directly
+        }
+    };
 
   const handleGenerateOutline = useCallback(async () => {
       if (!project || isGenerating || isSummarizing || isGeneratingToc || isGeneratingOutline) return;
@@ -518,9 +536,41 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   return (
     // Main container for the editor layout
     <div className="flex h-full"> {/* Use full height */}
-      {/* --- Local Project Sidebar --- */}
+      {/* --- Local Project Sidebar (Drawer on Mobile) --- */}
+       {/* Mobile Sheet */}
+      <Sheet>
+         {/* The trigger is now in the header, rendered conditionally */}
+
+         <SheetContent side="left" className="p-0 w-64 bg-card"> {/* Apply card background */}
+             <SheetHeader className="sr-only">
+                 <SheetTitle>Project Menu</SheetTitle>
+                 <SheetDescription>Navigate project sections and details</SheetDescription>
+             </SheetHeader>
+            {/* Render sidebar content inside the sheet */}
+            <ProjectSidebarContent
+                project={project}
+                activeSectionIndex={activeSectionIndex}
+                setActiveSectionIndex={(index) => {
+                    setActiveSectionIndex(index);
+                    // Close sheet on selection if needed (optional)
+                    // document.querySelector('[cmdk-item]')?.closest('[role="dialog"]')?.querySelector('button[aria-label="Close"]')?.click();
+                }}
+                addSection={addSection}
+                customSectionName={customSectionName}
+                setCustomSectionName={setCustomSectionName}
+                handleGenerateOutline={handleGenerateOutline}
+                isGeneratingOutline={isGeneratingOutline}
+                isGenerating={isGenerating}
+                isSummarizing={isSummarizing}
+                isGeneratingToc={isGeneratingToc}
+                handleSaveOnline={handleSaveOnline}
+             />
+         </SheetContent>
+      </Sheet>
+
+      {/* Desktop Static Sidebar */}
       <div className={cn(
-          "transition-all duration-300 ease-in-out overflow-y-auto overflow-x-hidden", // Added y-auto, x-hidden
+          "hidden md:block transition-all duration-300 ease-in-out overflow-y-auto overflow-x-hidden", // Hide on mobile (use Sheet instead)
            isLocalSidebarOpen ? "w-64 border-r" : "w-0 border-r-0" // Adjust width and border based on state
          )}
          aria-hidden={!isLocalSidebarOpen}
@@ -548,12 +598,24 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
        <div className="flex-1 flex flex-col overflow-hidden"> {/* Allow main content to scroll */}
             {/* Sticky Header for Main Content */}
            <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/95 backdrop-blur-sm px-4 lg:px-6 flex-shrink-0">
-                {/* Button to toggle local sidebar */}
+                {/* Mobile Sheet Trigger */}
+                 <SheetTrigger asChild>
+                   <Button
+                       variant="ghost"
+                       size="icon"
+                       className="md:hidden text-foreground" // Only show on mobile
+                       aria-label="Open project menu"
+                   >
+                       <Menu className="h-5 w-5" />
+                   </Button>
+                 </SheetTrigger>
+
+                {/* Desktop Sidebar Toggle Button */}
                 <Button
                     variant="ghost"
                     size="icon"
                     onClick={() => setIsLocalSidebarOpen(!isLocalSidebarOpen)}
-                    className="text-foreground"
+                    className="hidden md:flex text-foreground" // Hide on mobile
                     aria-label={isLocalSidebarOpen ? "Collapse project menu" : "Expand project menu"}
                 >
                     <Menu className="h-5 w-5" />
@@ -569,7 +631,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                <Button
                    variant="outline"
                    size="sm"
-                   onClick={handleGenerateToc}
+                   onClick={handleGenerateTocClick} // Use the new click handler
                    disabled={isGeneratingToc || isGenerating || isSummarizing || isGeneratingOutline || !project.sections || project.sections.filter(s => s.name !== TOC_SECTION_NAME).length === 0}
                    className="hover:glow-accent focus-visible:glow-accent"
                    title={!project.sections || project.sections.filter(s => s.name !== TOC_SECTION_NAME).length === 0 ? "Add sections before generating ToC" : "Generate Table of Contents"}
@@ -617,7 +679,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                                 placeholder="Briefly describe your project, its goals, scope, and key features or technologies involved. This helps the AI generate a relevant outline and content."
                                 className="mt-1 min-h-[120px] focus-visible:glow-primary"
                             />
-                            <p className="text-xs text-muted-foreground mt-1">This context is used by the AI to generate the initial project outline.</p>
+                            <p className="text-xs text-muted-foreground mt-1">This context is used by the AI to generate the initial project outline and can influence the Table of Contents generation.</p>
                         </div>
                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
@@ -808,6 +870,25 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             )}
           </ScrollArea>
         </div> {/* End Main Content Area */}
+
+      {/* Context Warning Dialog for ToC Generation */}
+      <AlertDialog open={showTocContextAlert} onOpenChange={setShowTocContextAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Project Context May Be Limited</AlertDialogTitle>
+            <AlertDialogDescription>
+              The project context provided is quite short. Generating a Table of Contents might be less accurate.
+              Consider adding more details to the "Project Context" field in Project Details for better results.
+              Do you want to proceed with generation anyway?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={proceedWithTocGeneration}>Generate Anyway</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 }
