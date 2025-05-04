@@ -72,9 +72,9 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
              description: "The project data seems to have been removed. Returning to dashboard.",
          });
          // Consider redirecting after a short delay
-         // setTimeout(() => router.push('/'), 1500);
+          setTimeout(() => router.push('/'), 1500); // Redirect back home
      }
-   }, [projectId, projects, isProjectFound, activeSectionIndex, toast]); // Added toast to dependencies
+   }, [projectId, projects, isProjectFound, activeSectionIndex, toast, router]); // Added router to dependencies
 
   const updateProject = useCallback((updatedProjectData: Partial<Project>) => {
     setProjects((prevProjects = []) => // Ensure prevProjects is an array
