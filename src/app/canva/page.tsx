@@ -84,6 +84,7 @@ interface StickyNoteData {
 // Sticky Note Component
 const StickyNote = React.memo(({
     note,
+    isDragging, // New prop to indicate dragging state
     onDragStart,
     onTouchStart, // Add touch start handler prop
     onContextMenu,
@@ -92,6 +93,7 @@ const StickyNote = React.memo(({
     onBlur,
 }: {
     note: StickyNoteData;
+    isDragging: boolean; // New prop
     onDragStart: (e: React.MouseEvent<HTMLDivElement>, id: string) => void;
     onTouchStart: (e: React.TouchEvent<HTMLDivElement>, id: string) => void; // Add touch start handler prop
     onContextMenu: (e: React.MouseEvent<HTMLDivElement>, id: string) => void;
@@ -111,15 +113,17 @@ const StickyNote = React.memo(({
     return (
         <div
             className={cn(
-                `absolute p-2 shadow-md rounded text-sm text-black cursor-grab active:cursor-grabbing border border-gray-400/50 flex flex-col touch-none`, // Added touch-none
-                note.color
+                `absolute p-2 shadow-md rounded text-sm text-black cursor-grab active:cursor-grabbing border border-gray-400/50 flex flex-col touch-none transition-transform duration-100 ease-in-out`, // Added touch-none and transition
+                note.color,
+                isDragging && 'ring-2 ring-primary ring-offset-2 scale-105 shadow-xl cursor-grabbing z-50', // Styles for dragging
+                note.isEditing && 'cursor-text' // Change cursor when editing
             )}
             style={{
                 left: `${note.x}px`,
                 top: `${note.y}px`,
                 width: `${note.width}px`,
                 height: `${note.height}px`,
-                cursor: note.isEditing ? 'text' : 'grab', // Change cursor when editing
+                // Removed cursor style from here, handled by classes
             }}
             onMouseDown={(e) => !note.isEditing && onDragStart(e, note.id)} // Only drag if not editing
             onTouchStart={(e) => !note.isEditing && onTouchStart(e, note.id)} // Add touch start handler
@@ -152,9 +156,10 @@ StickyNote.displayName = 'StickyNote'; // Add display name
 
 
 // Placeholder for Canvas Backgrounds - Updated with new types and sections
-const CanvasBackground = ({ type, notes, onDragStart, onTouchStart, onContextMenu, onNoteTextChange, onNoteDoubleClick, onNoteBlur }: {
+const CanvasBackground = ({ type, notes, draggingNoteId, onDragStart, onTouchStart, onContextMenu, onNoteTextChange, onNoteDoubleClick, onNoteBlur }: { // Added draggingNoteId
     type: CanvasType;
     notes: StickyNoteData[];
+    draggingNoteId: string | null; // Added draggingNoteId prop
     onDragStart: (e: React.MouseEvent<HTMLDivElement>, id: string) => void;
     onTouchStart: (e: React.TouchEvent<HTMLDivElement>, id: string) => void; // Add touch handler
     onContextMenu: (e: React.MouseEvent<HTMLDivElement>, id: string) => void;
@@ -226,6 +231,7 @@ const CanvasBackground = ({ type, notes, onDragStart, onTouchStart, onContextMen
                    <StickyNote
                         key={note.id}
                         note={note}
+                        isDragging={note.id === draggingNoteId} // Pass dragging state
                         onDragStart={onDragStart}
                         onTouchStart={onTouchStart} // Pass touch handler
                         onContextMenu={onContextMenu}
@@ -277,6 +283,7 @@ const CanvasBackground = ({ type, notes, onDragStart, onTouchStart, onContextMen
                 <StickyNote
                     key={note.id}
                     note={note}
+                    isDragging={note.id === draggingNoteId} // Pass dragging state
                     onDragStart={onDragStart}
                     onTouchStart={onTouchStart} // Pass touch handler
                     onContextMenu={onContextMenu}
@@ -301,6 +308,7 @@ export default function CanvaPage() {
   const [currentNoteColor, setCurrentNoteColor] = useState('bg-yellow-200'); // Default color for new notes
   const canvasRef = useRef<HTMLDivElement>(null);
   const longPressTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Ref for long press timeout
+  const dragStartTimeRef = useRef<number>(0); // To differentiate click from drag
 
   // Placeholder Project/Common Info (Replace with actual data fetching if linked to a project)
   const commonHeaderInfo = {
@@ -323,8 +331,8 @@ export default function CanvaPage() {
     const canvasBounds = canvasRef.current?.getBoundingClientRect();
     const newNote: StickyNoteData = {
       id: uuidv4(),
-      x: canvasBounds ? (canvasBounds.width / 2) - 50 : 50, // Center horizontally initially or fallback
-      y: canvasBounds ? (canvasBounds.height / 2) - 50 : 50, // Center vertically initially or fallback
+      x: canvasBounds ? (canvasBounds.width / 2) - 50 + (canvasRef.current?.scrollLeft || 0) : 50, // Adjust for scroll
+      y: canvasBounds ? (canvasBounds.height / 2) - 50 + (canvasRef.current?.scrollTop || 0) : 50, // Adjust for scroll
       text: '',
       color: currentNoteColor, // Use current selected color
       width: 96, // Default width (w-24)
@@ -335,12 +343,18 @@ export default function CanvaPage() {
 
    // --- Drag and Drop Logic (Mouse) ---
   const handleDragStart = (e: React.MouseEvent<HTMLDivElement>, id: string) => {
+    // Check if it's the primary mouse button (usually left)
+    if (e.button !== 0) return;
     e.preventDefault(); // Prevent default browser drag behavior
+    e.stopPropagation(); // Prevent canvas click listeners
+
     const noteElement = e.currentTarget;
     const startX = e.clientX;
     const startY = e.clientY;
     const noteX = noteElement.offsetLeft;
     const noteY = noteElement.offsetTop;
+
+    dragStartTimeRef.current = Date.now(); // Record start time
 
     setDraggingNoteId(id);
     setDragOffset({ x: startX - noteX, y: startY - noteY });
@@ -349,6 +363,7 @@ export default function CanvaPage() {
   // --- Drag and Drop Logic (Touch with Long Press) ---
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>, id: string) => {
     // Don't prevent default here initially, allow potential scroll
+    e.stopPropagation(); // Prevent canvas click listeners
     const noteElement = e.currentTarget;
     const touch = e.touches[0];
     const startX = touch.clientX;
@@ -356,16 +371,18 @@ export default function CanvaPage() {
     const noteX = noteElement.offsetLeft;
     const noteY = noteElement.offsetTop;
 
-    // Set a timeout for long press (e.g., 500ms)
+    // Set a timeout for long press (e.g., 300ms)
     longPressTimeoutRef.current = setTimeout(() => {
         // If timeout finishes, initiate drag
         setDraggingNoteId(id);
         setDragOffset({ x: startX - noteX, y: startY - noteY });
         // Optionally, provide haptic feedback here if possible
+        navigator.vibrate?.(50); // Short vibrate on drag start
         longPressTimeoutRef.current = null; // Clear the ref
         // Prevent scrolling *after* long press detected
         // This might need refinement depending on exact desired behavior
-    }, 500); // 500ms for long press
+        dragStartTimeRef.current = Date.now(); // Record start time for touch drag
+    }, 300); // 300ms for long press
   };
 
    // --- Universal Move Handler (Mouse & Touch) ---
@@ -373,33 +390,41 @@ export default function CanvaPage() {
        if (!draggingNoteId || !canvasRef.current) return;
 
        const canvasBounds = canvasRef.current.getBoundingClientRect();
-       let newX = clientX - dragOffset.x - canvasBounds.left + canvasRef.current.scrollLeft;
-       let newY = clientY - dragOffset.y - canvasBounds.top + canvasRef.current.scrollTop;
 
-       // Optional: Keep note within canvas bounds (adjust as needed)
-       // const noteWidth = notes.find(n => n.id === draggingNoteId)?.width || 96;
-       // const noteHeight = notes.find(n => n.id === draggingNoteId)?.height || 96;
-       // newX = Math.max(0, Math.min(newX, canvasRef.current.scrollWidth - noteWidth));
-       // newY = Math.max(0, Math.min(newY, canvasRef.current.scrollHeight - noteHeight));
+       // Calculate the new position relative to the canvas viewport
+       const newViewportX = clientX - dragOffset.x;
+       const newViewportY = clientY - dragOffset.y;
+
+       // Convert viewport coordinates to canvas coordinates including scroll
+       const newCanvasX = newViewportX - canvasBounds.left + canvasRef.current.scrollLeft;
+       const newCanvasY = newViewportY - canvasBounds.top + canvasRef.current.scrollTop;
+
 
        setNotes(prevNotes =>
          prevNotes.map(note =>
-           note.id === draggingNoteId ? { ...note, x: newX, y: newY } : note
+           note.id === draggingNoteId ? { ...note, x: newCanvasX, y: newCanvasY } : note
          )
        );
-   }, [draggingNoteId, dragOffset]);
+   }, [draggingNoteId, dragOffset]); // Removed canvasRef from dependencies
 
 
    // Handle mouse move for dragging
    const handleMouseMove = useCallback((e: MouseEvent) => {
-       handlePointerMove(e.clientX, e.clientY);
-   }, [handlePointerMove]);
+        // Check if dragging actually started (to prevent move on simple click)
+        if(draggingNoteId && Date.now() - dragStartTimeRef.current > 100) { // Threshold for drag vs click
+            handlePointerMove(e.clientX, e.clientY);
+        }
+   }, [draggingNoteId, handlePointerMove]);
 
    // Handle touch move for dragging (only if dragging started)
     const handleTouchMove = useCallback((e: TouchEvent) => {
         if (!draggingNoteId) return; // Only move if dragging is active
-        // Prevent scroll while dragging
-        e.preventDefault();
+
+        // Prevent scroll while dragging *only* if drag has definitively started
+        if (Date.now() - dragStartTimeRef.current > 100) { // Check drag start time
+            e.preventDefault();
+        }
+
         const touch = e.touches[0];
         handlePointerMove(touch.clientX, touch.clientY);
     }, [draggingNoteId, handlePointerMove]);
@@ -416,6 +441,7 @@ export default function CanvaPage() {
       if (draggingNoteId) {
           setDraggingNoteId(null);
       }
+      dragStartTimeRef.current = 0; // Reset drag start time
   }, [draggingNoteId]); // Depend on draggingNoteId
 
     // Stop dragging (Mouse)
@@ -447,21 +473,25 @@ export default function CanvaPage() {
           clearTimeout(longPressTimeoutRef.current);
       }
     };
-  }, [handleMouseMove, handleMouseUp, handleTouchMove, handleTouchEnd]);
+  }, [handleMouseMove, handleMouseUp, handleTouchMove, handleTouchEnd]); // Include all handlers
 
 
   // Handle right-click context menu
   const handleContextMenu = (e: React.MouseEvent<HTMLDivElement>, id: string) => {
     e.preventDefault();
+    e.stopPropagation(); // Prevent canvas click
     // Don't show context menu while dragging
     if (draggingNoteId) return;
-    setContextMenu({ x: e.clientX, y: e.clientY, noteId: id });
+    // Check if it was a short click (not end of drag)
+    if (Date.now() - dragStartTimeRef.current < 200) {
+        setContextMenu({ x: e.clientX, y: e.clientY, noteId: id });
+    }
   };
 
   // Close context menu
-  const handleCloseContextMenu = () => {
+  const handleCloseContextMenu = useCallback(() => {
     setContextMenu(null);
-  };
+  }, []);
 
   // Delete a note
   const handleDeleteNote = (id: string) => {
@@ -490,13 +520,16 @@ export default function CanvaPage() {
 
    // Set editing flag on double click
    const handleNoteDoubleClick = (id: string) => {
-     // Don't allow edit if dragging was just active
-     if (draggingNoteId) return;
-     setNotes(prevNotes =>
-       prevNotes.map(note =>
-         note.id === id ? { ...note, isEditing: true } : { ...note, isEditing: false } // Start editing this note, stop others
-       )
-     );
+     // Don't allow edit if dragging was just active or long press was held
+     if (draggingNoteId || (longPressTimeoutRef.current !== null)) return;
+     // Check if it was a quick double click, not the end of a drag
+     if (Date.now() - dragStartTimeRef.current < 300) {
+        setNotes(prevNotes =>
+        prevNotes.map(note =>
+            note.id === id ? { ...note, isEditing: true } : { ...note, isEditing: false } // Start editing this note, stop others
+        )
+        );
+     }
    };
 
    // Unset editing flag on blur
@@ -560,12 +593,14 @@ export default function CanvaPage() {
         <ScrollArea className="flex-1 bg-muted/20" viewportRef={canvasRef} > {/* Assign ref here */}
            {/* Container for positioning and interactions */}
            <div
-               className="relative w-full h-full p-4 md:p-6" // Add padding for spacing from edges
+               className="relative w-full h-full p-4 md:p-6 cursor-default" // Added cursor-default, canvas handles interaction
                onClick={handleCloseContextMenu} // Close context menu on canvas click
+               onContextMenu={(e) => e.preventDefault()} // Prevent default canvas context menu
             >
              <CanvasBackground
                 type={selectedCanvas}
                 notes={notes}
+                draggingNoteId={draggingNoteId} // Pass dragging ID
                 onDragStart={handleDragStart}
                 onTouchStart={handleTouchStart} // Pass touch handler
                 onContextMenu={handleContextMenu}
@@ -609,17 +644,17 @@ export default function CanvaPage() {
                 <Redo className="h-4 w-4" />
             </Button>
         </div>
-         <p className="text-xs text-muted-foreground text-center mt-2">Tip: Double-click a note to edit text. Right-click for options (or long-press on mobile - coming soon!).</p>
+         <p className="text-xs text-muted-foreground text-center mt-2">Tip: Double-click to edit. Right-click/Long-press for options.</p>
       </aside>
 
       {/* Context Menu */}
       {contextMenu && (
           <DropdownMenu open={!!contextMenu} onOpenChange={(open) => !open && handleCloseContextMenu()}>
                <DropdownMenuTrigger
-                    style={{ position: 'absolute', left: contextMenu.x, top: contextMenu.y, width: 0, height: 0 }}
+                    style={{ position: 'fixed', left: contextMenu.x, top: contextMenu.y, width: 0, height: 0 }} // Use fixed positioning
                     aria-hidden="true" // Hide trigger visually and from accessibility tree
                 />
-               <DropdownMenuContent align="start" className="w-40">
+               <DropdownMenuContent align="start" className="w-40 z-50"> {/* Ensure high z-index */}
                     <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleNoteDoubleClick(contextMenu.noteId); handleCloseContextMenu(); }}>
                         <Edit3 className="mr-2 h-4 w-4" /> Edit Text
                     </DropdownMenuItem>
@@ -661,3 +696,5 @@ const renderCommonInfoOnCanvas = (info: typeof commonHeaderInfo) => (
          <p><strong>Semester:</strong> {info.semester}</p>
      </div>
 );
+
+    
