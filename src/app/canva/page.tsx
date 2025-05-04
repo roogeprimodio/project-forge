@@ -9,14 +9,26 @@ import { Input } from '@/components/ui/input'; // Added for potential use in sid
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Paintbrush, Save, Download, Wand2, StickyNote, Undo, Redo, Palette, PlusCircle } from 'lucide-react';
 
-// Define Canvas Types
-type CanvasType = 'aeiou' | 'empathy' | 'ideation' | 'product_dev' | 'none';
+// Define Canvas Types - Updated
+type CanvasType =
+  | 'aeiou_summary'
+  | 'empathy'
+  | 'ideation'
+  | 'product_dev'
+  | 'mind_map'
+  | 'user_journey'
+  | 'stakeholder'
+  | 'none';
 
+// Updated canvasTemplates list
 const canvasTemplates: { value: CanvasType; label: string }[] = [
-  { value: 'aeiou', label: 'AEIOU Canvas' },
-  { value: 'empathy', label: 'Empathy Canvas' },
+  { value: 'aeiou_summary', label: 'AEIOU Summary Canvas' },
+  { value: 'empathy', label: 'Empathy Mapping Canvas' },
   { value: 'ideation', label: 'Ideation Canvas' },
   { value: 'product_dev', label: 'Product Development Canvas' },
+  { value: 'mind_map', label: 'Mind Mapping Canvas' },
+  { value: 'user_journey', label: 'User Journey Mapping Canvas' },
+  { value: 'stakeholder', label: 'Stakeholder Mapping Canvas' },
 ];
 
 // Simple Placeholder Sticky Note Component
@@ -29,18 +41,24 @@ const StickyNotePlaceholder = ({ color = 'bg-yellow-200', text = 'Edit me...' }:
     </div>
 );
 
-// Placeholder for Canvas Backgrounds
+// Placeholder for Canvas Backgrounds - Updated with new types
 const CanvasBackground = ({ type }: { type: CanvasType }) => {
     const getGridStyle = () => {
         switch (type) {
-            case 'aeiou':
+            case 'aeiou_summary': // Assuming similar to old AEIOU for placeholder
                 return { gridTemplateColumns: '1fr 1fr 1fr', gridTemplateRows: '1fr 1fr', height: '400px' };
             case 'empathy':
                 return { gridTemplateColumns: '1fr 1fr 1fr', gridTemplateRows: '1fr 1fr 1fr', height: '600px' };
             case 'ideation':
                 return { gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr', height: '400px' };
-            case 'product_dev': // Assuming a simple 2x2 grid for placeholder
+            case 'product_dev':
                 return { gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr', height: '400px' };
+            case 'mind_map': // Placeholder - typically freeform, but use a grid for structure now
+                return { gridTemplateColumns: '1fr', gridTemplateRows: 'auto', height: 'auto', minHeight: '400px' };
+            case 'user_journey': // Placeholder - more complex, maybe linear sections
+                return { gridTemplateColumns: 'repeat(4, 1fr)', gridTemplateRows: 'auto', height: 'auto', minHeight: '400px' };
+            case 'stakeholder': // Placeholder - radial or grid
+                 return { gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr', height: '400px' };
             default:
                 return {};
         }
@@ -48,14 +66,20 @@ const CanvasBackground = ({ type }: { type: CanvasType }) => {
 
     const getZones = () => {
         switch (type) {
-            case 'aeiou':
-                return ['Activities', 'Environments', 'Users', 'Interactions', 'Objects', '']; // Empty for 3x2 grid
+            case 'aeiou_summary':
+                return ['Activities', 'Environments', 'Interactions', 'Objects', 'Users', 'Summary']; // Adjusted for Summary
             case 'empathy':
-                return ['SAY', 'DO', '', 'THINK', 'FEEL', '', 'Pain', 'Gain', '']; // 3x3 layout
+                return ['SAY', 'DO', '', 'THINK', 'FEEL', '', 'Pain', 'Gain', ''];
             case 'ideation':
-                return ['People', 'Activities', 'Situations / Contexts', 'Props / Tools']; // 2x2 layout
+                return ['People', 'Activities', 'Situations / Contexts', 'Props / Tools'];
             case 'product_dev':
-                 return ['Features', 'User Needs', 'Metrics', 'Risks']; // 2x2 Placeholder
+                 return ['Features', 'User Needs', 'Metrics', 'Risks'];
+            case 'mind_map':
+                 return ['Central Idea']; // Placeholder
+            case 'user_journey':
+                 return ['Phase 1', 'Phase 2', 'Phase 3', 'Phase 4']; // Placeholder
+            case 'stakeholder':
+                 return ['Internal', 'External', 'Key Players', 'Keep Informed']; // Placeholder
             default:
                 return [];
         }
@@ -114,7 +138,7 @@ export default function CanvaPage() {
             value={selectedCanvas}
             onValueChange={(value: CanvasType) => setSelectedCanvas(value)}
           >
-            <SelectTrigger className="w-[200px] ml-auto">
+            <SelectTrigger className="w-[230px] ml-auto"> {/* Increased width */}
               <SelectValue placeholder="Select Canvas Type" />
             </SelectTrigger>
             <SelectContent>
