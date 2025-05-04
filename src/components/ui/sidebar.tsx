@@ -209,8 +209,8 @@ const Sidebar = React.forwardRef<
           >
             {/* Add SheetHeader for accessibility */}
             <SheetHeader className="sr-only">
-                <SheetTitle>Project Navigation</SheetTitle>
-                <SheetDescription>Navigate between project details and report sections.</SheetDescription>
+                <SheetTitle>Main Navigation</SheetTitle>
+                <SheetDescription>Navigate between different sections of the application.</SheetDescription>
             </SheetHeader>
             <div className="flex h-full w-full flex-col">
                  {/* Apply padding/structure inside this div if needed, as SheetContent padding is removed */}

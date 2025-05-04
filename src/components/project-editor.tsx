@@ -1,9 +1,7 @@
-
 // src/components/project-editor.tsx
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-// Removed Sidebar imports as it's now global
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -11,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { BookOpen, Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, List, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu } from 'lucide-react'; // Added Menu for potential use
+import { BookOpen, Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, List, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu } from 'lucide-react'; // Added Menu
 import Link from 'next/link';
 import type { Project, ProjectSection } from '@/types/project';
 import { COMMON_SECTIONS, TOC_SECTION_NAME } from '@/types/project';
@@ -20,7 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import { generateSectionAction, summarizeSectionAction, generateTocAction, generateOutlineAction } from '@/app/actions';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils'; // Import cn
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"; // Ensure Sheet components are imported
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"; // Sheet components for potential mobile use
 
 interface ProjectEditorProps {
   projectId: string;
@@ -171,35 +169,42 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const [customSectionName, setCustomSectionName] = useState('');
   const [isProjectFound, setIsProjectFound] = useState<boolean | null>(null);
   const [isLocalSidebarOpen, setIsLocalSidebarOpen] = useState(true); // State for local sidebar visibility
+  const [hasMounted, setHasMounted] = useState(false); // Track hydration
   const router = useRouter();
+
+  // Mark as mounted on client
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
 
   // Derived state: current project
   const project = useMemo(() => {
+    // Ensure projects is an array before trying to find
     return Array.isArray(projects) ? projects.find(p => p.id === projectId) : undefined;
   }, [projects, projectId]);
 
    // Effect to check if project exists and set initial state
    useEffect(() => {
-     if (projects !== undefined) {
-       const projectExists = Array.isArray(projects) && projects.some(p => p.id === projectId);
-       setIsProjectFound(projectExists);
+    if (!hasMounted || projects === undefined) return; // Don't run on server or before hydration
 
-       if (projectExists && activeSectionIndex === null) {
-           setActiveSectionIndex(-1); // Default to project details if project exists
-       } else if (!projectExists && isProjectFound !== false) {
-           // Only show toast and redirect if we newly detect the project is missing
-           setIsProjectFound(false); // Set definitively to false
-           toast({
-               variant: "destructive",
-               title: "Project Not Found",
-               description: `Project with ID ${projectId} seems missing. Returning to dashboard.`,
-           });
-           const timer = setTimeout(() => router.push('/'), 2000);
-           return () => clearTimeout(timer);
-       }
-     }
-   // eslint-disable-next-line react-hooks/exhaustive-deps
-   }, [projectId, projects, activeSectionIndex, toast, router]); // Removed isProjectFound dependency
+    const projectExists = Array.isArray(projects) && projects.some(p => p.id === projectId);
+    setIsProjectFound(projectExists);
+
+    if (projectExists && activeSectionIndex === null) {
+        setActiveSectionIndex(-1); // Default to project details if project exists
+    } else if (!projectExists && isProjectFound !== false) {
+        // Only show toast and redirect if we newly detect the project is missing
+        setIsProjectFound(false); // Set definitively to false
+        toast({
+            variant: "destructive",
+            title: "Project Not Found",
+            description: `Project with ID ${projectId} seems missing. Returning to dashboard.`,
+        });
+        const timer = setTimeout(() => router.push('/'), 2000);
+        return () => clearTimeout(timer);
+    }
+   }, [projectId, projects, activeSectionIndex, toast, router, isProjectFound, hasMounted]); // Add hasMounted
 
   const updateProject = useCallback((updatedProjectData: Partial<Project>) => {
     setProjects((prevProjects = []) =>
@@ -295,13 +300,26 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     setIsGenerating(true);
 
     try {
-      const result = await generateSectionAction({
-        projectTitle: project.title,
+      // Ensure required fields for the AI action are present
+      const input = {
+        projectTitle: project.title || 'Untitled Project', // Provide fallback
         sectionName: section.name,
         prompt: section.prompt,
-        teamDetails: project.teamDetails,
-        collegeInfo: project.instituteName, // Use instituteName now
-      });
+        teamDetails: project.teamDetails || '', // Provide fallback
+        instituteName: project.instituteName || '', // Use instituteName, provide fallback
+        // Add optional fields if they exist in the project, otherwise they remain undefined
+        teamId: project.teamId,
+        subject: project.subject,
+        semester: project.semester,
+        branch: project.branch,
+        guideName: project.guideName,
+      };
+
+      // Type check (optional but good practice)
+      // const validatedInput: GenerateReportSectionInput = GenerateReportSectionInputSchema.parse(input);
+
+      const result = await generateSectionAction(input);
+
 
       if ('error' in result) throw new Error(result.error);
 
@@ -480,7 +498,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
    // --- Render Logic ---
 
-   if (isProjectFound === null) {
+   if (!hasMounted || isProjectFound === null) { // Show loading until mounted and project status known
      return ( <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,60px))] text-center p-4"><Loader2 className="h-16 w-16 animate-spin text-primary mb-4" /><p className="text-lg text-muted-foreground">Loading project...</p></div> );
    }
 
@@ -498,7 +516,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     : null;
 
   return (
-    // Removed SidebarProvider and outer div
+    // Main container for the editor layout
     <div className="flex h-full"> {/* Use full height */}
       {/* --- Local Project Sidebar --- */}
       <div className={cn(
