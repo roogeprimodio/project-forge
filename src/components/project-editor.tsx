@@ -19,7 +19,7 @@ import { generateSectionAction, summarizeSectionAction, generateTocAction, gener
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger, SheetClose } from "@/components/ui/sheet";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 interface ProjectEditorProps {
   projectId: string;
@@ -546,363 +546,365 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     : null;
 
   return (
-    // Main container for the editor layout
-    <div className="flex h-full relative"> {/* Use full height and relative positioning for floating button */}
+    // Wrap the entire return content with the Sheet component
+    <Sheet open={isMobileSheetOpen} onOpenChange={setIsMobileSheetOpen}>
+      {/* Main container for the editor layout */}
+      <div className="flex h-full relative"> {/* Use full height and relative positioning for floating button */}
 
-      {/* --- Local Project Sidebar (Drawer on Mobile) --- */}
-      <Sheet open={isMobileSheetOpen} onOpenChange={setIsMobileSheetOpen}>
+        {/* --- Local Project Sidebar (Drawer on Mobile - Content only) --- */}
         {/* The SheetTrigger is now the floating button */}
         <SheetContent side="left" className="p-0 w-64 bg-card md:hidden"> {/* Hide on desktop */}
-            <SheetHeader className="sr-only">
-                <SheetTitle>Project Menu</SheetTitle>
-                <SheetDescription>Navigate project sections and details</SheetDescription>
-            </SheetHeader>
-            <ProjectSidebarContent
-                project={project}
-                activeSectionIndex={activeSectionIndex}
-                setActiveSectionIndex={setActiveSectionIndex}
-                addSection={addSection}
-                customSectionName={customSectionName}
-                setCustomSectionName={setCustomSectionName}
-                handleGenerateOutline={handleGenerateOutline}
-                isGeneratingOutline={isGeneratingOutline}
-                isGenerating={isGenerating}
-                isSummarizing={isSummarizing}
-                isGeneratingToc={isGeneratingToc}
-                handleSaveOnline={handleSaveOnline}
-                onCloseSheet={() => setIsMobileSheetOpen(false)} // Pass close handler
-            />
+          <SheetHeader className="sr-only">
+            <SheetTitle>Project Menu</SheetTitle>
+            <SheetDescription>Navigate project sections and details</SheetDescription>
+          </SheetHeader>
+          <ProjectSidebarContent
+            project={project}
+            activeSectionIndex={activeSectionIndex}
+            setActiveSectionIndex={setActiveSectionIndex}
+            addSection={addSection}
+            customSectionName={customSectionName}
+            setCustomSectionName={setCustomSectionName}
+            handleGenerateOutline={handleGenerateOutline}
+            isGeneratingOutline={isGeneratingOutline}
+            isGenerating={isGenerating}
+            isSummarizing={isSummarizing}
+            isGeneratingToc={isGeneratingToc}
+            handleSaveOnline={handleSaveOnline}
+            onCloseSheet={() => setIsMobileSheetOpen(false)} // Pass close handler
+          />
         </SheetContent>
-      </Sheet>
 
-      {/* Desktop Static Sidebar */}
-      <div className={cn(
-          "hidden md:block transition-all duration-300 ease-in-out overflow-y-auto overflow-x-hidden", // Hide on mobile
-           isLocalSidebarOpen ? "w-64 border-r" : "w-0 border-r-0" // Adjust width and border based on state
-         )}
-         aria-hidden={!isLocalSidebarOpen}
-         >
-         {/* Only render content if open to prevent visual glitches when collapsed */}
-         {isLocalSidebarOpen && (
-             <ProjectSidebarContent
-                project={project}
-                activeSectionIndex={activeSectionIndex}
-                setActiveSectionIndex={setActiveSectionIndex}
-                addSection={addSection}
-                customSectionName={customSectionName}
-                setCustomSectionName={setCustomSectionName}
-                handleGenerateOutline={handleGenerateOutline}
-                isGeneratingOutline={isGeneratingOutline}
-                isGenerating={isGenerating}
-                isSummarizing={isSummarizing}
-                isGeneratingToc={isGeneratingToc}
-                handleSaveOnline={handleSaveOnline}
-                // No onCloseSheet needed for desktop
-             />
-         )}
-      </div>
+        {/* Desktop Static Sidebar */}
+        <div
+          className={cn(
+            "hidden md:block transition-all duration-300 ease-in-out overflow-y-auto overflow-x-hidden", // Hide on mobile
+            isLocalSidebarOpen ? "w-64 border-r" : "w-0 border-r-0" // Adjust width and border based on state
+          )}
+          aria-hidden={!isLocalSidebarOpen}
+        >
+          {/* Only render content if open to prevent visual glitches when collapsed */}
+          {isLocalSidebarOpen && (
+            <ProjectSidebarContent
+              project={project}
+              activeSectionIndex={activeSectionIndex}
+              setActiveSectionIndex={setActiveSectionIndex}
+              addSection={addSection}
+              customSectionName={customSectionName}
+              setCustomSectionName={setCustomSectionName}
+              handleGenerateOutline={handleGenerateOutline}
+              isGeneratingOutline={isGeneratingOutline}
+              isGenerating={isGenerating}
+              isSummarizing={isSummarizing}
+              isGeneratingToc={isGeneratingToc}
+              handleSaveOnline={handleSaveOnline}
+              // No onCloseSheet needed for desktop
+            />
+          )}
+        </div>
 
         {/* --- Main Content Area --- */}
-       <div className="flex-1 flex flex-col overflow-hidden"> {/* Allow main content to scroll */}
-            {/* Sticky Header for Main Content */}
-           <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/95 backdrop-blur-sm px-4 lg:px-6 flex-shrink-0">
-                {/* Global Sidebar Trigger (only if needed, usually handled by MainLayout) */}
-                {/* <SheetTrigger asChild><Button>Global Menu</Button></SheetTrigger> */}
+        <div className="flex-1 flex flex-col overflow-hidden"> {/* Allow main content to scroll */}
+          {/* Sticky Header for Main Content */}
+          <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/95 backdrop-blur-sm px-4 lg:px-6 flex-shrink-0">
+            {/* Global Sidebar Trigger (only if needed, usually handled by MainLayout) */}
+            {/* Mobile Sheet Trigger (moved to FAB) */}
 
-               <h1 className="flex-1 text-lg font-semibold md:text-xl text-primary truncate text-glow-primary">
-                {activeSectionIndex === -1 ? 'Project Details' : activeSection?.name ?? project.title ?? 'Project'}
-               </h1>
-               <div className="flex items-center gap-1 text-xs text-muted-foreground ml-auto mr-2" title={`Project stored ${project.storageType === 'local' ? 'locally' : 'in the cloud'}`}>
-                 {project.storageType === 'local' ? <CloudOff className="h-4 w-4" /> : <Cloud className="h-4 w-4 text-green-500" />}
-                 <span>{project.storageType === 'local' ? 'Local' : 'Cloud'}</span>
-               </div>
-               <Button
-                   variant="outline"
-                   size="sm"
-                   onClick={handleGenerateTocClick} // Use the new click handler
-                   disabled={isGeneratingToc || isGenerating || isSummarizing || isGeneratingOutline || !project.sections || project.sections.filter(s => s.name !== TOC_SECTION_NAME).length === 0}
-                   className="hover:glow-accent focus-visible:glow-accent"
-                   title={!project.sections || project.sections.filter(s => s.name !== TOC_SECTION_NAME).length === 0 ? "Add sections before generating ToC" : "Generate Table of Contents"}
-               >
-                   {isGeneratingToc ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <List className="mr-2 h-4 w-4" />}
-                   {isGeneratingToc ? 'Generating ToC...' : 'Generate ToC'}
-               </Button>
-               <Button
-                   variant="outline"
-                   size="sm"
-                   onClick={handleNavigateToExport}
-                   className="hover:glow-accent focus-visible:glow-accent ml-2"
-               >
-                   <Download className="mr-2 h-4 w-4" />
-                   Export Report
-               </Button>
-           </header>
+            <h1 className="flex-1 text-lg font-semibold md:text-xl text-primary truncate text-glow-primary">
+              {activeSectionIndex === -1 ? 'Project Details' : activeSection?.name ?? project.title ?? 'Project'}
+            </h1>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground ml-auto mr-2" title={`Project stored ${project.storageType === 'local' ? 'locally' : 'in the cloud'}`}>
+              {project.storageType === 'local' ? <CloudOff className="h-4 w-4" /> : <Cloud className="h-4 w-4 text-green-500" />}
+              <span>{project.storageType === 'local' ? 'Local' : 'Cloud'}</span>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleGenerateTocClick} // Use the new click handler
+              disabled={isGeneratingToc || isGenerating || isSummarizing || isGeneratingOutline || !project.sections || project.sections.filter(s => s.name !== TOC_SECTION_NAME).length === 0}
+              className="hover:glow-accent focus-visible:glow-accent"
+              title={!project.sections || project.sections.filter(s => s.name !== TOC_SECTION_NAME).length === 0 ? "Add sections before generating ToC" : "Generate Table of Contents"}
+            >
+              {isGeneratingToc ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <List className="mr-2 h-4 w-4" />}
+              {isGeneratingToc ? 'Generating ToC...' : 'Generate ToC'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleNavigateToExport}
+              className="hover:glow-accent focus-visible:glow-accent ml-2"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Export Report
+            </Button>
+          </header>
 
           <ScrollArea className="flex-1 p-4 md:p-6 relative"> {/* Make content scrollable & relative for floating button */}
             {activeSectionIndex === -1 ? (
-                // Project Details Form
-                <Card className="shadow-md">
-                    <CardHeader>
-                        <CardTitle className="text-glow-primary">Project Details</CardTitle>
-                        <CardDescription>Edit general information about your project. Providing context helps the AI generate a relevant outline and content.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                         <div>
-                            <Label htmlFor="projectTitleMain">Project Title *</Label>
-                            <Input
-                                id="projectTitleMain"
-                                value={project.title}
-                                onChange={(e) => handleProjectDetailChange('title', e.target.value)}
-                                placeholder="Enter Project Title"
-                                className="mt-1 focus-visible:glow-primary"
-                                required
-                            />
-                        </div>
-                        <div>
-                            <Label htmlFor="projectContext">Project Context</Label>
-                            <Textarea
-                                id="projectContext"
-                                value={project.projectContext}
-                                onChange={(e) => handleProjectDetailChange('projectContext', e.target.value)}
-                                placeholder="Briefly describe your project, its goals, scope, and key features or technologies involved. This helps the AI generate a relevant outline and content."
-                                className="mt-1 min-h-[120px] focus-visible:glow-primary"
-                            />
-                            <p className="text-xs text-muted-foreground mt-1">This context is used by the AI to generate the initial project outline and can influence the Table of Contents generation.</p>
-                        </div>
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <Label htmlFor="instituteName">Institute Name</Label>
-                                <Input
-                                    id="instituteName"
-                                    value={project.instituteName || ''}
-                                    onChange={(e) => handleProjectDetailChange('instituteName', e.target.value)}
-                                    placeholder="e.g., L. D. College of Engineering"
-                                    className="mt-1 focus-visible:glow-primary"
-                                />
-                            </div>
-                            <div>
-                                <Label htmlFor="branch">Branch</Label>
-                                <Input
-                                    id="branch"
-                                    value={project.branch || ''}
-                                    onChange={(e) => handleProjectDetailChange('branch', e.target.value)}
-                                    placeholder="e.g., Computer Engineering"
-                                    className="mt-1 focus-visible:glow-primary"
-                                />
-                            </div>
-                             <div>
-                                <Label htmlFor="semester">Semester</Label>
-                                <Input
-                                    id="semester"
-                                    value={project.semester || ''}
-                                    onChange={(e) => handleProjectDetailChange('semester', e.target.value)}
-                                    placeholder="e.g., 5"
-                                    type="number" // Use number type for semester if appropriate
-                                    className="mt-1 focus-visible:glow-primary"
-                                />
-                            </div>
-                            <div>
-                                <Label htmlFor="subject">Subject</Label>
-                                <Input
-                                    id="subject"
-                                    value={project.subject || ''}
-                                    onChange={(e) => handleProjectDetailChange('subject', e.target.value)}
-                                    placeholder="e.g., Design Engineering - 1A"
-                                    className="mt-1 focus-visible:glow-primary"
-                                />
-                            </div>
-                        </div>
-                        <Separator />
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                             <div>
-                                <Label htmlFor="teamId">Team ID</Label>
-                                <Input
-                                    id="teamId"
-                                    value={project.teamId || ''}
-                                    onChange={(e) => handleProjectDetailChange('teamId', e.target.value)}
-                                    placeholder="Enter Team ID"
-                                    className="mt-1 focus-visible:glow-primary"
-                                />
-                            </div>
-                            <div>
-                                <Label htmlFor="guideName">Faculty Guide Name</Label>
-                                <Input
-                                    id="guideName"
-                                    value={project.guideName || ''}
-                                    onChange={(e) => handleProjectDetailChange('guideName', e.target.value)}
-                                    placeholder="Enter Guide's Name"
-                                    className="mt-1 focus-visible:glow-primary"
-                                />
-                            </div>
-                         </div>
-                         <div>
-                            <Label htmlFor="teamDetails">Team Details (Members & Enrollment)</Label>
-                            <Textarea
-                                id="teamDetails"
-                                value={project.teamDetails}
-                                onChange={(e) => handleProjectDetailChange('teamDetails', e.target.value)}
-                                placeholder="Enter team member names and enrollment numbers, one per line (e.g., John Doe - 123456789)"
-                                className="mt-1 min-h-[100px] focus-visible:glow-primary"
-                            />
-                            <p className="text-xs text-muted-foreground mt-1">This information will be used in the generated report sections and title page.</p>
-                        </div>
-                    </CardContent>
-                     <CardFooter className="flex justify-end">
-                         <Button
-                             variant="default"
-                             size="sm"
-                             onClick={handleGenerateOutline}
-                             disabled={isGeneratingOutline || isGenerating || isSummarizing || isGeneratingToc || !project.projectContext?.trim()}
-                             className="hover:glow-primary focus-visible:glow-primary"
-                             title={!project.projectContext?.trim() ? "Add project context above first" : "Generate section outline based on project context"}
-                         >
-                             {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
-                             {isGeneratingOutline ? 'Generating Outline...' : 'Generate Section Outline'}
-                         </Button>
-                     </CardFooter>
-                </Card>
+              // Project Details Form
+              <Card className="shadow-md">
+                <CardHeader>
+                  <CardTitle className="text-glow-primary">Project Details</CardTitle>
+                  <CardDescription>Edit general information about your project. Providing context helps the AI generate a relevant outline and content.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div>
+                    <Label htmlFor="projectTitleMain">Project Title *</Label>
+                    <Input
+                      id="projectTitleMain"
+                      value={project.title}
+                      onChange={(e) => handleProjectDetailChange('title', e.target.value)}
+                      placeholder="Enter Project Title"
+                      className="mt-1 focus-visible:glow-primary"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="projectContext">Project Context</Label>
+                    <Textarea
+                      id="projectContext"
+                      value={project.projectContext}
+                      onChange={(e) => handleProjectDetailChange('projectContext', e.target.value)}
+                      placeholder="Briefly describe your project, its goals, scope, and key features or technologies involved. This helps the AI generate a relevant outline and content."
+                      className="mt-1 min-h-[120px] focus-visible:glow-primary"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">This context is used by the AI to generate the initial project outline and can influence the Table of Contents generation.</p>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="instituteName">Institute Name</Label>
+                      <Input
+                        id="instituteName"
+                        value={project.instituteName || ''}
+                        onChange={(e) => handleProjectDetailChange('instituteName', e.target.value)}
+                        placeholder="e.g., L. D. College of Engineering"
+                        className="mt-1 focus-visible:glow-primary"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="branch">Branch</Label>
+                      <Input
+                        id="branch"
+                        value={project.branch || ''}
+                        onChange={(e) => handleProjectDetailChange('branch', e.target.value)}
+                        placeholder="e.g., Computer Engineering"
+                        className="mt-1 focus-visible:glow-primary"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="semester">Semester</Label>
+                      <Input
+                        id="semester"
+                        value={project.semester || ''}
+                        onChange={(e) => handleProjectDetailChange('semester', e.target.value)}
+                        placeholder="e.g., 5"
+                        type="number" // Use number type for semester if appropriate
+                        className="mt-1 focus-visible:glow-primary"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="subject">Subject</Label>
+                      <Input
+                        id="subject"
+                        value={project.subject || ''}
+                        onChange={(e) => handleProjectDetailChange('subject', e.target.value)}
+                        placeholder="e.g., Design Engineering - 1A"
+                        className="mt-1 focus-visible:glow-primary"
+                      />
+                    </div>
+                  </div>
+                  <Separator />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="teamId">Team ID</Label>
+                      <Input
+                        id="teamId"
+                        value={project.teamId || ''}
+                        onChange={(e) => handleProjectDetailChange('teamId', e.target.value)}
+                        placeholder="Enter Team ID"
+                        className="mt-1 focus-visible:glow-primary"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="guideName">Faculty Guide Name</Label>
+                      <Input
+                        id="guideName"
+                        value={project.guideName || ''}
+                        onChange={(e) => handleProjectDetailChange('guideName', e.target.value)}
+                        placeholder="Enter Guide's Name"
+                        className="mt-1 focus-visible:glow-primary"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="teamDetails">Team Details (Members & Enrollment)</Label>
+                    <Textarea
+                      id="teamDetails"
+                      value={project.teamDetails}
+                      onChange={(e) => handleProjectDetailChange('teamDetails', e.target.value)}
+                      placeholder="Enter team member names and enrollment numbers, one per line (e.g., John Doe - 123456789)"
+                      className="mt-1 min-h-[100px] focus-visible:glow-primary"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">This information will be used in the generated report sections and title page.</p>
+                  </div>
+                </CardContent>
+                <CardFooter className="flex justify-end">
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={handleGenerateOutline}
+                    disabled={isGeneratingOutline || isGenerating || isSummarizing || isGeneratingToc || !project.projectContext?.trim()}
+                    className="hover:glow-primary focus-visible:glow-primary"
+                    title={!project.projectContext?.trim() ? "Add project context above first" : "Generate section outline based on project context"}
+                  >
+                    {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
+                    {isGeneratingOutline ? 'Generating Outline...' : 'Generate Section Outline'}
+                  </Button>
+                </CardFooter>
+              </Card>
             ) : activeSection ? (
               // Section Editor
               <div className="space-y-6">
-                 {activeSection.name !== TOC_SECTION_NAME && (
-                    <Card className="shadow-md">
-                        <CardHeader>
-                            <CardTitle className="text-primary text-glow-primary">{activeSection.name} - AI Prompt</CardTitle>
-                             {activeSection.lastGenerated && (
-                                 <CardDescription>Last generated: {new Date(activeSection.lastGenerated).toLocaleString()}</CardDescription>
-                             )}
-                        </CardHeader>
-                         <CardContent className="space-y-4">
-                              <div>
-                                  <Label htmlFor={`section-prompt-${activeSectionIndex}`}>Generation Prompt</Label>
-                                  <Textarea
-                                    id={`section-prompt-${activeSectionIndex}`}
-                                    value={activeSection.prompt}
-                                    onChange={(e) => handleSectionPromptChange(activeSectionIndex, e.target.value)}
-                                    placeholder="Enter instructions for the AI..."
-                                    className="mt-1 min-h-[100px] font-mono text-sm focus-visible:glow-primary"
-                                  />
-                              </div>
-                               <Button onClick={() => handleGenerateSection(activeSectionIndex)} disabled={isGenerating || isSummarizing || isGeneratingToc || isGeneratingOutline} className="hover:glow-primary focus-visible:glow-primary">
-                                 {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
-                                 {isGenerating ? 'Generating...' : 'Generate Content'}
-                               </Button>
-                         </CardContent>
-                    </Card>
-                 )}
-
-                 <Card className="shadow-md">
+                {activeSection.name !== TOC_SECTION_NAME && (
+                  <Card className="shadow-md">
                     <CardHeader>
-                        <CardTitle>{activeSection.name} - Content</CardTitle>
-                        <CardDescription>
-                          {activeSection.name === TOC_SECTION_NAME
-                            ? "This Table of Contents was generated by the AI. You can manually edit it below."
-                            : "Edit the generated or existing content below."}
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                         <Textarea
-                           id={`section-content-${activeSectionIndex}`}
-                           value={activeSection.content}
-                           onChange={(e) => handleSectionContentChange(activeSectionIndex, e.target.value)}
-                           placeholder={activeSection.name === TOC_SECTION_NAME ? "Table of Contents will appear here." : "Generated content will appear here. You can also write manually."}
-                           className="min-h-[400px] text-base focus-visible:glow-primary"
-                         />
-                    </CardContent>
-                     {activeSection.name !== TOC_SECTION_NAME && (
-                         <CardFooter className="flex justify-end">
-                             <Button
-                                 variant="outline"
-                                 onClick={() => handleSummarizeSection(activeSectionIndex)}
-                                 disabled={isSummarizing || isGenerating || isGeneratingToc || isGeneratingOutline || !activeSection.content?.trim()}
-                                 className="hover:glow-accent focus-visible:glow-accent"
-                             >
-                               {isSummarizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ScrollText className="mr-2 h-4 w-4" />}
-                               {isSummarizing ? 'Summarizing...' : 'Summarize'}
-                             </Button>
-                         </CardFooter>
+                      <CardTitle className="text-primary text-glow-primary">{activeSection.name} - AI Prompt</CardTitle>
+                      {activeSection.lastGenerated && (
+                        <CardDescription>Last generated: {new Date(activeSection.lastGenerated).toLocaleString()}</CardDescription>
                       )}
-                 </Card>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div>
+                        <Label htmlFor={`section-prompt-${activeSectionIndex}`}>Generation Prompt</Label>
+                        <Textarea
+                          id={`section-prompt-${activeSectionIndex}`}
+                          value={activeSection.prompt}
+                          onChange={(e) => handleSectionPromptChange(activeSectionIndex, e.target.value)}
+                          placeholder="Enter instructions for the AI..."
+                          className="mt-1 min-h-[100px] font-mono text-sm focus-visible:glow-primary"
+                        />
+                      </div>
+                      <Button onClick={() => handleGenerateSection(activeSectionIndex)} disabled={isGenerating || isSummarizing || isGeneratingToc || isGeneratingOutline} className="hover:glow-primary focus-visible:glow-primary">
+                        {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
+                        {isGenerating ? 'Generating...' : 'Generate Content'}
+                      </Button>
+                    </CardContent>
+                  </Card>
+                )}
+
+                <Card className="shadow-md">
+                  <CardHeader>
+                    <CardTitle>{activeSection.name} - Content</CardTitle>
+                    <CardDescription>
+                      {activeSection.name === TOC_SECTION_NAME
+                        ? "This Table of Contents was generated by the AI. You can manually edit it below."
+                        : "Edit the generated or existing content below."}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Textarea
+                      id={`section-content-${activeSectionIndex}`}
+                      value={activeSection.content}
+                      onChange={(e) => handleSectionContentChange(activeSectionIndex, e.target.value)}
+                      placeholder={activeSection.name === TOC_SECTION_NAME ? "Table of Contents will appear here." : "Generated content will appear here. You can also write manually."}
+                      className="min-h-[400px] text-base focus-visible:glow-primary"
+                    />
+                  </CardContent>
+                  {activeSection.name !== TOC_SECTION_NAME && (
+                    <CardFooter className="flex justify-end">
+                      <Button
+                        variant="outline"
+                        onClick={() => handleSummarizeSection(activeSectionIndex)}
+                        disabled={isSummarizing || isGenerating || isGeneratingToc || isGeneratingOutline || !activeSection.content?.trim()}
+                        className="hover:glow-accent focus-visible:glow-accent"
+                      >
+                        {isSummarizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ScrollText className="mr-2 h-4 w-4" />}
+                        {isSummarizing ? 'Summarizing...' : 'Summarize'}
+                      </Button>
+                    </CardFooter>
+                  )}
+                </Card>
               </div>
             ) : (
-               // Initial State - No Section Selected or Empty Project
-               <div className="flex items-center justify-center h-full">
-                    {project.sections && project.sections.length > 0 ? (
-                       <p className="text-muted-foreground text-lg">Select a section from the sidebar or add a new one.</p>
-                    ) : (
-                       <Card className="text-center py-8 px-6 max-w-md mx-auto shadow-md">
-                           <CardHeader>
-                                <CardTitle className="text-xl text-primary text-glow-primary">Project Outline Needed</CardTitle>
-                                <CardDescription className="mt-2">
-                                  Your project doesn't have any sections yet.
-                                </CardDescription>
-                           </CardHeader>
-                            <CardContent className="mt-4 space-y-4">
-                                <p>Go to <Button variant="link" className="p-0 h-auto text-base" onClick={() => setActiveSectionIndex(-1)}>Project Details</Button> and provide some context, then click "Generate Section Outline" below or in the details section.</p>
-                                <Button
-                                    variant="default"
-                                    size="sm"
-                                    onClick={handleGenerateOutline}
-                                    disabled={isGeneratingOutline || isGenerating || isSummarizing || isGeneratingToc || !project.projectContext?.trim()}
-                                    className="hover:glow-primary focus-visible:glow-primary"
-                                    title={!project.projectContext?.trim() ? "Add project context in Project Details first" : "Generate section outline based on project context"}
-                                >
-                                    {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
-                                    {isGeneratingOutline ? 'Generating Outline...' : 'Generate Outline'}
-                                </Button>
-                                <p className="text-xs text-muted-foreground mt-3">Alternatively, you can add standard or custom sections manually using the sidebar.</p>
-                            </CardContent>
-                       </Card>
-                    )}
-               </div>
+              // Initial State - No Section Selected or Empty Project
+              <div className="flex items-center justify-center h-full">
+                {project.sections && project.sections.length > 0 ? (
+                  <p className="text-muted-foreground text-lg">Select a section from the sidebar or add a new one.</p>
+                ) : (
+                  <Card className="text-center py-8 px-6 max-w-md mx-auto shadow-md">
+                    <CardHeader>
+                      <CardTitle className="text-xl text-primary text-glow-primary">Project Outline Needed</CardTitle>
+                      <CardDescription className="mt-2">
+                        Your project doesn't have any sections yet.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="mt-4 space-y-4">
+                      <p>Go to <Button variant="link" className="p-0 h-auto text-base" onClick={() => setActiveSectionIndex(-1)}>Project Details</Button> and provide some context, then click "Generate Section Outline" below or in the details section.</p>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={handleGenerateOutline}
+                        disabled={isGeneratingOutline || isGenerating || isSummarizing || isGeneratingToc || !project.projectContext?.trim()}
+                        className="hover:glow-primary focus-visible:glow-primary"
+                        title={!project.projectContext?.trim() ? "Add project context in Project Details first" : "Generate section outline based on project context"}
+                      >
+                        {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
+                        {isGeneratingOutline ? 'Generating Outline...' : 'Generate Outline'}
+                      </Button>
+                      <p className="text-xs text-muted-foreground mt-3">Alternatively, you can add standard or custom sections manually using the sidebar.</p>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
             )}
 
             {/* Floating Action Button (FAB) for Sidebar Toggle */}
             <div className="absolute bottom-6 right-6 z-20">
-                {/* Mobile: Sheet Trigger */}
-                <SheetTrigger asChild>
-                    <Button
-                        variant="default" // Use default style for FAB
-                        size="icon"
-                        className="rounded-full w-14 h-14 shadow-lg md:hidden hover:glow-primary focus-visible:glow-primary"
-                        aria-label="Open project menu"
-                    >
-                        <Menu className="h-6 w-6" />
-                    </Button>
-                </SheetTrigger>
+              {/* Mobile: Sheet Trigger */}
+              <SheetTrigger asChild>
+                <Button
+                  variant="default" // Use default style for FAB
+                  size="icon"
+                  className="rounded-full w-14 h-14 shadow-lg md:hidden hover:glow-primary focus-visible:glow-primary"
+                  aria-label="Open project menu"
+                >
+                  <Menu className="h-6 w-6" />
+                </Button>
+              </SheetTrigger>
 
-                {/* Desktop: Static Sidebar Toggle */}
-                 <Button
-                    variant="default" // Use default style for FAB
-                    size="icon"
-                    onClick={() => setIsLocalSidebarOpen(!isLocalSidebarOpen)}
-                    className="hidden md:flex rounded-full w-14 h-14 shadow-lg hover:glow-primary focus-visible:glow-primary"
-                    aria-label={isLocalSidebarOpen ? "Collapse project menu" : "Expand project menu"}
-                 >
-                    <Menu className="h-6 w-6" />
-                 </Button>
+              {/* Desktop: Static Sidebar Toggle */}
+              <Button
+                variant="default" // Use default style for FAB
+                size="icon"
+                onClick={() => setIsLocalSidebarOpen(!isLocalSidebarOpen)}
+                className="hidden md:flex rounded-full w-14 h-14 shadow-lg hover:glow-primary focus-visible:glow-primary"
+                aria-label={isLocalSidebarOpen ? "Collapse project menu" : "Expand project menu"}
+              >
+                <Menu className="h-6 w-6" />
+              </Button>
             </div>
           </ScrollArea>
         </div> {/* End Main Content Area */}
 
-      {/* Context Warning Dialog for ToC Generation */}
-      <AlertDialog open={showTocContextAlert} onOpenChange={setShowTocContextAlert}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Project Context May Be Limited</AlertDialogTitle>
-            <AlertDialogDescription>
-              The project context provided is quite short. Generating a Table of Contents might be less accurate.
-              Consider adding more details to the "Project Context" field in Project Details for better results.
-              Do you want to proceed with generation anyway?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={proceedWithTocGeneration}>Generate Anyway</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        {/* Context Warning Dialog for ToC Generation */}
+        <AlertDialog open={showTocContextAlert} onOpenChange={setShowTocContextAlert}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Project Context May Be Limited</AlertDialogTitle>
+              <AlertDialogDescription>
+                The project context provided is quite short. Generating a Table of Contents might be less accurate.
+                Consider adding more details to the "Project Context" field in Project Details for better results.
+                Do you want to proceed with generation anyway?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={proceedWithTocGeneration}>Generate Anyway</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
-    </div>
+      </div> {/* End Main Flex Container */}
+    </Sheet> // Close the wrapping Sheet component
   );
 }
