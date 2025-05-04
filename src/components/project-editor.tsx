@@ -537,15 +537,23 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     // Main container for the editor layout
     <div className="flex h-full"> {/* Use full height */}
       {/* --- Local Project Sidebar (Drawer on Mobile) --- */}
-       {/* Mobile Sheet */}
+       {/* Wrap SheetTrigger and SheetContent in Sheet */}
       <Sheet>
-         {/* The trigger is now in the header, rendered conditionally */}
-
-         <SheetContent side="left" className="p-0 w-64 bg-card"> {/* Apply card background */}
-             <SheetHeader className="sr-only">
-                 <SheetTitle>Project Menu</SheetTitle>
-                 <SheetDescription>Navigate project sections and details</SheetDescription>
-             </SheetHeader>
+        <SheetTrigger asChild>
+          <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden fixed top-3 left-2 z-20 text-foreground" // Position trigger visually
+              aria-label="Open project menu"
+          >
+              <Menu className="h-5 w-5" />
+          </Button>
+        </SheetTrigger>
+        <SheetContent side="left" className="p-0 w-64 bg-card"> {/* Apply card background */}
+            <SheetHeader className="sr-only">
+                <SheetTitle>Project Menu</SheetTitle>
+                <SheetDescription>Navigate project sections and details</SheetDescription>
+            </SheetHeader>
             {/* Render sidebar content inside the sheet */}
             <ProjectSidebarContent
                 project={project}
@@ -553,7 +561,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 setActiveSectionIndex={(index) => {
                     setActiveSectionIndex(index);
                     // Close sheet on selection if needed (optional)
-                    // document.querySelector('[cmdk-item]')?.closest('[role="dialog"]')?.querySelector('button[aria-label="Close"]')?.click();
+                    // Consider using SheetClose inside the button onClick if direct closing is needed
                 }}
                 addSection={addSection}
                 customSectionName={customSectionName}
@@ -564,8 +572,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 isSummarizing={isSummarizing}
                 isGeneratingToc={isGeneratingToc}
                 handleSaveOnline={handleSaveOnline}
-             />
-         </SheetContent>
+            />
+        </SheetContent>
       </Sheet>
 
       {/* Desktop Static Sidebar */}
@@ -598,18 +606,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
        <div className="flex-1 flex flex-col overflow-hidden"> {/* Allow main content to scroll */}
             {/* Sticky Header for Main Content */}
            <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/95 backdrop-blur-sm px-4 lg:px-6 flex-shrink-0">
-                {/* Mobile Sheet Trigger */}
-                 <SheetTrigger asChild>
-                   <Button
-                       variant="ghost"
-                       size="icon"
-                       className="md:hidden text-foreground" // Only show on mobile
-                       aria-label="Open project menu"
-                   >
-                       <Menu className="h-5 w-5" />
-                   </Button>
-                 </SheetTrigger>
-
+                {/* Removed Mobile Sheet Trigger from here as it's now outside with Sheet */}
                 {/* Desktop Sidebar Toggle Button */}
                 <Button
                     variant="ghost"
