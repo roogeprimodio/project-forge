@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 // Helper function to safely access localStorage
 function getStorageValue<T>(key: string, defaultValue: T): T {
@@ -21,35 +21,47 @@ function getStorageValue<T>(key: string, defaultValue: T): T {
   }
 }
 
-export function useLocalStorage<T>(key: string, defaultValue: T): [T, (value: T | ((val: T) => T)) => void] {
-  // Initialize state with defaultValue initially, useEffect will load from storage client-side
-  const [value, setValue] = useState<T>(() => defaultValue);
+export function useLocalStorage<T>(
+  key: string,
+  defaultValue: T
+): [T, (value: T | ((val: T) => T)) => void] {
+  // Initialize state. Use a function to read from storage only once on initial render client-side.
+  const [value, setValue] = useState<T>(() => {
+    // Check if window is defined (client-side)
+    if (typeof window !== "undefined") {
+      return getStorageValue(key, defaultValue);
+    }
+    // Server-side or during build, return default
+    return defaultValue;
+  });
+
+  // Ref to track if the component has mounted and initial value loaded
+  const isMounted = useRef(false);
 
   // Effect to load initial value from localStorage on mount (client-side only)
+  // And handle updates if defaultValue or key changes (though key change is less common)
   useEffect(() => {
-    // Ensure this runs only once on mount client-side
-    setValue(getStorageValue(key, defaultValue));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]); // Only depend on key
+    if (typeof window !== "undefined") {
+      // On mount, ensure the state reflects the current storage value.
+      // This also handles cases where the value might have changed between SSR and client hydration.
+      setValue(getStorageValue(key, defaultValue));
+      isMounted.current = true; // Mark as mounted after initial load
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, defaultValue]); // Depend on key and defaultValue
 
   // Effect to update localStorage when value changes
   useEffect(() => {
-    // Check if window is defined (runs only on client-side)
-    if (typeof window !== "undefined") {
+    // Only run this effect on the client-side and after the initial value has been loaded
+    if (typeof window !== "undefined" && isMounted.current) {
       try {
-        // Prevent storing the initial defaultValue if it hasn't been updated yet by the load effect
-        // This check might be redundant if the initial state is set correctly, but adds safety
-        const currentValueInStorage = localStorage.getItem(key);
         const newValueString = JSON.stringify(value);
-        // Only write if the value is different or if storage is empty (initial set)
-        if (currentValueInStorage !== newValueString) {
-            localStorage.setItem(key, newValueString);
-        }
+        localStorage.setItem(key, newValueString);
       } catch (error) {
         console.error(`Error setting localStorage key “${key}”:`, error);
       }
     }
-  }, [key, value]);
+  }, [key, value]); // Only depends on key and value
 
   // Effect to listen for storage events from other tabs/windows
   useEffect(() => {
@@ -58,29 +70,21 @@ export function useLocalStorage<T>(key: string, defaultValue: T): [T, (value: T 
     }
 
     const handleStorageChange = (event: StorageEvent) => {
-      // Check if the change involves the key this hook is managing
-      if (event.key === key) {
-        if (event.newValue !== null) {
-          // Item updated or added in another tab
-          try {
-             const newValueParsed = JSON.parse(event.newValue);
-             // Update state only if the parsed new value differs from the current state
-             // This prevents unnecessary re-renders if the value is technically the same
-             setValue(currentVal => {
-                 if (JSON.stringify(currentVal) !== event.newValue) {
-                     return newValueParsed;
-                 }
-                 return currentVal;
-             });
-          } catch(error) {
-            console.error(`Error parsing storage event value for key "${key}"`, error);
-            // If parsing fails, revert to reading directly from storage as a fallback
-            setValue(getStorageValue(key, defaultValue));
-          }
-        } else {
-          // Item deleted or cleared in another tab (event.newValue is null)
-          // Update the state to reflect the deletion, typically by setting it to the default value
-          setValue(defaultValue);
+      if (event.storageArea === localStorage && event.key === key) {
+        try {
+          const newValueParsed = event.newValue !== null ? JSON.parse(event.newValue) : defaultValue;
+          // Update state only if the new value is actually different from the current state
+          setValue(currentVal => {
+            // Use JSON.stringify for comparison to handle objects/arrays correctly
+            if (JSON.stringify(currentVal) !== JSON.stringify(newValueParsed)) {
+              return newValueParsed;
+            }
+            return currentVal;
+          });
+        } catch (error) {
+          console.error(`Error parsing storage event value for key "${key}"`, error);
+          // Fallback to reading directly from storage if parsing fails
+          setValue(getStorageValue(key, defaultValue));
         }
       }
     };
@@ -89,21 +93,16 @@ export function useLocalStorage<T>(key: string, defaultValue: T): [T, (value: T 
     return () => {
       window.removeEventListener('storage', handleStorageChange);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, defaultValue]); // Include defaultValue in dependencies
-
 
   // useCallback ensures the setter function has a stable identity
   const setStoredValue = useCallback((newValue: T | ((val: T) => T)) => {
-      // Allow functional updates like useState
-      setValue(prevValue => {
-          const valueToStore = newValue instanceof Function ? newValue(prevValue) : newValue;
-          // The useEffect listening to [key, value] will handle saving to localStorage
-          return valueToStore;
-      });
-  }, [key]); // Keep key in dependency array? No, setter shouldn't change if key changes. Removed key.
-
+    setValue(prevValue => {
+      const valueToStore = newValue instanceof Function ? newValue(prevValue) : newValue;
+      // The useEffect listening to [key, value] will handle saving to localStorage
+      return valueToStore;
+    });
+  }, [key]); // Setter depends on the key
 
   return [value, setStoredValue];
 }
-

@@ -1,3 +1,4 @@
+
 // src/components/project-editor.tsx
 "use client";
 
@@ -43,7 +44,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const [isGeneratingToc, setIsGeneratingToc] = useState(false);
   const [isGeneratingOutline, setIsGeneratingOutline] = useState(false);
   const [customSectionName, setCustomSectionName] = useState('');
-  const [isProjectFound, setIsProjectFound] = useState<boolean | null>(null);
+  const [isProjectFound, setIsProjectFound] = useState<boolean | null>(null); // null: checking, true: found, false: not found
   const router = useRouter();
 
   // Derived state: current project
@@ -54,27 +55,28 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
    // Effect to check if project exists and set initial state
    useEffect(() => {
-     // Only run if projects data is loaded (not initial undefined) and we haven't determined existence yet
-     if (projects !== undefined && isProjectFound === null) {
+     // Only run if projects data is loaded (not initial undefined)
+     if (projects !== undefined) {
        const projectExists = Array.isArray(projects) && projects.some(p => p.id === projectId);
-       setIsProjectFound(projectExists);
+       setIsProjectFound(projectExists); // Set to true or false
+
        if (projectExists && activeSectionIndex === null) {
            // If project found and no section is active, default to Project Details
            setActiveSectionIndex(-1);
+       } else if (!projectExists && isProjectFound !== false) {
+           // If project not found, ensure state is set to false if not already
+           // (Handles edge case where project might be deleted after initial load)
+           toast({
+               variant: "destructive",
+               title: "Project Not Found",
+               description: `Project with ID ${projectId} seems missing. Returning to dashboard.`,
+           });
+           // Redirect back home after a delay to allow toast to be seen
+           const timer = setTimeout(() => router.push('/'), 2000);
+           return () => clearTimeout(timer); // Cleanup timer on unmount
        }
-       // If not found, isProjectFound is false, and the component will render the "Not Found" message
-     } else if (isProjectFound === true && !project) {
-         // Edge case: Project existed, but is now gone (e.g., deleted in another tab)
-         setIsProjectFound(false);
-         toast({
-             variant: "destructive",
-             title: "Project Data Lost",
-             description: "The project data seems to have been removed. Returning to dashboard.",
-         });
-         // Consider redirecting after a short delay
-          setTimeout(() => router.push('/'), 1500); // Redirect back home
      }
-   }, [projectId, projects, isProjectFound, activeSectionIndex, toast, router]); // Added router to dependencies
+   }, [projectId, projects, isProjectFound, activeSectionIndex, toast, router]); // Depend on projects array itself
 
   const updateProject = useCallback((updatedProjectData: Partial<Project>) => {
     setProjects((prevProjects = []) => // Ensure prevProjects is an array
@@ -123,7 +125,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     };
     const updatedSections = [...project.sections, newSection];
     updateProject({ sections: updatedSections });
-    setActiveSectionIndex(updatedSections.length - 1);
+    setActiveSectionIndex(updatedSections.length - 1); // Activate the newly added section
     setCustomSectionName('');
     toast({
       title: "Section Added",
@@ -187,20 +189,23 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         // Handle case where currentProjects might be undefined initially
         if (!currentProjects) return [];
 
-        const projectToUpdate = currentProjects.find(p => p.id === projectId);
-        if (!projectToUpdate || index >= projectToUpdate.sections.length) return currentProjects;
+        return currentProjects.map(p => {
+           if (p.id === projectId) {
+                // Ensure the project exists and the index is valid before updating
+                if (!p.sections || index >= p.sections.length) return p; // Return unchanged if invalid
 
-        const updatedSections = [...projectToUpdate.sections];
-         updatedSections[index] = {
-           ...updatedSections[index],
-           content: result.reportSectionContent,
-           lastGenerated: new Date().toISOString(),
-         };
-
-         return currentProjects.map(p =>
-            p.id === projectId ? { ...projectToUpdate, sections: updatedSections, updatedAt: new Date().toISOString() } : p
-          );
+                const updatedSections = [...p.sections];
+                updatedSections[index] = {
+                    ...updatedSections[index],
+                    content: result.reportSectionContent,
+                    lastGenerated: new Date().toISOString(),
+                };
+                return { ...p, sections: updatedSections, updatedAt: new Date().toISOString() };
+           }
+           return p;
+        });
       });
+
 
       toast({
         title: "Section Generated",
@@ -274,34 +279,40 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         // Use functional update for safety
         setProjects(currentProjects => {
              if (!currentProjects) return [];
-            const projectToUpdate = currentProjects.find(p => p.id === projectId);
-            if (!projectToUpdate) return currentProjects;
+             let tocSectionIndexResult = -1; // To store the index for setActiveSectionIndex outside map
+             let sectionAdded = false;
 
-            let tocSectionIndex = projectToUpdate.sections.findIndex(s => s.name === TOC_SECTION_NAME);
-            let updatedSections = [...projectToUpdate.sections];
-            let sectionAdded = false;
+             const updatedProjects = currentProjects.map(p => {
+                if (p.id === projectId) {
+                    let tocSectionIndex = p.sections.findIndex(s => s.name === TOC_SECTION_NAME);
+                    let updatedSections = [...p.sections];
 
-            if (tocSectionIndex > -1) {
-                updatedSections[tocSectionIndex] = { ...updatedSections[tocSectionIndex], content: tocContent, lastGenerated: now };
-            } else {
-                const newTocSection: ProjectSection = { name: TOC_SECTION_NAME, prompt: "Table of Contents generated by AI.", content: tocContent, lastGenerated: now };
-                updatedSections.unshift(newTocSection); // Add to the beginning
-                tocSectionIndex = 0;
-                sectionAdded = true;
-            }
+                    if (tocSectionIndex > -1) {
+                        updatedSections[tocSectionIndex] = { ...updatedSections[tocSectionIndex], content: tocContent, lastGenerated: now };
+                    } else {
+                        const newTocSection: ProjectSection = { name: TOC_SECTION_NAME, prompt: "Table of Contents generated by AI.", content: tocContent, lastGenerated: now };
+                        updatedSections.unshift(newTocSection); // Add to the beginning
+                        tocSectionIndex = 0;
+                        sectionAdded = true;
+                    }
+                    tocSectionIndexResult = tocSectionIndex; // Store the index
+                    return { ...p, sections: updatedSections, updatedAt: now };
+                }
+                return p;
+            });
 
-             toast({
-                title: "Table of Contents Generated",
-                description: `The "${TOC_SECTION_NAME}" section has been ${sectionAdded ? 'added' : 'updated'}.`,
+            // After state update, trigger the UI updates
+             requestAnimationFrame(() => {
+                 toast({
+                     title: "Table of Contents Generated",
+                     description: `The "${TOC_SECTION_NAME}" section has been ${sectionAdded ? 'added' : 'updated'}.`,
+                 });
+                 if (tocSectionIndexResult !== -1) {
+                    setActiveSectionIndex(tocSectionIndexResult);
+                 }
              });
 
-            // Update active section index state *after* the project state update
-            // Use requestAnimationFrame to ensure state updates flush before setting active index
-            requestAnimationFrame(() => setActiveSectionIndex(tocSectionIndex));
-
-            return currentProjects.map(p =>
-                p.id === projectId ? { ...projectToUpdate, sections: updatedSections, updatedAt: now } : p
-            );
+            return updatedProjects;
         });
 
     } catch (error) {
@@ -357,20 +368,25 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
    // --- Render Logic ---
 
+   // 1. Initial checking state
    if (isProjectFound === null) {
      return ( <div className="flex flex-col items-center justify-center min-h-screen text-center p-4"><Loader2 className="h-16 w-16 animate-spin text-primary mb-4" /><p className="text-lg text-muted-foreground">Loading project...</p></div> );
    }
 
-   if (!isProjectFound) {
+   // 2. Project explicitly not found
+   if (isProjectFound === false) {
      return ( <div className="flex flex-col items-center justify-center min-h-screen text-center p-4"><CloudOff className="h-16 w-16 text-destructive mb-4" /><h2 className="text-2xl font-semibold text-destructive mb-2">Project Not Found</h2><p className="text-muted-foreground mb-6">The project with ID <code className="bg-muted px-1 rounded">{projectId}</code> could not be found. It might have been deleted or the link is incorrect.</p><Button onClick={() => router.push('/')}><Home className="mr-2 h-4 w-4" /> Go to Dashboard</Button></div> );
    }
 
-   // Project found, but `project` object might still be momentarily undefined during hydration/update
+   // 3. Project found, but `project` object might still be momentarily undefined during hydration/update
+   //    or if `projects` array is updated by the hook listener.
    if (!project) {
+       // This state indicates `isProjectFound` was true, but the `project` object isn't available *yet*.
+       // Show a more specific loading state.
        return ( <div className="flex flex-col items-center justify-center min-h-screen text-center p-4"><Loader2 className="h-16 w-16 animate-spin text-primary mb-4" /><p className="text-lg text-muted-foreground">Finalizing project data...</p><Button onClick={() => router.push('/')} className="mt-4"><Home className="mr-2 h-4 w-4" /> Go to Dashboard</Button></div> );
    }
 
-   // Project is guaranteed to exist from here
+   // --- Project is guaranteed to exist from here ---
    const activeSection = activeSectionIndex !== null && activeSectionIndex >= 0 && activeSectionIndex < project.sections.length
     ? project.sections[activeSectionIndex]
     : null;
@@ -403,7 +419,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                     <Label htmlFor="projectTitleSidebar" className="text-xs font-medium text-sidebar-foreground/70">Project Title</Label>
                     <Input
                         id="projectTitleSidebar"
-                        value={project.title}
+                        value={project.title} // Safely access title
                         onChange={(e) => handleProjectDetailChange('title', e.target.value)}
                         className="h-8 mt-1 text-base bg-input text-input-foreground border-sidebar-border focus-visible:ring-sidebar-ring"
                         placeholder="Enter Project Title"
@@ -424,7 +440,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 </SidebarMenuItem>
                  <Separator className="my-2 bg-sidebar-border" />
                 <p className="px-4 text-xs font-semibold text-sidebar-foreground/70 mb-1 group-data-[state=collapsed]:hidden">SECTIONS</p>
-                {project.sections.map((section, index) => (
+                {project.sections?.map((section, index) => ( // Safely map sections
                   <SidebarMenuItem key={`${section.name}-${index}`}> {/* Use a more stable key if possible */}
                     <SidebarMenuButton
                       onClick={() => setActiveSectionIndex(index)}
@@ -444,13 +460,13 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                     <div className="flex flex-col gap-1">
                         {COMMON_SECTIONS
                          .filter(cs => cs !== TOC_SECTION_NAME)
-                         .filter(cs => !project.sections.some(s => s.name.toLowerCase() === cs.toLowerCase()))
+                         .filter(cs => !project.sections?.some(s => s.name.toLowerCase() === cs.toLowerCase())) // Safe check
                          .map(sectionName => (
                             <Button key={sectionName} variant="ghost" size="sm" className="justify-start text-sidebar-foreground/80 hover:text-sidebar-accent-foreground hover:bg-sidebar-accent" onClick={() => addSection(sectionName)}>
                                 {sectionName}
                             </Button>
                         ))}
-                        {COMMON_SECTIONS.filter(cs => cs !== TOC_SECTION_NAME).every(cs => project.sections.some(s => s.name.toLowerCase() === cs.toLowerCase())) && (
+                        {COMMON_SECTIONS.filter(cs => cs !== TOC_SECTION_NAME).every(cs => project.sections?.some(s => s.name.toLowerCase() === cs.toLowerCase())) && ( // Safe check
                              <p className="text-xs text-sidebar-foreground/60">All standard sections added.</p>
                         )}
                     </div>
@@ -477,9 +493,9 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                    variant="outline"
                    size="sm"
                    onClick={handleGenerateOutline}
-                   disabled={isGeneratingOutline || isGenerating || isSummarizing || isGeneratingToc || !project.projectContext?.trim()}
+                   disabled={isGeneratingOutline || isGenerating || isSummarizing || isGeneratingToc || !project.projectContext?.trim()} // Safe check
                    className="w-full hover:glow-accent focus-visible:glow-accent"
-                   title={!project.projectContext?.trim() ? "Add project context in Project Details first" : "Generate section outline based on project context"}
+                   title={!project.projectContext?.trim() ? "Add project context in Project Details first" : "Generate section outline based on project context"} // Safe check
                >
                    {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
                    {isGeneratingOutline ? 'Generating Outline...' : 'Generate Outline'}
@@ -488,9 +504,9 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                     variant="outline"
                     size="sm"
                     onClick={handleSaveOnline}
-                    disabled={project.storageType === 'cloud'}
+                    disabled={project.storageType === 'cloud'} // Safe check
                     className="w-full mt-2 hover:glow-accent focus-visible:glow-accent"
-                    title={project.storageType === 'cloud' ? "Project is saved online" : "Save project to the cloud (requires login - coming soon)"}
+                    title={project.storageType === 'cloud' ? "Project is saved online" : "Save project to the cloud (requires login - coming soon)"} // Safe check
                 >
                     {project.storageType === 'cloud' ? <Cloud className="mr-2 h-4 w-4 text-green-500" /> : <CloudOff className="mr-2 h-4 w-4" />}
                     {project.storageType === 'cloud' ? 'Saved Online' : 'Save Online'}
@@ -516,9 +532,9 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                    variant="outline"
                    size="sm"
                    onClick={handleGenerateToc}
-                   disabled={isGeneratingToc || isGenerating || isSummarizing || isGeneratingOutline || project.sections.filter(s => s.name !== TOC_SECTION_NAME).length === 0}
+                   disabled={isGeneratingToc || isGenerating || isSummarizing || isGeneratingOutline || !project.sections || project.sections.filter(s => s.name !== TOC_SECTION_NAME).length === 0} // Safe check
                    className="hover:glow-accent focus-visible:glow-accent"
-                   title={project.sections.filter(s => s.name !== TOC_SECTION_NAME).length === 0 ? "Add sections before generating ToC" : "Generate Table of Contents"}
+                   title={!project.sections || project.sections.filter(s => s.name !== TOC_SECTION_NAME).length === 0 ? "Add sections before generating ToC" : "Generate Table of Contents"} // Safe check
                >
                    {isGeneratingToc ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <List className="mr-2 h-4 w-4" />}
                    {isGeneratingToc ? 'Generating ToC...' : 'Generate ToC'}
@@ -548,7 +564,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                             <Label htmlFor="projectTitleMain">Project Title *</Label>
                             <Input
                                 id="projectTitleMain"
-                                value={project.title}
+                                value={project.title} // Safe access
                                 onChange={(e) => handleProjectDetailChange('title', e.target.value)}
                                 placeholder="Enter Project Title"
                                 className="mt-1 focus-visible:glow-primary"
@@ -560,7 +576,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                             <Label htmlFor="projectContext">Project Context</Label>
                             <Textarea
                                 id="projectContext"
-                                value={project.projectContext}
+                                value={project.projectContext} // Safe access
                                 onChange={(e) => handleProjectDetailChange('projectContext', e.target.value)}
                                 placeholder="Briefly describe your project, its goals, scope, and key features or technologies involved. This helps the AI generate a relevant outline and content."
                                 className="mt-1 min-h-[120px] focus-visible:glow-primary"
@@ -573,7 +589,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                                 <Label htmlFor="teamDetails">Team Details</Label>
                                 <Textarea
                                     id="teamDetails"
-                                    value={project.teamDetails}
+                                    value={project.teamDetails} // Safe access
                                     onChange={(e) => handleProjectDetailChange('teamDetails', e.target.value)}
                                     placeholder="Enter team member names and IDs, one per line"
                                     className="mt-1 min-h-[80px] focus-visible:glow-primary"
@@ -583,7 +599,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                                 <Label htmlFor="collegeInfo">College Information</Label>
                                 <Input
                                     id="collegeInfo"
-                                    value={project.collegeInfo}
+                                    value={project.collegeInfo} // Safe access
                                     onChange={(e) => handleProjectDetailChange('collegeInfo', e.target.value)}
                                     placeholder="Enter College Name"
                                     className="mt-1 focus-visible:glow-primary"
@@ -596,9 +612,9 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                              variant="default"
                              size="sm"
                              onClick={handleGenerateOutline}
-                             disabled={isGeneratingOutline || isGenerating || isSummarizing || isGeneratingToc || !project.projectContext?.trim()}
+                             disabled={isGeneratingOutline || isGenerating || isSummarizing || isGeneratingToc || !project.projectContext?.trim()} // Safe check
                              className="hover:glow-primary focus-visible:glow-primary"
-                             title={!project.projectContext?.trim() ? "Add project context above first" : "Generate section outline based on project context"}
+                             title={!project.projectContext?.trim() ? "Add project context above first" : "Generate section outline based on project context"} // Safe check
                          >
                              {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
                              {isGeneratingOutline ? 'Generating Outline...' : 'Generate Section Outline'}
@@ -671,7 +687,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             ) : (
                // Initial State - No Section Selected or Empty Project
                <div className="flex items-center justify-center h-full">
-                    {project.sections.length > 0 ? (
+                    {project.sections && project.sections.length > 0 ? ( // Safe check
                        <p className="text-muted-foreground text-lg">Select a section from the sidebar or add a new one.</p>
                     ) : (
                        <Card className="text-center py-8 px-6 max-w-md mx-auto shadow-md">
@@ -687,9 +703,9 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                                     variant="default"
                                     size="sm"
                                     onClick={handleGenerateOutline}
-                                    disabled={isGeneratingOutline || isGenerating || isSummarizing || isGeneratingToc || !project.projectContext?.trim()}
+                                    disabled={isGeneratingOutline || isGenerating || isSummarizing || isGeneratingToc || !project.projectContext?.trim()} // Safe check
                                     className="hover:glow-primary focus-visible:glow-primary"
-                                    title={!project.projectContext?.trim() ? "Add project context in Project Details first" : "Generate section outline based on project context"}
+                                    title={!project.projectContext?.trim() ? "Add project context in Project Details first" : "Generate section outline based on project context"} // Safe check
                                 >
                                     {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
                                     {isGeneratingOutline ? 'Generating Outline...' : 'Generate Outline'}
@@ -706,3 +722,4 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     </SidebarProvider>
   );
 }
+
