@@ -82,11 +82,21 @@ export default {
   				to: {
   					height: '0'
   				}
-  			}
+  			},
+              'subtle-glow': {
+                 '0%, 100%': { boxShadow: '0 0 3px 0px hsla(var(--primary), 0.4)' },
+                 '50%': { boxShadow: '0 0 8px 2px hsla(var(--primary), 0.6)' },
+              },
+              'subtle-glow-accent': {
+                  '0%, 100%': { boxShadow: '0 0 3px 0px hsla(var(--accent), 0.4)' },
+                  '50%': { boxShadow: '0 0 8px 2px hsla(var(--accent), 0.6)' },
+              }
   		},
   		animation: {
   			'accordion-down': 'accordion-down 0.2s ease-out',
-  			'accordion-up': 'accordion-up 0.2s ease-out'
+  			'accordion-up': 'accordion-up 0.2s ease-out',
+            'subtle-glow': 'subtle-glow 2s ease-in-out infinite',
+            'subtle-glow-accent': 'subtle-glow-accent 2s ease-in-out infinite'
   		}
   	}
   },

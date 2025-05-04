@@ -2,6 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Keyframes for subtle glow */
+@keyframes subtleGlow {
+  0% { box-shadow: 0 0 3px 0px hsla(var(--primary), 0.4); }
+  50% { box-shadow: 0 0 8px 2px hsla(var(--primary), 0.6); }
+  100% { box-shadow: 0 0 3px 0px hsla(var(--primary), 0.4); }
+}
+@keyframes subtleGlowAccent {
+  0% { box-shadow: 0 0 3px 0px hsla(var(--accent), 0.4); }
+  50% { box-shadow: 0 0 8px 2px hsla(var(--accent), 0.6); }
+  100% { box-shadow: 0 0 3px 0px hsla(var(--accent), 0.4); }
+}
+
 body {
   font-family: Arial, Helvetica, sans-serif;
 }
@@ -10,72 +22,74 @@ body {
   :root {
     --background: 0 0% 96.1%; /* Light Gray */
     --foreground: 0 0% 3.9%;
-    --card: 0 0% 100%; /* Keep card white for contrast */
+    --card: 0 0% 100%; /* White card */
     --card-foreground: 0 0% 3.9%;
-    --popover: 0 0% 100%; /* Keep popover white */
+    --popover: 0 0% 100%; /* White popover */
     --popover-foreground: 0 0% 3.9%;
     --primary: 232 52% 40%; /* Dark Blue */
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 90%; /* Slightly darker gray for secondary elements */
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 90%; /* Same as secondary */
-    --muted-foreground: 0 0% 45.1%;
+    --primary-foreground: 0 0% 98%; /* White */
+    --secondary: 220 13% 91%; /* Slightly darker gray */
+    --secondary-foreground: 240 5% 34%; /* Darker gray text */
+    --muted: 220 13% 91%; /* Same as secondary */
+    --muted-foreground: 240 4% 46%; /* Medium gray text */
     --accent: 174 100% 29%; /* Teal */
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 174 100% 29%; /* Teal */
+    --accent-foreground: 0 0% 98%; /* White */
+    --destructive: 0 84.2% 60.2%; /* Red */
+    --destructive-foreground: 0 0% 98%; /* White */
+    --border: 220 13% 86%; /* Lighter gray border */
+    --input: 220 13% 91%; /* Input background slightly off-white */
+    --input-foreground: 0 0% 3.9%; /* Dark input text */
+    --ring: 174 100% 29%; /* Teal ring */
     --chart-1: 232 52% 40%; /* Dark Blue */
     --chart-2: 174 100% 29%; /* Teal */
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
+    --chart-3: 197 37% 34%; /* Darker Teal/Blue */
+    --chart-4: 43 74% 66%; /* Orange/Yellow */
+    --chart-5: 27 87% 67%; /* Coral */
     --radius: 0.5rem;
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 232 52% 40%; /* Dark Blue for sidebar primary */
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 174 10% 90%; /* Lighter Teal/Gray for sidebar accent */
-    --sidebar-accent-foreground: 232 52% 40%; /* Dark Blue */
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 174 100% 29%; /* Teal */
+    --sidebar-background: 0 0% 98%; /* Slightly off-white sidebar */
+    --sidebar-foreground: 240 5.3% 26.1%; /* Dark sidebar text */
+    --sidebar-primary: 232 52% 40%; /* Dark Blue */
+    --sidebar-primary-foreground: 0 0% 98%; /* White */
+    --sidebar-accent: 220 14% 93%; /* Very light gray/blue accent */
+    --sidebar-accent-foreground: 232 52% 40%; /* Dark Blue text on accent */
+    --sidebar-border: 220 13% 88%; /* Slightly darker sidebar border */
+    --sidebar-ring: 174 100% 29%; /* Teal ring */
   }
+
   .dark {
-    /* Define dark theme colors if needed, otherwise keep default or adjust */
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 174 100% 39%; /* Teal for primary in dark */
-    --primary-foreground: 0 0% 9%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 232 52% 50%; /* Lighter Blue for accent */
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 174 100% 39%; /* Teal */
+    --background: 240 10% 3.9%; /* Very dark gray */
+    --foreground: 0 0% 98%; /* White text */
+    --card: 240 4% 10%; /* Dark card */
+    --card-foreground: 0 0% 98%; /* White text */
+    --popover: 240 4% 10%; /* Dark popover */
+    --popover-foreground: 0 0% 98%; /* White text */
+    --primary: 174 90% 45%; /* Brighter Teal */
+    --primary-foreground: 240 10% 3.9%; /* Dark text on primary */
+    --secondary: 240 4% 15.9%; /* Darker secondary */
+    --secondary-foreground: 0 0% 80%; /* Lighter gray text */
+    --muted: 240 4% 15.9%; /* Same as secondary */
+    --muted-foreground: 0 0% 63.9%; /* Medium gray text */
+    --accent: 232 60% 60%; /* Lighter Blue accent */
+    --accent-foreground: 0 0% 98%; /* White text on accent */
+    --destructive: 0 62.8% 50.6%; /* Brighter Red */
+    --destructive-foreground: 0 0% 98%; /* White text */
+    --border: 240 4% 18%; /* Darker border */
+    --input: 240 4% 15.9%; /* Dark input background */
+    --input-foreground: 0 0% 98%; /* White input text */
+    --ring: 174 80% 50%; /* Brighter Teal ring */
     --chart-1: 174 70% 50%; /* Teal */
     --chart-2: 232 60% 55%; /* Blue */
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 174 100% 39%; /* Teal */
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 0 0% 98%; /* White/Light text */
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 174 100% 39%; /* Teal */
+    --chart-3: 30 80% 55%; /* Orange */
+    --chart-4: 280 65% 60%; /* Purple */
+    --chart-5: 340 75% 55%; /* Pink */
+    --sidebar-background: 240 6% 10%; /* Slightly darker sidebar */
+    --sidebar-foreground: 0 0% 85%; /* Lighter sidebar text */
+    --sidebar-primary: 174 90% 45%; /* Brighter Teal */
+    --sidebar-primary-foreground: 240 10% 3.9%; /* Dark text */
+    --sidebar-accent: 240 4% 15.9%; /* Dark accent */
+    --sidebar-accent-foreground: 0 0% 95%; /* Light text on accent */
+    --sidebar-border: 240 4% 18%; /* Darker border */
+    --sidebar-ring: 174 80% 50%; /* Brighter Teal ring */
   }
 }
 
@@ -85,5 +99,51 @@ body {
   }
   body {
     @apply bg-background text-foreground;
+    /* Smooth scrolling */
+    scroll-behavior: smooth;
+  }
+  /* Apply subtle glow on focus-visible for accessibility and style */
+  *:focus-visible {
+     outline: none;
+     @apply ring-2 ring-offset-2 ring-ring ring-offset-background;
+     /* Add glow based on context */
+     /* Apply primary glow by default */
+     /* animation: subtleGlow 1.5s ease-in-out infinite; */
+  }
+   /* Example: Apply accent glow specifically to accent-colored interactive elements */
+   .focus-visible\:glow-accent:focus-visible {
+       /* animation: subtleGlowAccent 1.5s ease-in-out infinite; */
+       @apply ring-accent;
+   }
+   /* Apply primary glow specifically to primary-colored interactive elements */
+    .focus-visible\:glow-primary:focus-visible {
+       /* animation: subtleGlow 1.5s ease-in-out infinite; */
+       @apply ring-primary;
+   }
+
+   /* General hover glow for primary buttons */
+   .hover\:glow-primary:hover {
+        /* animation: subtleGlow 1.5s ease-in-out infinite; */
+        box-shadow: 0 0 8px 2px hsla(var(--primary), 0.5);
+   }
+    /* General hover glow for accent elements */
+   .hover\:glow-accent:hover {
+        /* animation: subtleGlowAccent 1.5s ease-in-out infinite; */
+         box-shadow: 0 0 8px 2px hsla(var(--accent), 0.5);
+   }
+
+   /* Add transition for smooth effect */
+    button, a, input, textarea, select {
+        @apply transition-all duration-200 ease-in-out;
+    }
+}
+
+/* Add glowing text utility class */
+@layer utilities {
+  .text-glow-primary {
+    text-shadow: 0 0 5px hsla(var(--primary), 0.7), 0 0 10px hsla(var(--primary), 0.5);
+  }
+  .text-glow-accent {
+    text-shadow: 0 0 5px hsla(var(--accent), 0.7), 0 0 10px hsla(var(--accent), 0.5);
   }
 }

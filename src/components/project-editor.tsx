@@ -1,3 +1,4 @@
+// src/components/project-editor.tsx
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -17,16 +18,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { BookOpen, Settings, ChevronLeft, Save, Loader2, Wand2 } from 'lucide-react';
+import { BookOpen, Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText } from 'lucide-react'; // Added ScrollText
 import Link from 'next/link';
 import type { Project, ProjectSection } from '@/types/project';
 import { COMMON_SECTIONS } from '@/types/project';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { useToast } from '@/hooks/use-toast';
-import { generateSectionAction } from '@/app/actions';
+import { generateSectionAction, summarizeSectionAction } from '@/app/actions'; // Added summarizeSectionAction
 
 interface ProjectEditorProps {
   projectId: string;
@@ -35,8 +36,9 @@ interface ProjectEditorProps {
 export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const [projects, setProjects] = useLocalStorage<Project[]>('projects', []);
   const { toast } = useToast();
-  const [activeSectionIndex, setActiveSectionIndex] = useState<number | null>(0); // Start with first section or null if empty
+  const [activeSectionIndex, setActiveSectionIndex] = useState<number | null | -1>(-1); // Start with details (-1)
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSummarizing, setIsSummarizing] = useState(false); // State for summarization loading
   const [customSectionName, setCustomSectionName] = useState('');
 
   // Find the current project based on projectId
@@ -44,16 +46,18 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
   // Effect to initialize activeSectionIndex if project loads/changes
   useEffect(() => {
+     // Only set to 0 if currently null and project has sections
      if (project && project.sections.length > 0 && activeSectionIndex === null) {
        setActiveSectionIndex(0);
-     } else if (project && project.sections.length === 0) {
-       setActiveSectionIndex(null);
+     } else if (project && project.sections.length === 0 && activeSectionIndex !== -1) {
+       // If project has no sections, default to project details unless already there
+       setActiveSectionIndex(-1);
      }
-     // If project becomes undefined (e.g., deleted), reset
+     // If project becomes undefined (e.g., deleted), reset to -1 (Project Details)
      if (!project) {
-         setActiveSectionIndex(null);
+         setActiveSectionIndex(-1);
      }
-  }, [project, activeSectionIndex]);
+   }, [project, activeSectionIndex]); // Rerun when project or activeSectionIndex changes
 
 
   const updateProject = useCallback((updatedProjectData: Partial<Project>) => {
@@ -65,14 +69,14 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   }, [projectId, setProjects]);
 
   const handleSectionContentChange = (index: number, content: string) => {
-    if (!project) return;
+    if (!project || index < 0 || index >= project.sections.length) return;
     const updatedSections = [...project.sections];
     updatedSections[index] = { ...updatedSections[index], content };
     updateProject({ sections: updatedSections });
   };
 
   const handleSectionPromptChange = (index: number, prompt: string) => {
-    if (!project) return;
+    if (!project || index < 0 || index >= project.sections.length) return;
     const updatedSections = [...project.sections];
     updatedSections[index] = { ...updatedSections[index], prompt };
     updateProject({ sections: updatedSections });
@@ -141,16 +145,74 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     }
   };
 
+  const handleSummarizeSection = async (index: number) => {
+      if (!project || index < 0 || index >= project.sections.length) return;
+
+      const section = project.sections[index];
+      if (!section.content || section.content.trim() === '') {
+          toast({
+              variant: "destructive",
+              title: "Summarization Failed",
+              description: "Section content is empty.",
+          });
+          return;
+      }
+
+      setIsSummarizing(true);
+
+      try {
+          const result = await summarizeSectionAction({
+              projectTitle: project.title,
+              sectionText: section.content,
+          });
+
+          if ('error' in result) {
+              throw new Error(result.error);
+          }
+
+          // Display summary in a toast
+          toast({
+              title: `Summary for "${section.name}"`,
+              description: (
+                 <ScrollArea className="h-32 w-full"> {/* Make description scrollable */}
+                     <p className="text-sm">{result.summary}</p>
+                 </ScrollArea>
+              ),
+              duration: 9000, // Longer duration for reading summary
+          });
+
+          // Optional: Update section content with summary?
+          // const updatedSections = [...project.sections];
+          // updatedSections[index] = {
+          //   ...section,
+          //   content: result.summary, // Replace content with summary
+          //   // Or add a new field like 'summary': result.summary
+          // };
+          // updateProject({ sections: updatedSections });
+
+
+      } catch (error) {
+          console.error("Summarization failed:", error);
+          toast({
+              variant: "destructive",
+              title: "Summarization Failed",
+              description: error instanceof Error ? error.message : "Could not summarize section content.",
+          });
+      } finally {
+          setIsSummarizing(false);
+      }
+  };
+
+
    if (!project) {
     // Handle case where project is not found (e.g., deleted or invalid ID)
-    // You might want to redirect or show a specific message
     useEffect(() => {
-        // Maybe redirect after a delay or show message
-        // router.push('/'); // If using useRouter
+        // Optional: Redirect after a delay or show message
+        // import { useRouter } from 'next/navigation'; const router = useRouter(); router.push('/');
     }, []);
     return (
-        <div className="flex items-center justify-center min-h-screen">
-            <p className="text-lg text-destructive">Project not found.</p>
+        <div className="flex flex-col items-center justify-center min-h-screen text-center p-4">
+            <p className="text-lg text-destructive mb-4">Project not found.</p>
              <Link href="/" passHref legacyBehavior>
                  <Button variant="link" className="ml-2">Go to Dashboard</Button>
              </Link>
@@ -159,7 +221,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
    }
 
 
-  const activeSection = activeSectionIndex !== null ? project.sections[activeSectionIndex] : null;
+  const activeSection = activeSectionIndex !== null && activeSectionIndex >= 0 ? project.sections[activeSectionIndex] : null;
 
   return (
     <SidebarProvider defaultOpen={true}>
@@ -200,7 +262,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                   <SidebarMenuButton
                     onClick={() => setActiveSectionIndex(-1)} // Use -1 for settings/details
                     isActive={activeSectionIndex === -1}
-                    tooltip="Project Settings"
+                    tooltip="Project Details"
                   >
                     <Settings />
                     <span className="group-data-[state=collapsed]:hidden">Project Details</span>
@@ -310,7 +372,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                         {/* Add API Key input later if needed */}
                     </CardContent>
                 </Card>
-            ) : activeSection ? (
+            ) : activeSectionIndex !== null && activeSection ? ( // Ensure index is valid
               // Render Section Editor
               <div className="space-y-6">
                 <Card>
@@ -333,7 +395,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                                 className="mt-1 min-h-[100px] font-mono text-sm"
                               />
                           </div>
-                           <Button onClick={() => handleGenerateSection(activeSectionIndex)} disabled={isGenerating}>
+                           <Button onClick={() => handleGenerateSection(activeSectionIndex)} disabled={isGenerating || isSummarizing}>
                              {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
                              {isGenerating ? 'Generating...' : 'Generate Content'}
                            </Button>
@@ -343,7 +405,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                  <Card>
                     <CardHeader>
                         <CardTitle>Section Content</CardTitle>
-                        <CardDescription>Edit the generated content below.</CardDescription>
+                        <CardDescription>Edit the generated or existing content below.</CardDescription>
                     </CardHeader>
                     <CardContent>
                          <Textarea
@@ -354,6 +416,17 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                            className="min-h-[300px] text-base" // Increased base text size
                          />
                     </CardContent>
+                     <CardFooter>
+                         {/* Summarize Button */}
+                         <Button
+                             variant="outline"
+                             onClick={() => handleSummarizeSection(activeSectionIndex)}
+                             disabled={isSummarizing || isGenerating || !activeSection.content?.trim()}
+                         >
+                           {isSummarizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ScrollText className="mr-2 h-4 w-4" />}
+                           {isSummarizing ? 'Summarizing...' : 'Summarize'}
+                         </Button>
+                     </CardFooter>
                  </Card>
               </div>
             ) : (
