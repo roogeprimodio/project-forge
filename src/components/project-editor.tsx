@@ -18,7 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import { generateSectionAction, summarizeSectionAction, generateTocAction, generateOutlineAction } from '@/app/actions';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils'; // Import cn
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"; // Sheet components for potential mobile use
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet"; // Sheet components for potential mobile use - Added SheetTrigger
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"; // Import AlertDialog components
 
 interface ProjectEditorProps {
