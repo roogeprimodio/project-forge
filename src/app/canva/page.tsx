@@ -13,6 +13,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { v4 as uuidv4 } from 'uuid';
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator'; // Import Separator
+import { Textarea } from '@/components/ui/textarea'; // Import Textarea for sidebar editing
 
 // Define Canvas Types - Updated based on JSON IDs
 type CanvasType =
@@ -95,7 +96,7 @@ const StickyNote = React.memo(({
     onDragStart,
     onTouchStart,
     onContextMenu,
-    onTextChange,
+    onTextChange, // Changed: now takes only new text
     onDoubleClick,
     onBlur,
     onClick, // New prop for single click selection
@@ -106,7 +107,7 @@ const StickyNote = React.memo(({
     onDragStart: (e: React.MouseEvent<HTMLDivElement>, id: string) => void;
     onTouchStart: (e: React.TouchEvent<HTMLDivElement>, id: string) => void;
     onContextMenu: (e: React.MouseEvent<HTMLDivElement>, id: string) => void;
-    onTextChange: (id: string, text: string) => void;
+    onTextChange: (text: string) => void; // Changed signature
     onDoubleClick: (id: string) => void; // For initiating edit
     onBlur: (id: string) => void; // For finishing edit
     onClick: (id: string) => void; // New prop
@@ -121,35 +122,44 @@ const StickyNote = React.memo(({
     }, [note.isEditing]);
 
     const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+        // Stop propagation to prevent canvas click handlers (deselect)
+        e.stopPropagation();
         // Prevent triggering click during/immediately after drag or while editing
         if (note.isEditing || isDragging) {
-             e.stopPropagation(); // Prevent potential parent handlers
              return;
         }
         onClick(note.id);
     };
 
+     const handleBlur = () => {
+       onBlur(note.id);
+     };
+
+
     return (
         <div
             className={cn(
-                `absolute p-2 shadow-md rounded text-sm text-black cursor-grab active:cursor-grabbing border border-gray-400/50 flex flex-col touch-none transition-transform duration-100 ease-in-out`,
+                `absolute p-2 shadow-md rounded text-sm text-black cursor-grab active:cursor-grabbing border border-gray-400/50 flex flex-col touch-none overflow-hidden`, // Added overflow-hidden
                 note.color,
-                isDragging && 'ring-2 ring-blue-500 ring-offset-2 scale-105 shadow-xl cursor-grabbing z-50', // Dragging style (changed ring color)
+                isDragging && 'ring-2 ring-blue-500 ring-offset-2 scale-105 shadow-xl cursor-grabbing z-50 opacity-80', // Dragging style (changed ring color, added opacity)
                 isSelected && !isDragging && 'ring-2 ring-primary ring-offset-1 z-10', // Selection style (only if not dragging)
-                note.isEditing && 'cursor-text z-20' // Editing style
+                note.isEditing && 'cursor-text z-20 ring-2 ring-blue-500 ring-offset-1' // Editing style with ring
             )}
             style={{
                 left: `${note.x}px`,
                 top: `${note.y}px`,
                 width: `${note.width}px`,
                 height: `${note.height}px`,
+                // Add transitions for smoother movement (optional)
+                // transition: isDragging ? 'none' : 'left 0.05s ease-out, top 0.05s ease-out',
             }}
             onMouseDown={(e) => !note.isEditing && onDragStart(e, note.id)}
             onTouchStart={(e) => !note.isEditing && onTouchStart(e, note.id)}
             onContextMenu={(e) => !note.isEditing && onContextMenu(e, note.id)} // Only context menu if not editing
             onDoubleClick={(e) => {
                 e.stopPropagation();
-                if (!isDragging) { // Prevent double click if dragging
+                // Prevent double click during drag or right after
+                if (!isDragging) {
                     onDoubleClick(note.id);
                 }
             }}
@@ -158,18 +168,18 @@ const StickyNote = React.memo(({
             {note.isEditing ? (
                 <textarea
                     ref={textAreaRef}
-                    className="w-full h-full bg-transparent border-none resize-none outline-none text-xs focus:ring-1 focus:ring-blue-500 rounded"
+                    className="w-full h-full bg-transparent border-none resize-none outline-none text-xs focus:ring-0" // Removed focus ring from textarea itself
                     value={note.text}
-                    onChange={(e) => onTextChange(note.id, e.target.value)}
-                    onBlur={() => onBlur(note.id)}
+                    onChange={(e) => onTextChange(e.target.value)} // Pass only text
+                    onBlur={handleBlur} // Use wrapper
                     onMouseDown={(e) => e.stopPropagation()} // Prevent drag when clicking textarea
                     onTouchStart={(e) => e.stopPropagation()} // Prevent drag when touching textarea
                     onClick={(e) => e.stopPropagation()} // Prevent note selection click when clicking textarea
                 />
             ) : (
                  // Display text, handle overflow
-                 <div className="w-full h-full overflow-hidden whitespace-pre-wrap text-xs break-words pointer-events-none"> {/* Add pointer-events-none */}
-                    {note.text || '...'}
+                 <div className="w-full h-full overflow-hidden whitespace-pre-wrap text-xs break-words pointer-events-none"> {/* Keep pointer-events-none */}
+                    {note.text || <span className="text-muted-foreground italic">Edit...</span>} {/* Placeholder */}
                  </div>
             )}
         </div>
@@ -187,7 +197,7 @@ const CanvasBackground = ({
     onDragStart,
     onTouchStart,
     onContextMenu,
-    onNoteTextChange,
+    onNoteTextChange, // Changed: now takes id and text
     onNoteDoubleClick,
     onNoteBlur,
     onNoteClick, // Added onNoteClick
@@ -199,7 +209,7 @@ const CanvasBackground = ({
     onDragStart: (e: React.MouseEvent<HTMLDivElement>, id: string) => void;
     onTouchStart: (e: React.TouchEvent<HTMLDivElement>, id: string) => void;
     onContextMenu: (e: React.MouseEvent<HTMLDivElement>, id: string) => void;
-    onNoteTextChange: (id: string, text: string) => void;
+    onNoteTextChange: (id: string, text: string) => void; // Changed signature
     onNoteDoubleClick: (id: string) => void;
     onNoteBlur: (id: string) => void;
     onNoteClick: (id: string) => void; // Added onNoteClick prop
@@ -273,7 +283,7 @@ const CanvasBackground = ({
                         onDragStart={onDragStart}
                         onTouchStart={onTouchStart} // Pass touch handler
                         onContextMenu={onContextMenu}
-                        onTextChange={onNoteTextChange}
+                        onTextChange={(text) => onNoteTextChange(note.id, text)} // Pass id and text
                         onDoubleClick={onNoteDoubleClick}
                         onBlur={onNoteBlur}
                         onClick={onNoteClick} // Pass click handler
@@ -327,7 +337,7 @@ const CanvasBackground = ({
                     onDragStart={onDragStart}
                     onTouchStart={onTouchStart} // Pass touch handler
                     onContextMenu={onContextMenu}
-                    onTextChange={onNoteTextChange}
+                    onTextChange={(text) => onNoteTextChange(note.id, text)} // Pass id and text
                     onDoubleClick={onNoteDoubleClick}
                     onBlur={onNoteBlur}
                     onClick={onNoteClick} // Pass click handler
@@ -350,11 +360,13 @@ export default function CanvaPage() {
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null); // Track selected note for sidebar editing
   const [editWidth, setEditWidth] = useState(''); // Width for sidebar editor
   const [editHeight, setEditHeight] = useState(''); // Height for sidebar editor
+  const [editText, setEditText] = useState(''); // Text for sidebar editor
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const longPressTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Ref for long press timeout
   const dragStartTimeRef = useRef<number>(0); // To differentiate click from drag
   const isDraggingRef = useRef(false); // Ref to track dragging state precisely
+  const pointerDownTimeRef = useRef<number>(0); // Track initial pointer down time
 
   // Placeholder Project/Common Info (Replace with actual data fetching if linked to a project)
   const commonHeaderInfo = {
@@ -370,17 +382,16 @@ export default function CanvaPage() {
 
   // Update sidebar edit fields when selectedNoteId changes
   useEffect(() => {
-    if (selectedNoteId) {
-      const selected = notes.find(n => n.id === selectedNoteId);
-      if (selected) {
+    const selected = notes.find(n => n.id === selectedNoteId);
+    if (selected) {
         setEditWidth(String(selected.width));
         setEditHeight(String(selected.height));
-        // Set color in sidebar if needed, though buttons are direct action
-      }
+        setEditText(selected.text); // Update text in sidebar
     } else {
       // Clear fields if no note is selected
       setEditWidth('');
       setEditHeight('');
+      setEditText(''); // Clear text
     }
   }, [selectedNoteId, notes]);
 
@@ -394,8 +405,8 @@ export default function CanvaPage() {
     const canvasBounds = canvasRef.current?.getBoundingClientRect();
     const newNote: StickyNoteData = {
       id: uuidv4(),
-      x: canvasBounds ? (canvasBounds.width / 2) - 50 + (canvasRef.current?.scrollLeft || 0) : 50, // Adjust for scroll
-      y: canvasBounds ? (canvasBounds.height / 2) - 50 + (canvasRef.current?.scrollTop || 0) : 50, // Adjust for scroll
+       x: canvasBounds ? (canvasBounds.width / 2) - 50 + (canvasRef.current?.scrollLeft || 0) : 50, // Centered, adjusted for scroll
+       y: canvasBounds ? (canvasBounds.height / 2) - 50 + (canvasRef.current?.scrollTop || 0) : 50, // Centered, adjusted for scroll
       text: '',
       color: currentNoteColor, // Use current selected color
       width: 96, // Default width (w-24)
@@ -403,104 +414,130 @@ export default function CanvaPage() {
     };
     setNotes(prevNotes => [...prevNotes, newNote]);
     setSelectedNoteId(newNote.id); // Select the new note
+    // Automatically trigger edit for the new note
+    startEditingNote(newNote.id);
+  };
+
+
+  const startEditingNote = (id: string) => {
+     setNotes(prevNotes =>
+       prevNotes.map(note =>
+         note.id === id ? { ...note, isEditing: true } : { ...note, isEditing: false } // Deactivate others
+       )
+     );
+     setSelectedNoteId(id); // Ensure it's selected
   };
 
    // --- Drag and Drop Logic (Mouse) ---
   const handleDragStart = (e: React.MouseEvent<HTMLDivElement>, id: string) => {
-    if (e.button !== 0) return;
+    if (e.button !== 0) return; // Only left click
     e.preventDefault();
     e.stopPropagation();
+
+    pointerDownTimeRef.current = Date.now(); // Record pointer down time
+    isDraggingRef.current = false; // Reset dragging flag
 
     const noteElement = e.currentTarget;
     const startX = e.clientX;
     const startY = e.clientY;
     const noteRect = noteElement.getBoundingClientRect();
-    // Calculate offset relative to the element's top-left corner
     const offsetX = startX - noteRect.left;
     const offsetY = startY - noteRect.top;
 
-
-    dragStartTimeRef.current = Date.now();
     setDraggingNoteId(id);
-    // Store the offset within the note itself
     setDragOffset({ x: offsetX, y: offsetY });
-    isDraggingRef.current = false; // Reset dragging flag
     setSelectedNoteId(id); // Select note on drag start
   };
 
-  // --- Drag and Drop Logic (Touch with Long Press) ---
+  // --- Drag and Drop Logic (Touch with Optimized Long Press) ---
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>, id: string) => {
     e.stopPropagation();
+    pointerDownTimeRef.current = Date.now(); // Record pointer down time
+    isDraggingRef.current = false; // Reset dragging flag
+
     const noteElement = e.currentTarget;
     const touch = e.touches[0];
     const startX = touch.clientX;
     const startY = touch.clientY;
     const noteRect = noteElement.getBoundingClientRect();
-    // Calculate offset relative to the element's top-left corner
     const offsetX = startX - noteRect.left;
     const offsetY = startY - noteRect.top;
 
+    // Clear any previous long press timeout
+    if (longPressTimeoutRef.current) {
+      clearTimeout(longPressTimeoutRef.current);
+    }
 
-    // Set timeout for long press
+    // Set timeout for long press to initiate drag
     longPressTimeoutRef.current = setTimeout(() => {
+        // If timeout fires, it's a drag
         setDraggingNoteId(id);
-        // Store the offset within the note itself
         setDragOffset({ x: offsetX, y: offsetY });
-        navigator.vibrate?.(50);
-        longPressTimeoutRef.current = null;
-        dragStartTimeRef.current = Date.now(); // Record time when drag *actually* starts
-        isDraggingRef.current = false; // Reset dragging flag
-        setSelectedNoteId(id); // Select note on drag start
-        // Maybe add a class to body to prevent scroll while dragging touch
+        isDraggingRef.current = true; // Mark as dragging immediately when timeout fires
+        navigator.vibrate?.(50); // Haptic feedback
+        setSelectedNoteId(id); // Ensure note is selected
         document.body.classList.add('dragging-touch');
-    }, 250); // Adjusted long press duration
+        longPressTimeoutRef.current = null; // Clear the ref after firing
+    }, 200); // Slightly shorter long press duration (adjust as needed)
   };
 
    // --- Universal Move Handler (Mouse & Touch) ---
    const handlePointerMove = useCallback((clientX: number, clientY: number) => {
        if (!draggingNoteId || !canvasRef.current) return;
 
-        // Detect if actual dragging has occurred (moved beyond a small threshold)
-        if (!isDraggingRef.current && Date.now() - dragStartTimeRef.current > 50) { // 50ms threshold for drag start
-            isDraggingRef.current = true;
-        }
+       // If a long press timer is still active, clear it - movement cancels long press
+       if (longPressTimeoutRef.current) {
+            clearTimeout(longPressTimeoutRef.current);
+            longPressTimeoutRef.current = null;
+       }
+
+       // Determine if it's *actually* dragging (moved beyond threshold OR long press fired)
+        // No need for explicit threshold check here if long press sets isDraggingRef.current
+       if (!isDraggingRef.current) {
+           // Optional: Add a small movement threshold if needed, e.g., if long press didn't fire yet
+           // const movedEnough = Math.abs(clientX - startX) > 5 || Math.abs(clientY - startY) > 5; // Example threshold
+           // if (movedEnough) { isDraggingRef.current = true; } else { return; }
+           isDraggingRef.current = true; // Assume movement means dragging if no long press timer
+           document.body.classList.add('dragging-touch'); // Ensure class is added on first move
+       }
+
 
        const canvasBounds = canvasRef.current.getBoundingClientRect();
+       // Calculate new position relative to canvas viewport, adjusted for scroll
+       const newCanvasX = clientX - canvasBounds.left - dragOffset.x + canvasRef.current.scrollLeft;
+       const newCanvasY = clientY - canvasBounds.top - dragOffset.y + canvasRef.current.scrollTop;
 
-       // Calculate the new top-left position relative to the canvas viewport
-       const newViewportX = clientX - canvasBounds.left - dragOffset.x;
-       const newViewportY = clientY - canvasBounds.top - dragOffset.y;
-
-       // Convert viewport coordinates to canvas coordinates including scroll
-       const newCanvasX = newViewportX + canvasRef.current.scrollLeft;
-       const newCanvasY = newViewportY + canvasRef.current.scrollTop;
-
-
+       // Debounce or throttle state updates if performance is an issue
        setNotes(prevNotes =>
          prevNotes.map(note =>
            note.id === draggingNoteId ? { ...note, x: newCanvasX, y: newCanvasY } : note
          )
        );
-   }, [draggingNoteId, dragOffset]);
+   }, [draggingNoteId, dragOffset]); // Removed handlePointerMove
 
 
    // Handle mouse move for dragging
    const handleMouseMove = useCallback((e: MouseEvent) => {
-        // Only move if draggingNoteId is set (avoids unnecessary checks)
         if (draggingNoteId) {
-             // Prevent text selection during drag
-             e.preventDefault();
+             e.preventDefault(); // Prevent text selection
              handlePointerMove(e.clientX, e.clientY);
         }
    }, [draggingNoteId, handlePointerMove]);
 
    // Handle touch move for dragging
     const handleTouchMove = useCallback((e: TouchEvent) => {
-        if (!draggingNoteId) return;
+        if (!draggingNoteId) {
+             // If no note is being dragged BUT a long press timer is active, clear it.
+             if (longPressTimeoutRef.current) {
+                 clearTimeout(longPressTimeoutRef.current);
+                 longPressTimeoutRef.current = null;
+             }
+             return; // Not dragging anything
+        }
 
-        // Prevent scroll *only* if dragging has actually started
-        if (isDraggingRef.current || Date.now() - dragStartTimeRef.current > 50) {
-             e.preventDefault(); // Prevent scroll only when definitely dragging
+        // Prevent scroll only if dragging has actually started
+        if (isDraggingRef.current) {
+             e.preventDefault();
         }
 
         const touch = e.touches[0];
@@ -509,54 +546,60 @@ export default function CanvaPage() {
 
 
   // --- Universal Up Handler (Mouse & Touch) ---
-  const handlePointerUp = useCallback(() => {
-      // Clear long press timeout if it exists
+  const handlePointerUp = useCallback((e: Event) => { // Accept event for context menu check
+      const upTime = Date.now();
+      const pressDuration = upTime - pointerDownTimeRef.current;
+
+      // 1. Clear long press timeout if it exists (touch up before timeout fires)
       if (longPressTimeoutRef.current) {
           clearTimeout(longPressTimeoutRef.current);
           longPressTimeoutRef.current = null;
+           // If touch up happens quickly after touch start, and wasn't dragging, treat as click/tap
+          if (pressDuration < 200 && draggingNoteId) { // Use the same threshold as long press
+              handleNoteClick(draggingNoteId); // Trigger selection/click
+          }
       }
 
-      const wasDragging = isDraggingRef.current; // Check if dragging occurred
+      // 2. Check if dragging actually occurred
+      const wasDragging = isDraggingRef.current;
 
-      // Stop dragging
+      // 3. Reset dragging state *before* potential click handling
       if (draggingNoteId) {
-          setDraggingNoteId(null);
+          setDraggingNoteId(null); // Stop dragging state
       }
-      dragStartTimeRef.current = 0;
-      isDraggingRef.current = false; // Reset dragging flag
+      isDraggingRef.current = false;
+      pointerDownTimeRef.current = 0; // Reset timer
 
-       // If it wasn't a drag, handle it as a potential click/selection
-      // Note: We now handle selection separately in handleNoteClick
-      // if (!wasDragging && draggingNoteId) {
-          // Find the note that was potentially clicked (the one that *was* draggingNoteId)
-          // const clickedNoteId = draggingNoteId;
-          // if (clickedNoteId) {
-          //   handleNoteClick(clickedNoteId);
-          // }
-      // }
-
-      // Remove body class for touch dragging
+      // 4. Cleanup body class
       document.body.classList.remove('dragging-touch');
 
-  }, [draggingNoteId]); // Depend on draggingNoteId
+      // 5. Handle click vs. drag end
+      // If it *was* dragging, do nothing more (drag ended).
+      // If it *wasn't* dragging (i.e., a short tap/click or aborted long press)
+      // AND it wasn't a right-click (context menu), handle as a click.
+      // Note: handleNoteClick is already called above for quick taps during touch.
+      // Mouse clicks are handled by the note's onClick directly.
+      // We mainly need to ensure drag end doesn't trigger a click.
+
+
+  }, [draggingNoteId, handleNoteClick]); // Added handleNoteClick
 
 
    // Stop dragging (Mouse)
-   const handleMouseUp = useCallback(() => {
-       handlePointerUp();
+   const handleMouseUp = useCallback((e: MouseEvent) => {
+       handlePointerUp(e);
    }, [handlePointerUp]);
 
    // Stop dragging (Touch)
-   const handleTouchEnd = useCallback(() => {
-       handlePointerUp();
+   const handleTouchEnd = useCallback((e: TouchEvent) => {
+       handlePointerUp(e);
    }, [handlePointerUp]);
 
   // Add mouse/touch move and up listeners to the window
   useEffect(() => {
-    // Use capture phase for move/up listeners to ensure they run even if propagation is stopped
     window.addEventListener('mousemove', handleMouseMove, { capture: true });
     window.addEventListener('mouseup', handleMouseUp, { capture: true });
-    window.addEventListener('touchmove', handleTouchMove, { passive: false, capture: true }); // Use passive: false
+    window.addEventListener('touchmove', handleTouchMove, { passive: false, capture: true });
     window.addEventListener('touchend', handleTouchEnd, { capture: true });
     window.addEventListener('touchcancel', handleTouchEnd, { capture: true });
 
@@ -569,7 +612,7 @@ export default function CanvaPage() {
       if (longPressTimeoutRef.current) {
           clearTimeout(longPressTimeoutRef.current);
       }
-      document.body.classList.remove('dragging-touch'); // Cleanup on unmount
+      document.body.classList.remove('dragging-touch');
     };
   }, [handleMouseMove, handleMouseUp, handleTouchMove, handleTouchEnd]);
 
@@ -578,14 +621,21 @@ export default function CanvaPage() {
   const handleContextMenu = (e: React.MouseEvent<HTMLDivElement>, id: string) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!isDraggingRef.current) { // Check ref instead of state
+    // Only show context menu if not dragging and not editing
+    const note = notes.find(n => n.id === id);
+    if (!isDraggingRef.current && !note?.isEditing) {
         setContextMenu({ x: e.clientX, y: e.clientY, noteId: id });
         setSelectedNoteId(id); // Select on context menu
     }
   };
 
   // Close context menu & deselect note if clicking outside
-  const handleCloseContextMenuAndDeselect = useCallback(() => {
+  const handleCloseContextMenuAndDeselect = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+     // Prevent closing if the click is on a note itself (handled by note's onClick)
+     const target = e.target as Element;
+     if (target.closest('[data-note-id]')) { // Add data-note-id attribute to StickyNote div if needed
+         return;
+     }
     setContextMenu(null);
     setSelectedNoteId(null); // Deselect note
   }, []);
@@ -614,45 +664,48 @@ export default function CanvaPage() {
      handleCloseContextMenu(); // Close context menu if open
    };
 
-   // Handle text change in sticky note textarea
+   // Handle text change in sticky note textarea OR sidebar textarea
   const handleNoteTextChange = (id: string, text: string) => {
     setNotes(prevNotes =>
       prevNotes.map(note =>
         note.id === id ? { ...note, text: text } : note
       )
     );
+     // Also update sidebar text if the edited note is selected
+     if (id === selectedNoteId) {
+         setEditText(text);
+     }
   };
 
-   // Set editing flag on double click
-   const handleNoteDoubleClick = (id: string) => {
-     // Prevent edit if dragging was just active or long press was held
-     if (isDraggingRef.current || longPressTimeoutRef.current !== null) return;
-     // Check timing if needed, though isDraggingRef should be reliable
-     setNotes(prevNotes =>
-       prevNotes.map(note =>
-         note.id === id ? { ...note, isEditing: true } : { ...note, isEditing: false }
-       )
-     );
-     setSelectedNoteId(id); // Ensure note is selected when editing starts
+   // Set editing flag on double click OR sidebar button click
+   const handleStartEditing = (id: string) => {
+     // Prevent edit if dragging was just active
+     if (isDraggingRef.current) return;
+     startEditingNote(id);
+     handleCloseContextMenu(); // Close menu if open
    };
 
    // Unset editing flag on blur
     const handleNoteBlur = (id: string) => {
-      setNotes(prevNotes =>
-        prevNotes.map(note =>
-          note.id === id ? { ...note, isEditing: false } : note
-        )
-      );
+      // Check if the blur target is within the sidebar text area to prevent premature closing
+      // This might need refinement depending on exact event flow
+      // For simplicity, assume any blur means stop editing for now.
+       setNotes(prevNotes =>
+         prevNotes.map(note =>
+           note.id === id ? { ...note, isEditing: false } : note
+         )
+       );
     };
 
   // --- Single Click Note Selection ---
-  const handleNoteClick = (id: string) => {
+  const handleNoteClick = useCallback((id: string) => {
       // Only select if not dragging and not editing
       const note = notes.find(n => n.id === id);
       if (!isDraggingRef.current && !note?.isEditing) {
           setSelectedNoteId(id);
+          handleCloseContextMenu(); // Close menu if open
       }
-  };
+  }, [notes]);
 
 
   // Change color for new notes
@@ -670,24 +723,35 @@ export default function CanvaPage() {
                    note.id === selectedNoteId ? { ...note, [dimension]: numValue } : note
                )
            );
+           // Update the corresponding state for the input field
            if (dimension === 'width') setEditWidth(value);
-           if (dimension === 'height') setEditHeight(value);
+           else setEditHeight(value);
        } else if (value === '') {
-             // Allow clearing the input
-             if (dimension === 'width') setEditWidth('');
-             if (dimension === 'height') setEditHeight('');
-             // Optionally reset to a default size or keep last valid size
+           // Allow clearing the input, keep state empty
+           if (dimension === 'width') setEditWidth('');
+           else setEditHeight('');
+           // Optionally reset to a default size or keep last valid size in the note data
+           // For simplicity, let's allow empty input but not update the note data unless it's valid
        }
    };
 
    const handleWidthInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-       handleSizeChange('width', e.target.value);
+       setEditWidth(e.target.value); // Update local state immediately
+       handleSizeChange('width', e.target.value); // Then validate and update note data
    };
 
    const handleHeightInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-       handleSizeChange('height', e.target.value);
+       setEditHeight(e.target.value); // Update local state immediately
+       handleSizeChange('height', e.target.value); // Then validate and update note data
    };
 
+  // Handle text changes from the sidebar textarea
+  const handleSidebarTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      if (!selectedNoteId) return;
+      const newText = e.target.value;
+      setEditText(newText); // Update sidebar state
+      handleNoteTextChange(selectedNoteId, newText); // Update actual note data
+  };
 
 
   const handleUndo = () => { console.log('Undo clicked'); /* Implement undo */ };
@@ -715,7 +779,11 @@ export default function CanvaPage() {
           {/* Canvas Type Selector */}
           <Select
             value={selectedCanvas}
-            onValueChange={(value: CanvasType) => setSelectedCanvas(value)}
+            onValueChange={(value: CanvasType) => {
+                 setSelectedCanvas(value);
+                 setSelectedNoteId(null); // Deselect note when changing canvas type
+                 setContextMenu(null); // Close context menu
+            }}
           >
             <SelectTrigger className="w-[250px] ml-auto">
               <SelectValue placeholder="Select Canvas Type" />
@@ -751,8 +819,8 @@ export default function CanvaPage() {
                 onDragStart={handleDragStart}
                 onTouchStart={handleTouchStart}
                 onContextMenu={handleContextMenu}
-                onNoteTextChange={handleNoteTextChange}
-                onNoteDoubleClick={handleNoteDoubleClick}
+                onNoteTextChange={handleNoteTextChange} // Pass changed handler
+                onNoteDoubleClick={handleStartEditing} // Use wrapper
                 onNoteBlur={handleNoteBlur}
                 onNoteClick={handleNoteClick} // Pass click handler
               />
@@ -761,7 +829,7 @@ export default function CanvaPage() {
       </div>
 
       {/* Sidebar */}
-      <aside className="w-64 border-l bg-card p-4 flex flex-col gap-4 flex-shrink-0 overflow-y-auto">
+      <aside className="w-72 border-l bg-card p-4 flex flex-col gap-4 flex-shrink-0 overflow-y-auto"> {/* Wider sidebar */}
         {/* Always Show Add Note and New Note Color */}
          <div>
             <h3 className="text-lg font-semibold text-primary mb-2">Tools</h3>
@@ -791,6 +859,30 @@ export default function CanvaPage() {
         {selectedNote ? (
             <div className="space-y-4">
                 <h3 className="text-lg font-semibold text-primary">Edit Note</h3>
+
+                 {/* Edit Text Button */}
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleStartEditing(selectedNoteId!)}
+                    className="w-full justify-start focus-visible:glow-accent"
+                >
+                    <Edit3 className="mr-2 h-4 w-4" /> Edit Text (or double-click note)
+                </Button>
+
+                {/* Text Area for Sidebar Editing */}
+                <div className="space-y-1">
+                    <Label htmlFor="note-text-sidebar">Text</Label>
+                    <Textarea
+                        id="note-text-sidebar"
+                        value={editText}
+                        onChange={handleSidebarTextChange}
+                        placeholder="Enter note text..."
+                        className="h-24 text-sm focus-visible:glow-primary" // Adjust height as needed
+                    />
+                </div>
+
+
                  {/* Color Palette for Selected Note */}
                 <div className="space-y-2">
                      <Label>Color</Label>
@@ -811,7 +903,7 @@ export default function CanvaPage() {
                 <div className="grid grid-cols-2 gap-2">
                      <div className="space-y-1">
                          <Label htmlFor="note-width" className="flex items-center gap-1 text-xs">
-                            <ArrowRightLeft className="w-3 h-3 transform rotate-90" /> Width
+                            <ArrowRightLeft className="w-3 h-3 transform rotate-90" /> Width (px)
                          </Label>
                          <Input
                             id="note-width"
@@ -819,13 +911,13 @@ export default function CanvaPage() {
                             value={editWidth}
                             onChange={handleWidthInputChange}
                             className="h-8 text-sm"
-                            placeholder="Width"
+                            placeholder="e.g., 96"
                             min="20"
                          />
                      </div>
                      <div className="space-y-1">
                           <Label htmlFor="note-height" className="flex items-center gap-1 text-xs">
-                             <ArrowRightLeft className="w-3 h-3" /> Height
+                             <ArrowRightLeft className="w-3 h-3" /> Height (px)
                           </Label>
                          <Input
                             id="note-height"
@@ -833,7 +925,7 @@ export default function CanvaPage() {
                             value={editHeight}
                             onChange={handleHeightInputChange}
                             className="h-8 text-sm"
-                            placeholder="Height"
+                            placeholder="e.g., 96"
                             min="20"
                          />
                      </div>
@@ -850,9 +942,10 @@ export default function CanvaPage() {
                  </Button>
             </div>
          ) : (
-             <div className="text-center text-sm text-muted-foreground mt-6">
-                 <StickyNoteIcon className="mx-auto h-8 w-8 mb-2 opacity-50"/>
-                 <p>Click on a note to edit its properties.</p>
+             <div className="text-center text-sm text-muted-foreground mt-6 flex flex-col items-center">
+                 <StickyNoteIcon className="h-10 w-10 mb-3 opacity-50"/>
+                 <p>Click on a note to select it.</p>
+                 <p>Edit its properties here.</p>
              </div>
          )}
 
@@ -866,7 +959,7 @@ export default function CanvaPage() {
                 <Redo className="h-4 w-4" />
             </Button>
              <p className="text-xs text-muted-foreground text-center flex-1 self-center">
-                 Tip: Dbl-click/Right-click
+                 Tip: Dbl-click/Right-click note
              </p>
         </div>
       </aside>
@@ -879,7 +972,7 @@ export default function CanvaPage() {
                     aria-hidden="true"
                 />
                <DropdownMenuContent align="start" className="w-48 z-50"> {/* Wider menu */}
-                    <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleNoteDoubleClick(contextMenu.noteId); handleCloseContextMenu(); }}>
+                    <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleStartEditing(contextMenu.noteId); }}>
                         <Edit3 className="mr-2 h-4 w-4" /> Edit Text
                     </DropdownMenuItem>
                     <Separator />
@@ -890,7 +983,7 @@ export default function CanvaPage() {
                             <button
                                 key={`ctx-${colorClass}`}
                                 className={`h-5 w-5 rounded-full border border-gray-400/50 ${colorClass} hover:opacity-80 focus:outline-none focus:ring-1 focus:ring-primary focus:ring-offset-1`}
-                                onClick={(e) => { e.preventDefault(); handleChangeNoteColor(contextMenu.noteId, colorClass); }}
+                                onClick={(e) => { e.stopPropagation(); handleChangeNoteColor(contextMenu.noteId, colorClass); }} // Stop propagation here too
                                 aria-label={`Set color to ${colorClass.split('-')[1]}`}
                             />
                          ))}
@@ -911,7 +1004,11 @@ export default function CanvaPage() {
           body.dragging-touch {
             overflow: hidden; /* Prevent scrolling */
             overscroll-behavior: none; /* Prevent pull-to-refresh/bounce */
+            /* Optional: Improve visual feedback */
+            /* cursor: grabbing !important; */
           }
+          /* Optional: Style for note being dragged */
+          /* .dragging-note { opacity: 0.8; transform: scale(1.05); } */
         `}</style>
 
     </div>
