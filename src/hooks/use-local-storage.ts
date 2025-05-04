@@ -39,20 +39,31 @@ export function useLocalStorage<T>(
   const isMounted = useRef(false);
 
   // Effect to load initial value from localStorage on mount (client-side only)
-  // And handle updates if defaultValue or key changes (though key change is less common)
+  // This runs AFTER the initial state is set by useState's initializer function.
+  // Its main purpose here is to ensure client-side hydration matches storage
+  // and to handle potential key changes.
   useEffect(() => {
     if (typeof window !== "undefined") {
-      // On mount, ensure the state reflects the current storage value.
-      // This also handles cases where the value might have changed between SSR and client hydration.
-      setValue(getStorageValue(key, defaultValue));
-      isMounted.current = true; // Mark as mounted after initial load
+      const storedValue = getStorageValue(key, defaultValue);
+      // Update the state ONLY if the value derived from storage differs
+      // from the currently rendered state. Prevents loops.
+      setValue(currentValue => {
+        // Use JSON.stringify for robust comparison of objects/arrays
+        if (JSON.stringify(currentValue) !== JSON.stringify(storedValue)) {
+          return storedValue;
+        }
+        return currentValue;
+      });
+      if (!isMounted.current) {
+          isMounted.current = true; // Mark as mounted after initial hydration sync attempt
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, defaultValue]); // Depend on key and defaultValue
+  }, [key]); // ONLY depend on the key. defaultValue is used by getStorageValue internally if needed.
 
   // Effect to update localStorage when value changes
   useEffect(() => {
-    // Only run this effect on the client-side and after the initial value has been loaded
+    // Only run this effect on the client-side and after the initial value has been loaded/synced
     if (typeof window !== "undefined" && isMounted.current) {
       try {
         const newValueString = JSON.stringify(value);
@@ -93,7 +104,9 @@ export function useLocalStorage<T>(
     return () => {
       window.removeEventListener('storage', handleStorageChange);
     };
-  }, [key, defaultValue]); // Include defaultValue in dependencies
+    // Use JSON.stringify for defaultValue dependency comparison to avoid unnecessary effect runs
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, JSON.stringify(defaultValue)]);
 
   // useCallback ensures the setter function has a stable identity
   const setStoredValue = useCallback((newValue: T | ((val: T) => T)) => {
@@ -102,7 +115,7 @@ export function useLocalStorage<T>(
       // The useEffect listening to [key, value] will handle saving to localStorage
       return valueToStore;
     });
-  }, [key]); // Setter depends on the key
+  }, []); // Removed key dependency as setValue from useState is stable
 
   return [value, setStoredValue];
 }
