@@ -22,4 +22,3 @@ export default function ProjectPage() {
   // Render ProjectEditor directly, layout is handled by project/[projectId]/layout.tsx and root layout.tsx
   return <ProjectEditor projectId={projectId} />;
 }
-```

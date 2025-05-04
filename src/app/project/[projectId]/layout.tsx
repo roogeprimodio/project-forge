@@ -14,4 +14,3 @@ export default function ProjectLayout({
     // The height: 100% ensures it takes up the available space within MainLayout's SidebarInset.
     return <div style={{ height: '100%' }}>{children}</div>;
 }
-```

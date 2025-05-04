@@ -19,6 +19,7 @@ import { useLocalStorage } from '@/hooks/use-local-storage';
 import { useToast } from '@/hooks/use-toast';
 import { generateSectionAction, summarizeSectionAction, generateTocAction, generateOutlineAction } from '@/app/actions';
 import { useRouter } from 'next/navigation';
+import { cn } from '@/lib/utils'; // Import cn
 
 interface ProjectEditorProps {
   projectId: string;
@@ -185,6 +186,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
        if (projectExists && activeSectionIndex === null) {
            setActiveSectionIndex(-1);
        } else if (!projectExists && isProjectFound !== false) {
+           // Only show toast and redirect if we newly detect the project is missing
+           setIsProjectFound(false); // Set definitively to false
            toast({
                variant: "destructive",
                title: "Project Not Found",
@@ -194,7 +197,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
            return () => clearTimeout(timer);
        }
      }
-   }, [projectId, projects, isProjectFound, activeSectionIndex, toast, router]);
+   // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [projectId, projects, activeSectionIndex, toast, router]); // Removed isProjectFound dependency
 
   const updateProject = useCallback((updatedProjectData: Partial<Project>) => {
     setProjects((prevProjects = []) =>
@@ -220,7 +224,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
   const handleProjectDetailChange = (field: keyof Project, value: string) => {
     if (!project) return;
-    if (field === 'storageType') return;
+    if (field === 'storageType') return; // Prevent direct modification of storageType
     updateProject({ [field]: value });
   };
 
@@ -730,4 +734,3 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     </div>
   );
 }
-```
