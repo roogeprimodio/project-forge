@@ -21,13 +21,14 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { BookOpen, Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, List } from 'lucide-react'; // Added List icon
+import { BookOpen, Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, List, Download } from 'lucide-react'; // Added List and Download icons
 import Link from 'next/link';
 import type { Project, ProjectSection } from '@/types/project';
 import { COMMON_SECTIONS, TOC_SECTION_NAME } from '@/types/project'; // Import TOC_SECTION_NAME
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { useToast } from '@/hooks/use-toast';
 import { generateSectionAction, summarizeSectionAction, generateTocAction } from '@/app/actions'; // Added generateTocAction
+import { useRouter } from 'next/navigation'; // Import useRouter
 
 interface ProjectEditorProps {
   projectId: string;
@@ -41,6 +42,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const [isSummarizing, setIsSummarizing] = useState(false); // State for summarization loading
   const [isGeneratingToc, setIsGeneratingToc] = useState(false); // State for ToC generation
   const [customSectionName, setCustomSectionName] = useState('');
+  const router = useRouter(); // Initialize useRouter
 
   // Find the current project based on projectId
   const project = useMemo(() => projects.find(p => p.id === projectId), [projects, projectId]);
@@ -278,6 +280,12 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     }
   };
 
+   // Navigate to the export page
+   const handleNavigateToExport = () => {
+     if (project) {
+       router.push(`/project/${projectId}/export`);
+     }
+   };
 
 
    if (!project) {
@@ -414,10 +422,20 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                    size="sm"
                    onClick={handleGenerateToc}
                    disabled={isGeneratingToc || isGenerating || isSummarizing}
-                   className="hover:glow-accent focus-visible:glow-accent ml-auto" // Moved to the right
+                   className="hover:glow-accent focus-visible:glow-accent ml-2" // Add some margin if needed
                >
                    {isGeneratingToc ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <List className="mr-2 h-4 w-4" />}
                    {isGeneratingToc ? 'Generating ToC...' : 'Generate ToC'}
+               </Button>
+               {/* Export Button */}
+               <Button
+                   variant="outline"
+                   size="sm"
+                   onClick={handleNavigateToExport}
+                   className="hover:glow-accent focus-visible:glow-accent ml-auto" // Moved to the right
+               >
+                   <Download className="mr-2 h-4 w-4" />
+                   Export Report
                </Button>
            </header>
 
@@ -544,40 +562,3 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     </SidebarProvider>
   );
 }
-
-```</content>
-  </change>
-  <change>
-    <file>src/types/project.ts</file>
-    <description>Add `TOC_SECTION_NAME` constant and exclude it from `COMMON_SECTIONS`.</description>
-    <content><![CDATA[export interface ProjectSection {
-  name: string;
-  prompt: string;
-  content: string;
-  lastGenerated?: Date | string;
-}
-
-export interface Project {
-  id: string;
-  title: string;
-  teamDetails: string; // Simple string for now, can be expanded later
-  collegeInfo: string; // Simple string
-  sections: ProjectSection[];
-  createdAt: Date | string;
-  updatedAt: Date | string;
-}
-
-// Special name for the Table of Contents section
-export const TOC_SECTION_NAME = "Table of Contents";
-
-// Predefined common sections, excluding the special ToC section
-export const COMMON_SECTIONS = [
-  "Introduction",
-  "Literature Review",
-  "Methodology",
-  "Implementation",
-  "Results and Discussion",
-  "Conclusion",
-  "References",
-  "Appendix",
-];
