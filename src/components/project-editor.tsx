@@ -1,7 +1,7 @@
 // src/components/project-editor.tsx
 "use client";
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -9,17 +9,18 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { BookOpen, Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, List, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu } from 'lucide-react';
+import { BookOpen, Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, List, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuestion, Sparkles } from 'lucide-react'; // Added Undo, MessageSquareQuestion, Sparkles
 import Link from 'next/link';
 import type { Project, ProjectSection } from '@/types/project';
 import { COMMON_SECTIONS, TOC_SECTION_NAME } from '@/types/project';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { useToast } from '@/hooks/use-toast';
-import { generateSectionAction, summarizeSectionAction, generateTocAction, generateOutlineAction } from '@/app/actions';
+import { generateSectionAction, summarizeSectionAction, generateTocAction, generateOutlineAction, suggestImprovementsAction } from '@/app/actions'; // Added suggestImprovementsAction
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger, SheetClose } from "@/components/ui/sheet";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { marked } from 'marked'; // For rendering markdown suggestions
 
 interface ProjectEditorProps {
   projectId: string;
@@ -27,6 +28,7 @@ interface ProjectEditorProps {
 
 // Minimum character length considered "sufficient" for context
 const MIN_CONTEXT_LENGTH = 50;
+const MAX_HISTORY_LENGTH = 10; // Limit undo history
 
 // New component for the local sidebar content (details, sections, add)
 function ProjectSidebarContent({
@@ -42,6 +44,8 @@ function ProjectSidebarContent({
     isSummarizing,
     isGeneratingToc,
     handleSaveOnline,
+    canUndo, // Added prop
+    handleUndo, // Added prop
     onCloseSheet // Added prop to close the sheet on mobile
 }: {
     project: Project;
@@ -56,6 +60,8 @@ function ProjectSidebarContent({
     isSummarizing: boolean;
     isGeneratingToc: boolean;
     handleSaveOnline: () => void;
+    canUndo: boolean; // Added type
+    handleUndo: () => void; // Added type
     onCloseSheet?: () => void; // Optional close handler
 }) {
      const handleSectionClick = (index: number | -1) => {
@@ -65,15 +71,26 @@ function ProjectSidebarContent({
 
      return (
         <div className="flex flex-col h-full border-r bg-card"> {/* Use Card background */}
-            <div className="p-4 border-b">
+            <div className="p-4 border-b flex justify-between items-center"> {/* Flex container for title and undo */}
                  <Input
                         id="projectTitleSidebar"
                         value={project.title}
                         readOnly // Title editing now in main area
-                        className="h-8 text-base font-semibold bg-transparent border-0 shadow-none focus-visible:ring-0 p-0 truncate"
+                        className="h-8 text-base font-semibold bg-transparent border-0 shadow-none focus-visible:ring-0 p-0 truncate flex-1 mr-2" // Make title flexible
                         placeholder="Project Title"
                         aria-label="Project Title (Readonly)"
                     />
+                {/* Undo Button */}
+                <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={handleUndo}
+                    disabled={!canUndo}
+                    className="flex-shrink-0"
+                    title={canUndo ? "Undo last change" : "Nothing to undo"}
+                >
+                    <Undo className="h-4 w-4" />
+                </Button>
             </div>
              <ScrollArea className="flex-1 px-2 py-2">
                  {/* Simplified menu structure */}
@@ -170,13 +187,16 @@ function ProjectSidebarContent({
 
 
 export function ProjectEditor({ projectId }: ProjectEditorProps) {
-  const [projects, setProjects] = useLocalStorage<Project[]>('projects', []);
+  const [projects, setProjects, loadInitialValue] = useLocalStorage<Project[]>('projects', []);
   const { toast } = useToast();
   const [activeSectionIndex, setActiveSectionIndex] = useState<number | null | -1>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [isGeneratingToc, setIsGeneratingToc] = useState(false);
   const [isGeneratingOutline, setIsGeneratingOutline] = useState(false);
+  const [isSuggesting, setIsSuggesting] = useState(false); // State for suggestion generation
+  const [suggestionInput, setSuggestionInput] = useState(''); // State for suggestion text input
+  const [suggestions, setSuggestions] = useState<string | null>(null); // State to store AI suggestions
   const [customSectionName, setCustomSectionName] = useState('');
   const [isProjectFound, setIsProjectFound] = useState<boolean | null>(null);
   const [isLocalSidebarOpen, setIsLocalSidebarOpen] = useState(true); // State for local sidebar visibility (desktop)
@@ -185,17 +205,87 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const [showTocContextAlert, setShowTocContextAlert] = useState(false); // State for context warning dialog
   const router = useRouter();
 
-  // Mark as mounted on client
+  // Undo/Redo state
+  const [history, setHistory] = useState<Project[]>([]);
+  const [historyIndex, setHistoryIndex] = useState<number>(-1);
+  const isUpdatingHistory = useRef(false); // Flag to prevent history loops
+
+  // Mark as mounted on client and load initial value explicitly
   useEffect(() => {
+    loadInitialValue(); // Ensure localStorage value is loaded on mount
     setHasMounted(true);
-  }, []);
+  }, [loadInitialValue]); // Added loadInitialValue dependency
 
 
-  // Derived state: current project
+  // Derived state: current project (use directly from history if available)
   const project = useMemo(() => {
-    // Ensure projects is an array before trying to find
-    return Array.isArray(projects) ? projects.find(p => p.id === projectId) : undefined;
-  }, [projects, projectId]);
+      if (historyIndex >= 0 && historyIndex < history.length) {
+          return history[historyIndex];
+      }
+      // Fallback to projects from localStorage if history is empty/invalid (should ideally not happen after init)
+      return Array.isArray(projects) ? projects.find(p => p.id === projectId) : undefined;
+  }, [projects, projectId, history, historyIndex]);
+
+   // Effect to initialize history when project is loaded
+  useEffect(() => {
+    if (hasMounted && project && history.length === 0) {
+        console.log("Initializing history with project:", project);
+        setHistory([project]);
+        setHistoryIndex(0);
+    }
+  }, [project, hasMounted, history.length]); // Run only when project is first defined and history is empty
+
+  // Update project and history
+  const updateProject = useCallback((updatedData: Partial<Project> | ((prev: Project) => Project), saveToHistory: boolean = true) => {
+      if (!project) return;
+
+      isUpdatingHistory.current = true; // Prevent triggering localStorage save from history update
+
+      const updatedProject = typeof updatedData === 'function'
+        ? updatedData(project)
+        : { ...project, ...updatedData, updatedAt: new Date().toISOString() };
+
+      setHistory(prevHistory => {
+          const newHistory = prevHistory.slice(0, historyIndex + 1);
+          newHistory.push(updatedProject);
+          // Limit history size
+          if (newHistory.length > MAX_HISTORY_LENGTH) {
+              newHistory.shift(); // Remove the oldest entry
+          }
+          const newIndex = Math.min(newHistory.length - 1, MAX_HISTORY_LENGTH - 1); // Index should correspond to the limited array
+          setHistoryIndex(newIndex);
+
+          // Update localStorage with the latest state from history
+           setProjects((prevProjects = []) =>
+             (prevProjects || []).map(p =>
+               p.id === projectId ? updatedProject : p
+             )
+           );
+
+           requestAnimationFrame(() => {
+               isUpdatingHistory.current = false;
+           });
+
+          return newHistory;
+      });
+
+
+  }, [project, historyIndex, setProjects, projectId]); // Added projectId
+
+
+    // Effect to update localStorage ONLY when history changes AND it wasn't triggered by history logic itself
+    // This effect might be redundant now that updateProject handles localStorage update
+    // useEffect(() => {
+    //     if (hasMounted && project && !isUpdatingHistory.current && historyIndex >= 0) {
+    //         console.log("Saving project to localStorage from history update");
+    //         setProjects((prevProjects = []) =>
+    //             (prevProjects || []).map(p =>
+    //                 p.id === projectId ? project : p
+    //             )
+    //         );
+    //     }
+    // }, [project, projectId, setProjects, hasMounted, historyIndex]);
+
 
    // Effect to check if project exists and set initial state
    useEffect(() => {
@@ -219,26 +309,45 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     }
    }, [projectId, projects, activeSectionIndex, toast, router, isProjectFound, hasMounted]); // Add hasMounted
 
-  const updateProject = useCallback((updatedProjectData: Partial<Project>) => {
-    setProjects((prevProjects = []) =>
-      (prevProjects || []).map(p =>
-        p.id === projectId ? { ...p, ...updatedProjectData, updatedAt: new Date().toISOString() } : p
-      )
-    );
-  }, [projectId, setProjects]);
+    // --- Undo/Redo Handlers ---
+    const handleUndo = useCallback(() => {
+        if (historyIndex > 0) {
+            isUpdatingHistory.current = true; // Prevent recursive updates
+            setHistoryIndex(prevIndex => prevIndex - 1);
+             // Update localStorage with the undone state
+             const undoneProject = history[historyIndex - 1];
+             setProjects((prevProjects = []) =>
+                 (prevProjects || []).map(p =>
+                     p.id === projectId ? undoneProject : p
+                 )
+             );
+             toast({ title: "Undo successful" });
+             requestAnimationFrame(() => { isUpdatingHistory.current = false; });
+        } else {
+             toast({ variant: "destructive", title: "Nothing to undo" });
+        }
+    }, [historyIndex, history, setProjects, projectId, toast]);
+
+    // Simple check if undo is possible
+    const canUndo = historyIndex > 0;
+
 
   const handleSectionContentChange = (index: number, content: string) => {
     if (!project || index < 0 || index >= project.sections.length) return;
-    const updatedSections = [...project.sections];
-    updatedSections[index] = { ...updatedSections[index], content };
-    updateProject({ sections: updatedSections });
+     updateProject(prev => {
+         const updatedSections = [...prev.sections];
+         updatedSections[index] = { ...updatedSections[index], content };
+         return { ...prev, sections: updatedSections };
+     });
   };
 
   const handleSectionPromptChange = (index: number, prompt: string) => {
     if (!project || index < 0 || index >= project.sections.length) return;
-    const updatedSections = [...project.sections];
-    updatedSections[index] = { ...updatedSections[index], prompt };
-    updateProject({ sections: updatedSections });
+     updateProject(prev => {
+         const updatedSections = [...prev.sections];
+         updatedSections[index] = { ...updatedSections[index], prompt };
+         return { ...prev, sections: updatedSections };
+     });
   }
 
   const handleProjectDetailChange = (field: keyof Project, value: string) => {
@@ -264,9 +373,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
       content: '',
       lastGenerated: undefined,
     };
-    const updatedSections = [...project.sections, newSection];
-    updateProject({ sections: updatedSections });
-    setActiveSectionIndex(updatedSections.length - 1);
+     updateProject(prev => ({ ...prev, sections: [...prev.sections, newSection] }));
+    setActiveSectionIndex(project.sections.length); // Set index for the newly added section
     setCustomSectionName('');
     toast({
       title: "Section Added",
@@ -298,8 +406,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
            return;
        }
 
-       const updatedSections = [...project.sections, ...newSections];
-       updateProject({ sections: updatedSections });
+       updateProject(prev => ({ ...prev, sections: [...prev.sections, ...newSections] }));
        toast({
             title: "Sections Added",
             description: `${newSections.length} new sections based on the generated outline have been added.`,
@@ -309,7 +416,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
 
   const handleGenerateSection = async (index: number) => {
-    if (!project || index < 0 || index >= project.sections.length || isGenerating || isSummarizing || isGeneratingToc || isGeneratingOutline) return;
+    if (!project || index < 0 || index >= project.sections.length || isGenerating || isSummarizing || isGeneratingToc || isGeneratingOutline || isSuggesting) return;
 
     const section = project.sections[index];
     setIsGenerating(true);
@@ -338,22 +445,17 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
       if ('error' in result) throw new Error(result.error);
 
-      setProjects(currentProjects => {
-        if (!currentProjects) return [];
-        return currentProjects.map(p => {
-           if (p.id === projectId) {
-                if (!p.sections || index >= p.sections.length) return p;
-                const updatedSections = [...p.sections];
-                updatedSections[index] = {
-                    ...updatedSections[index],
-                    content: result.reportSectionContent,
-                    lastGenerated: new Date().toISOString(),
-                };
-                return { ...p, sections: updatedSections, updatedAt: new Date().toISOString() };
-           }
-           return p;
-        });
-      });
+       // Use updateProject to manage state and history
+       updateProject(prev => {
+           const updatedSections = [...prev.sections];
+           updatedSections[index] = {
+               ...updatedSections[index],
+               content: result.reportSectionContent,
+               lastGenerated: new Date().toISOString(),
+           };
+           return { ...prev, sections: updatedSections };
+       });
+
 
       toast({
         title: "Section Generated",
@@ -373,7 +475,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   };
 
   const handleSummarizeSection = async (index: number) => {
-      if (!project || index < 0 || index >= project.sections.length || isGenerating || isSummarizing || isGeneratingToc || isGeneratingOutline) return;
+      if (!project || index < 0 || index >= project.sections.length || isGenerating || isSummarizing || isGeneratingToc || isGeneratingOutline || isSuggesting) return;
 
       const section = project.sections[index];
       if (!section.content?.trim()) {
@@ -397,8 +499,27 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
       }
   };
 
+  // Function to extract section names from ToC Markdown (simple example)
+  const extractSectionsFromToc = (tocContent: string): string[] => {
+    const lines = tocContent.split('\n');
+    const sections: string[] = [];
+    const sectionRegex = /^\s*[\*\-]\s*(.+)/; // Matches lines starting with * or - (markdown list items)
+
+    lines.forEach(line => {
+      const match = line.match(sectionRegex);
+      if (match && match[1]) {
+        // Basic cleaning: remove potential page numbers or extra formatting
+        const sectionName = match[1].replace(/\s+\(\d+\)$/, '').trim();
+        if (sectionName) {
+          sections.push(sectionName);
+        }
+      }
+    });
+    return sections;
+  };
+
   const proceedWithTocGeneration = useCallback(async () => {
-    if (!project || isGenerating || isSummarizing || isGeneratingToc || isGeneratingOutline) return;
+    if (!project || isGenerating || isSummarizing || isGeneratingToc || isGeneratingOutline || isSuggesting) return;
 
     const contentSections = project.sections.filter(s => s.name !== TOC_SECTION_NAME);
      if (contentSections.length === 0) {
@@ -423,44 +544,58 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
         const tocContent = result.tableOfContents;
         const now = new Date().toISOString();
+        const extractedSections = extractSectionsFromToc(tocContent);
 
-        setProjects(currentProjects => {
-             if (!currentProjects) return [];
-             let tocSectionIndexResult = -1;
-             let sectionAdded = false;
+        // --- Update Project State ---
+        updateProject(prev => {
+            let tocSectionIndex = prev.sections.findIndex(s => s.name === TOC_SECTION_NAME);
+            let updatedSections = [...prev.sections];
+            let sectionAdded = false;
 
-             const updatedProjects = currentProjects.map(p => {
-                if (p.id === projectId) {
-                    let tocSectionIndex = p.sections.findIndex(s => s.name === TOC_SECTION_NAME);
-                    let updatedSections = [...p.sections];
+            // 1. Update or Add ToC Section
+            if (tocSectionIndex > -1) {
+                updatedSections[tocSectionIndex] = { ...updatedSections[tocSectionIndex], content: tocContent, lastGenerated: now };
+            } else {
+                const newTocSection: ProjectSection = { name: TOC_SECTION_NAME, prompt: "Table of Contents generated by AI.", content: tocContent, lastGenerated: now };
+                updatedSections.unshift(newTocSection);
+                tocSectionIndex = 0;
+                sectionAdded = true;
+            }
 
-                    if (tocSectionIndex > -1) {
-                        updatedSections[tocSectionIndex] = { ...updatedSections[tocSectionIndex], content: tocContent, lastGenerated: now };
-                    } else {
-                        const newTocSection: ProjectSection = { name: TOC_SECTION_NAME, prompt: "Table of Contents generated by AI.", content: tocContent, lastGenerated: now };
-                        updatedSections.unshift(newTocSection);
-                        tocSectionIndex = 0;
-                        sectionAdded = true;
-                    }
-                    tocSectionIndexResult = tocSectionIndex;
-                    return { ...p, sections: updatedSections, updatedAt: now };
-                }
-                return p;
-            });
+            // 2. Add missing sections based on ToC
+            const existingSectionNamesLower = new Set(updatedSections.map(s => s.name.toLowerCase()));
+            const missingSections = extractedSections
+                .map(name => name.trim())
+                .filter(name => name && !existingSectionNamesLower.has(name.toLowerCase()))
+                .map(name => ({
+                    name: name,
+                    prompt: `Generate the ${name} section for the project titled "${prev.title}". Consider the project context: ${prev.projectContext || '[No context provided]'}. [Add more specific instructions here if needed]`,
+                    content: '',
+                    lastGenerated: undefined,
+                }));
 
+            if (missingSections.length > 0) {
+                 // Insert missing sections after the ToC section
+                 updatedSections.splice(tocSectionIndex + 1, 0, ...missingSections);
+                toast({
+                     title: "Sections Added",
+                     description: `${missingSections.length} missing sections were added based on the generated ToC.`,
+                 });
+            }
+
+             // 3. Schedule UI Updates (Toast and Active Index)
              requestAnimationFrame(() => {
                  toast({
                      title: "Table of Contents Generated",
                      description: `The "${TOC_SECTION_NAME}" section has been ${sectionAdded ? 'added' : 'updated'}.`,
                  });
-                 if (tocSectionIndexResult !== -1) {
-                    setActiveSectionIndex(tocSectionIndexResult);
-                    setIsMobileSheetOpen(false); // Close mobile sheet after generating
-                 }
+                 setActiveSectionIndex(tocSectionIndex);
+                 setIsMobileSheetOpen(false); // Close mobile sheet after generating
              });
 
-            return updatedProjects;
+            return { ...prev, sections: updatedSections, updatedAt: now };
         });
+
 
     } catch (error) {
         console.error("Table of Contents generation failed:", error);
@@ -468,11 +603,11 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     } finally {
         setIsGeneratingToc(false);
     }
-  }, [project, isGenerating, isSummarizing, isGeneratingToc, isGeneratingOutline, setProjects, toast, setActiveSectionIndex, projectId]); // Added dependencies
+  }, [project, isGenerating, isSummarizing, isGeneratingToc, isGeneratingOutline, isSuggesting, updateProject, toast, setActiveSectionIndex]); // Added isSuggesting, updateProject
 
 
     const handleGenerateTocClick = () => {
-        if (!project || isGenerating || isSummarizing || isGeneratingToc || isGeneratingOutline) return;
+        if (!project || isGenerating || isSummarizing || isGeneratingToc || isGeneratingOutline || isSuggesting) return;
 
         const contextLength = project.projectContext?.trim().length || 0;
 
@@ -484,7 +619,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     };
 
   const handleGenerateOutline = useCallback(async () => {
-      if (!project || isGenerating || isSummarizing || isGeneratingToc || isGeneratingOutline) return;
+      if (!project || isGenerating || isSummarizing || isGeneratingToc || isGeneratingOutline || isSuggesting) return;
 
       if (!project.projectContext?.trim()) {
           toast({ variant: "destructive", title: "Cannot Generate Outline", description: "Please provide some project context in Project Details first." });
@@ -507,7 +642,45 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
       } finally {
           setIsGeneratingOutline(false);
       }
-  }, [project, isGenerating, isSummarizing, isGeneratingToc, isGeneratingOutline, toast, addMultipleSections, setActiveSectionIndex]); // Added setActiveSectionIndex
+  }, [project, isGenerating, isSummarizing, isGeneratingToc, isGeneratingOutline, isSuggesting, toast, addMultipleSections, setActiveSectionIndex]); // Added isSuggesting, setActiveSectionIndex
+
+    // --- AI Suggestions ---
+   const handleGetSuggestions = async () => {
+     if (!project || isGenerating || isSummarizing || isGeneratingToc || isGeneratingOutline || isSuggesting) return;
+
+     setIsSuggesting(true);
+     setSuggestions(null); // Clear previous suggestions
+     try {
+       const allSectionsContent = project.sections
+         .map(s => `## ${s.name}\n\n${s.content || '[Empty Section]'}`)
+         .join('\n\n---\n\n');
+
+       const result = await suggestImprovementsAction({
+         projectTitle: project.title,
+         projectContext: project.projectContext,
+         allSectionsContent: allSectionsContent,
+         focusArea: suggestionInput || undefined, // Pass user input if available
+       });
+
+       if ('error' in result) throw new Error(result.error);
+
+       setSuggestions(result.suggestions);
+       toast({
+         title: "AI Suggestions Ready",
+         description: "Suggestions for improvement have been generated below.",
+       });
+
+     } catch (error) {
+       console.error("Suggestion generation failed:", error);
+       toast({
+         variant: "destructive",
+         title: "Suggestion Failed",
+         description: error instanceof Error ? error.message : "Could not generate suggestions.",
+       });
+     } finally {
+       setIsSuggesting(false);
+     }
+   };
 
 
   const handleSaveOnline = () => {
@@ -571,6 +744,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             isSummarizing={isSummarizing}
             isGeneratingToc={isGeneratingToc}
             handleSaveOnline={handleSaveOnline}
+            canUndo={canUndo} // Pass undo state
+            handleUndo={handleUndo} // Pass undo handler
             onCloseSheet={() => setIsMobileSheetOpen(false)} // Pass close handler
           />
         </SheetContent>
@@ -598,6 +773,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
               isSummarizing={isSummarizing}
               isGeneratingToc={isGeneratingToc}
               handleSaveOnline={handleSaveOnline}
+              canUndo={canUndo} // Pass undo state
+              handleUndo={handleUndo} // Pass undo handler
               // No onCloseSheet needed for desktop
             />
           )}
@@ -621,9 +798,9 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
               variant="outline"
               size="sm"
               onClick={handleGenerateTocClick} // Use the new click handler
-              disabled={isGeneratingToc || isGenerating || isSummarizing || isGeneratingOutline || !project.sections || project.sections.filter(s => s.name !== TOC_SECTION_NAME).length === 0}
+              disabled={isGeneratingToc || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting || !project.sections || project.sections.filter(s => s.name !== TOC_SECTION_NAME).length === 0}
               className="hover:glow-accent focus-visible:glow-accent"
-              title={!project.sections || project.sections.filter(s => s.name !== TOC_SECTION_NAME).length === 0 ? "Add sections before generating ToC" : "Generate Table of Contents"}
+              title={!project.sections || project.sections.filter(s => s.name !== TOC_SECTION_NAME).length === 0 ? "Add sections before generating ToC" : "Generate Table of Contents (updates sections)"}
             >
               {isGeneratingToc ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <List className="mr-2 h-4 w-4" />}
               {isGeneratingToc ? 'Generating ToC...' : 'Generate ToC'}
@@ -642,7 +819,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
           <ScrollArea className="flex-1 p-4 md:p-6 relative"> {/* Make content scrollable & relative for floating button */}
             {activeSectionIndex === -1 ? (
               // Project Details Form
-              <Card className="shadow-md">
+              <Card className="shadow-md mb-6">
                 <CardHeader>
                   <CardTitle className="text-glow-primary">Project Details</CardTitle>
                   <CardDescription>Edit general information about your project. Providing context helps the AI generate a relevant outline and content.</CardDescription>
@@ -753,7 +930,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                     variant="default"
                     size="sm"
                     onClick={handleGenerateOutline}
-                    disabled={isGeneratingOutline || isGenerating || isSummarizing || isGeneratingToc || !project.projectContext?.trim()}
+                    disabled={isGeneratingOutline || isGenerating || isSummarizing || isGeneratingToc || isSuggesting || !project.projectContext?.trim()}
                     className="hover:glow-primary focus-visible:glow-primary"
                     title={!project.projectContext?.trim() ? "Add project context above first" : "Generate section outline based on project context"}
                   >
@@ -784,7 +961,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                           className="mt-1 min-h-[100px] font-mono text-sm focus-visible:glow-primary"
                         />
                       </div>
-                      <Button onClick={() => handleGenerateSection(activeSectionIndex)} disabled={isGenerating || isSummarizing || isGeneratingToc || isGeneratingOutline} className="hover:glow-primary focus-visible:glow-primary">
+                      <Button onClick={() => handleGenerateSection(activeSectionIndex)} disabled={isGenerating || isSummarizing || isGeneratingToc || isGeneratingOutline || isSuggesting} className="hover:glow-primary focus-visible:glow-primary">
                         {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
                         {isGenerating ? 'Generating...' : 'Generate Content'}
                       </Button>
@@ -792,12 +969,12 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                   </Card>
                 )}
 
-                <Card className="shadow-md">
+                <Card className="shadow-md mb-6"> {/* Added margin-bottom */}
                   <CardHeader>
                     <CardTitle>{activeSection.name} - Content</CardTitle>
                     <CardDescription>
                       {activeSection.name === TOC_SECTION_NAME
-                        ? "This Table of Contents was generated by the AI. You can manually edit it below."
+                        ? "This Table of Contents was generated by the AI. Generating it again may add missing sections based on its content. You can manually edit it below."
                         : "Edit the generated or existing content below."}
                     </CardDescription>
                   </CardHeader>
@@ -815,7 +992,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                       <Button
                         variant="outline"
                         onClick={() => handleSummarizeSection(activeSectionIndex)}
-                        disabled={isSummarizing || isGenerating || isGeneratingToc || isGeneratingOutline || !activeSection.content?.trim()}
+                        disabled={isSummarizing || isGenerating || isGeneratingToc || isGeneratingOutline || isSuggesting || !activeSection.content?.trim()}
                         className="hover:glow-accent focus-visible:glow-accent"
                       >
                         {isSummarizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ScrollText className="mr-2 h-4 w-4" />}
@@ -844,7 +1021,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                         variant="default"
                         size="sm"
                         onClick={handleGenerateOutline}
-                        disabled={isGeneratingOutline || isGenerating || isSummarizing || isGeneratingToc || !project.projectContext?.trim()}
+                        disabled={isGeneratingOutline || isGenerating || isSummarizing || isGeneratingToc || isSuggesting || !project.projectContext?.trim()}
                         className="hover:glow-primary focus-visible:glow-primary"
                         title={!project.projectContext?.trim() ? "Add project context in Project Details first" : "Generate section outline based on project context"}
                       >
@@ -858,8 +1035,50 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
               </div>
             )}
 
+            {/* AI Suggestions Section (Always visible below content) */}
+            <Card className="shadow-md mt-6">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-primary text-glow-primary">
+                        <Sparkles className="w-5 h-5" /> AI Suggestions
+                    </CardTitle>
+                    <CardDescription>Ask the AI for feedback or specific improvements on your report.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div>
+                        <Label htmlFor="suggestion-input">What would you like suggestions on? (Optional)</Label>
+                        <Input
+                            id="suggestion-input"
+                            value={suggestionInput}
+                            onChange={(e) => setSuggestionInput(e.target.value)}
+                            placeholder="e.g., Improve the flow, Add more technical details, Check clarity..."
+                            className="mt-1 focus-visible:glow-primary"
+                        />
+                    </div>
+                    <Button
+                        onClick={handleGetSuggestions}
+                        disabled={isSuggesting || isGenerating || isSummarizing || isGeneratingToc || isGeneratingOutline}
+                        className="hover:glow-primary focus-visible:glow-primary"
+                    >
+                        {isSuggesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquareQuestion className="mr-2 h-4 w-4" />}
+                        {isSuggesting ? 'Getting Suggestions...' : 'Get Suggestions'}
+                    </Button>
+
+                    {/* Display Suggestions */}
+                    {suggestions && (
+                        <div className="mt-4 p-4 border rounded-md bg-muted/30">
+                             <h4 className="font-semibold mb-2 text-foreground">Suggestions:</h4>
+                             <div
+                                className="prose prose-sm max-w-none dark:prose-invert text-foreground"
+                                dangerouslySetInnerHTML={{ __html: marked.parse(suggestions) }}
+                             />
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
+
             {/* Floating Action Button (FAB) for Sidebar Toggle */}
-            <div className="absolute bottom-6 right-6 z-20">
+            <div className="fixed bottom-6 right-6 z-20 md:bottom-8 md:right-8"> {/* Use fixed positioning */}
               {/* Mobile: Sheet Trigger */}
               <SheetTrigger asChild>
                 <Button
@@ -892,7 +1111,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             <AlertDialogHeader>
               <AlertDialogTitle>Project Context May Be Limited</AlertDialogTitle>
               <AlertDialogDescription>
-                The project context provided is quite short. Generating a Table of Contents might be less accurate.
+                The project context provided is quite short. Generating a Table of Contents might be less accurate, and it might not identify all necessary sections.
                 Consider adding more details to the "Project Context" field in Project Details for better results.
                 Do you want to proceed with generation anyway?
               </AlertDialogDescription>

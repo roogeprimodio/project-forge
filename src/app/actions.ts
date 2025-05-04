@@ -8,6 +8,8 @@ import { generateTableOfContents, GenerateTableOfContentsInput } from '@/ai/flow
 import type { GenerateTableOfContentsOutput } from '@/ai/flows/generate-table-of-contents';
 import { generateProjectOutline, GenerateProjectOutlineInput } from '@/ai/flows/generate-project-outline'; // Import new flow
 import type { GenerateProjectOutlineOutput } from '@/ai/flows/generate-project-outline'; // Import new flow types
+import { suggestImprovements, SuggestImprovementsInput } from '@/ai/flows/suggest-improvements'; // Import new flow
+import type { SuggestImprovementsOutput } from '@/ai/flows/suggest-improvements'; // Import new flow types
 
 
 /**
@@ -87,6 +89,23 @@ export async function generateOutlineAction(input: GenerateProjectOutlineInput):
   } catch (error) {
     console.error("Error generating project outline:", error);
     const errorMessage = error instanceof Error ? error.message : "An unknown error occurred during outline generation.";
+    return { error: errorMessage };
+  }
+}
+
+/**
+ * Server action to suggest improvements for the project report using the AI flow.
+ * Handles potential errors during the AI call.
+ */
+export async function suggestImprovementsAction(input: SuggestImprovementsInput): Promise<SuggestImprovementsOutput | { error: string }> {
+  try {
+    console.log("Suggesting improvements with input:", input);
+    const result = await suggestImprovements(input);
+    console.log("Suggestion result:", result);
+    return result;
+  } catch (error) {
+    console.error("Error suggesting improvements:", error);
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred while suggesting improvements.";
     return { error: errorMessage };
   }
 }
