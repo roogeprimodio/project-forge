@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { BookOpen, Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, List, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuestion, Sparkles } from 'lucide-react'; // Added Undo, MessageSquareQuestion, Sparkles
+import { BookOpen, Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, List, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles } from 'lucide-react'; // Replaced MessageSquareQuestion with MessageSquareQuote
 import Link from 'next/link';
 import type { Project, ProjectSection } from '@/types/project';
 import { COMMON_SECTIONS, TOC_SECTION_NAME } from '@/types/project';
@@ -187,7 +187,7 @@ function ProjectSidebarContent({
 
 
 export function ProjectEditor({ projectId }: ProjectEditorProps) {
-  const [projects, setProjects, loadInitialValue] = useLocalStorage<Project[]>('projects', []);
+  const [projects, setProjects] = useLocalStorage<Project[]>('projects', []);
   const { toast } = useToast();
   const [activeSectionIndex, setActiveSectionIndex] = useState<number | null | -1>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -210,11 +210,10 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const [historyIndex, setHistoryIndex] = useState<number>(-1);
   const isUpdatingHistory = useRef(false); // Flag to prevent history loops
 
-  // Mark as mounted on client and load initial value explicitly
+  // Mark as mounted on client
   useEffect(() => {
-    loadInitialValue(); // Ensure localStorage value is loaded on mount
     setHasMounted(true);
-  }, [loadInitialValue]); // Added loadInitialValue dependency
+  }, []);
 
 
   // Derived state: current project (use directly from history if available)
@@ -228,12 +227,13 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
    // Effect to initialize history when project is loaded
   useEffect(() => {
-    if (hasMounted && project && history.length === 0) {
+    if (hasMounted && project && history.length === 0 && historyIndex === -1) {
         console.log("Initializing history with project:", project);
         setHistory([project]);
         setHistoryIndex(0);
     }
-  }, [project, hasMounted, history.length]); // Run only when project is first defined and history is empty
+  }, [project, hasMounted, history.length, historyIndex]); // Run only when project is first defined and history is empty
+
 
   // Update project and history
   const updateProject = useCallback((updatedData: Partial<Project> | ((prev: Project) => Project), saveToHistory: boolean = true) => {
@@ -241,50 +241,54 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
       isUpdatingHistory.current = true; // Prevent triggering localStorage save from history update
 
-      const updatedProject = typeof updatedData === 'function'
-        ? updatedData(project)
-        : { ...project, ...updatedData, updatedAt: new Date().toISOString() };
+      setProjects((prevProjects = []) => {
+        const currentProjectIndex = (prevProjects || []).findIndex(p => p.id === projectId);
+        if (currentProjectIndex === -1) {
+            console.error("Project not found in setProjects during update");
+            requestAnimationFrame(() => { isUpdatingHistory.current = false; });
+            return prevProjects || []; // Return current state if project not found
+        }
 
-      setHistory(prevHistory => {
-          const newHistory = prevHistory.slice(0, historyIndex + 1);
-          newHistory.push(updatedProject);
-          // Limit history size
-          if (newHistory.length > MAX_HISTORY_LENGTH) {
-              newHistory.shift(); // Remove the oldest entry
-          }
-          const newIndex = Math.min(newHistory.length - 1, MAX_HISTORY_LENGTH - 1); // Index should correspond to the limited array
-          setHistoryIndex(newIndex);
+        const currentProject = prevProjects[currentProjectIndex];
+        const updatedProject = typeof updatedData === 'function'
+            ? updatedData(currentProject)
+            : { ...currentProject, ...updatedData, updatedAt: new Date().toISOString() };
 
-          // Update localStorage with the latest state from history
-           setProjects((prevProjects = []) =>
-             (prevProjects || []).map(p =>
-               p.id === projectId ? updatedProject : p
-             )
-           );
+        if (saveToHistory) {
+            setHistory(prevHistory => {
+                const newHistory = prevHistory.slice(0, historyIndex + 1);
+                newHistory.push(updatedProject);
+                // Limit history size
+                if (newHistory.length > MAX_HISTORY_LENGTH) {
+                    newHistory.shift(); // Remove the oldest entry
+                }
+                const newIndex = Math.min(newHistory.length - 1, MAX_HISTORY_LENGTH - 1); // Index should correspond to the limited array
+                setHistoryIndex(newIndex);
+                return newHistory;
+            });
+        } else {
+             // If not saving to history (e.g., undo/redo), just update the current history entry
+             setHistory(prevHistory => {
+                 const newHistory = [...prevHistory];
+                 if (historyIndex >= 0 && historyIndex < newHistory.length) {
+                     newHistory[historyIndex] = updatedProject;
+                 }
+                 return newHistory;
+             });
+        }
 
-           requestAnimationFrame(() => {
-               isUpdatingHistory.current = false;
-           });
 
-          return newHistory;
+        // Update localStorage with the latest state
+        const updatedProjects = [...prevProjects];
+        updatedProjects[currentProjectIndex] = updatedProject;
+        return updatedProjects;
       });
 
+      requestAnimationFrame(() => {
+        isUpdatingHistory.current = false;
+      });
 
   }, [project, historyIndex, setProjects, projectId]); // Added projectId
-
-
-    // Effect to update localStorage ONLY when history changes AND it wasn't triggered by history logic itself
-    // This effect might be redundant now that updateProject handles localStorage update
-    // useEffect(() => {
-    //     if (hasMounted && project && !isUpdatingHistory.current && historyIndex >= 0) {
-    //         console.log("Saving project to localStorage from history update");
-    //         setProjects((prevProjects = []) =>
-    //             (prevProjects || []).map(p =>
-    //                 p.id === projectId ? project : p
-    //             )
-    //         );
-    //     }
-    // }, [project, projectId, setProjects, hasMounted, historyIndex]);
 
 
    // Effect to check if project exists and set initial state
@@ -313,9 +317,10 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     const handleUndo = useCallback(() => {
         if (historyIndex > 0) {
             isUpdatingHistory.current = true; // Prevent recursive updates
-            setHistoryIndex(prevIndex => prevIndex - 1);
-             // Update localStorage with the undone state
-             const undoneProject = history[historyIndex - 1];
+            const newIndex = historyIndex - 1;
+            setHistoryIndex(newIndex);
+             // Update localStorage with the undone state from history
+             const undoneProject = history[newIndex];
              setProjects((prevProjects = []) =>
                  (prevProjects || []).map(p =>
                      p.id === projectId ? undoneProject : p
@@ -935,7 +940,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                     title={!project.projectContext?.trim() ? "Add project context above first" : "Generate section outline based on project context"}
                   >
                     {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
-                    {isGeneratingOutline ? 'Generating Outline...' : 'Generate Section Outline'}
+                    {isGeneratingOutline ? 'Generating Section Outline...' : 'Generate Section Outline'}
                   </Button>
                 </CardFooter>
               </Card>
@@ -1059,7 +1064,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                         disabled={isSuggesting || isGenerating || isSummarizing || isGeneratingToc || isGeneratingOutline}
                         className="hover:glow-primary focus-visible:glow-primary"
                     >
-                        {isSuggesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquareQuestion className="mr-2 h-4 w-4" />}
+                        {isSuggesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquareQuote className="mr-2 h-4 w-4" />} {/* Use MessageSquareQuote */}
                         {isSuggesting ? 'Getting Suggestions...' : 'Get Suggestions'}
                     </Button>
 
