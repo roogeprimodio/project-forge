@@ -14,7 +14,7 @@ export interface HierarchicalSectionItemProps {
     section: HierarchicalProjectSection;
     level: number;
     activeSectionId: string | null;
-    setActiveSectionId: (id: string) => void;
+    setActiveSectionId: (id: string | number) => void; // Allow number for standard pages
     onEditSectionName: (id: string, newName: string) => void; // Changed signature
     onDeleteSection: (id: string) => void;
     onAddSubSection: (parentId: string) => void; // Added prop for adding sub-sections

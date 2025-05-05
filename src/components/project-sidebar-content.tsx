@@ -60,7 +60,8 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
 }) => {
      const handleSectionClick = (id: string | number) => {
          if (isEditingSections) {
-             return;
+             // Allow selection even in edit mode for easier navigation before editing name/deleting
+             // return;
          }
          setActiveSectionId(id);
          onCloseSheet?.();
@@ -102,7 +103,7 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                          onClick={() => handleSectionClick(-1)}
                          className="justify-start"
                          aria-current={activeSectionId === String(-1) ? "page" : undefined}
-                         disabled={isEditingSections}
+                         //disabled={isEditingSections} // Allow clicking even in edit mode
                      >
                          <Settings className="mr-2 h-4 w-4" />
                          Project Details
@@ -123,7 +124,7 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                                 className="justify-start"
                                 aria-current={activeSectionId === pageId ? "page" : undefined}
                                 title={pageName}
-                                disabled={isEditingSections}
+                                //disabled={isEditingSections} // Allow clicking even in edit mode
                             >
                                 <FileText className="mr-2 h-4 w-4 flex-shrink-0" />
                                 <span>{pageName}</span>
@@ -154,10 +155,10 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                                 section={section}
                                 level={0}
                                 activeSectionId={activeSectionId}
-                                setActiveSectionId={(id) => handleSectionClick(id)} // Pass string ID
+                                setActiveSectionId={setActiveSectionId} // Pass setActiveSectionId down
                                 onEditSectionName={onEditSectionName}
                                 onDeleteSection={onDeleteSection} // Pass handler
-                                onAddSubSection={onAddSection} // Pass handler
+                                onAddSubSection={onAddSection} // Pass add sub-section handler
                                 isEditing={isEditingSections}
                                 onCloseSheet={onCloseSheet}
                             />
@@ -171,7 +172,7 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                                 key="add-new-section-button" // Static key for this button
                                 variant="outline"
                                 size="sm"
-                                onClick={handleAddNewSection}
+                                onClick={() => handleAddNewSection()} // Call without parentId for top-level
                                 className="justify-start mt-2 text-muted-foreground hover:text-primary"
                                 title="Add new top-level section"
                                 >
@@ -190,7 +191,7 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                     onClick={handleGenerateTocClick}
                     disabled={isGeneratingOutline || isGenerating || isSummarizing || isSuggesting || !project.projectContext?.trim()}
                     className="w-full hover:glow-accent focus-visible:glow-accent"
-                    title={!project.projectContext?.trim() ? "Add project context in Project Details first" : "Generate Table of Contents based on project context"}
+                    title={!project.projectContext?.trim() ? "Add project context in Project Details first" : "Generate/Update Sections based on project context"}
                 >
                     {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
                     {isGeneratingOutline ? 'Generating Sections...' : 'Generate/Update Sections'}
