@@ -89,7 +89,7 @@ const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = ({
                     size="sm"
                     onClick={handleSectionClick}
                     className={cn(
-                        "justify-start truncate flex-1 group/btn", // Use group/btn for button-specific hover
+                        "justify-start flex-1 group/btn", // Remove truncate here, rely on parent container scroll
                         isEditing ? 'pr-16' : 'pr-2' // Adjust padding based on edit mode
                     )}
                     aria-current={isActive && !isEditing ? "page" : undefined}
@@ -113,8 +113,8 @@ const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = ({
                     )}
 
                     <FileText className="mr-2 h-4 w-4 flex-shrink-0" />
-                    {/* Ensure text span handles potential overflow */}
-                    <span className="truncate flex-1">{section.name}</span>
+                    {/* Text span should not truncate if parent handles scrolling */}
+                    <span className="flex-1">{section.name}</span>
                 </Button>
 
                  {/* Edit and Delete Buttons - only show when editing is enabled */}
@@ -242,9 +242,9 @@ function ProjectSidebarContent({
                 </Button>
             </div>
              {/* Ensure ScrollArea handles horizontal overflow */}
-             <ScrollArea className="flex-1 px-2 py-2 overflow-x-auto"> {/* Add overflow-x-auto */}
+             <ScrollArea className="flex-1 px-2 py-2 overflow-x-auto"> {/* Add overflow-x-auto here */}
                  {/* Ensure nav prevents wrapping to allow horizontal scroll */}
-                 <nav className="flex flex-col gap-1 whitespace-nowrap"> {/* Add whitespace-nowrap */}
+                 <nav className="flex flex-col gap-1 whitespace-nowrap"> {/* Add whitespace-nowrap here */}
                      {/* Project Details Button */}
                      <Button
                          variant={activeSectionId === String(-1) ? "secondary" : "ghost"} // Compare as string
@@ -271,13 +271,14 @@ function ProjectSidebarContent({
                                 variant={activeSectionId === pageId ? "secondary" : "ghost"}
                                 size="sm"
                                 onClick={() => handleSectionClick(pageIndex)} // Pass numeric index
-                                className="justify-start truncate"
+                                className="justify-start" // Removed truncate, let parent scroll
                                 aria-current={activeSectionId === pageId ? "page" : undefined}
                                 title={pageName}
                                 disabled={isEditingSections} // Disable during edit mode
                             >
                                 <FileText className="mr-2 h-4 w-4 flex-shrink-0" />
-                                <span className="truncate">{pageName}</span>
+                                {/* Text span should not truncate */}
+                                <span className="">{pageName}</span>
                             </Button>
                         );
                      })}
@@ -1641,4 +1642,3 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     </Sheet>
   );
 }
-
