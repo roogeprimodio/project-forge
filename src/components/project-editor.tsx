@@ -301,7 +301,7 @@ function ProjectSidebarContent({
                           project.sections.map((section) => (
                             // Apply the key directly to the HierarchicalSectionItem component
                             <HierarchicalSectionItem
-                                key={section.id} // Key directly on the component rendered by map
+                                key={section.id} // Apply key here to the component rendered by map
                                 section={section}
                                 level={0}
                                 activeSectionId={activeSectionId}
