@@ -9,10 +9,10 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { BookOpen, Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, List, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, FileWarning } from 'lucide-react'; // Added icons
+import { BookOpen, Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, List, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, FileWarning, Eye } from 'lucide-react'; // Added Eye icon
 import Link from 'next/link';
 import type { Project, ProjectSection } from '@/types/project';
-import { STANDARD_REPORT_PAGES, TOC_SECTION_NAME } from '@/types/project'; // Import standard pages
+import { STANDARD_REPORT_PAGES, TOC_SECTION_NAME } from '@/types/project'; // Import standard pages and TOC name
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { useToast } from '@/hooks/use-toast';
 import { generateSectionAction, summarizeSectionAction, generateOutlineAction, suggestImprovementsAction } from '@/app/actions';
@@ -353,20 +353,26 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   // Mark as mounted on client
   useEffect(() => {
     setHasMounted(true);
-     // Initialize FAB position (bottom right corner)
-     if (fabRef.current?.parentElement) {
-         const parentRect = fabRef.current.parentElement.getBoundingClientRect();
-         const fabWidth = fabRef.current.offsetWidth || 56; // Default width if not rendered yet
-         const fabHeight = fabRef.current.offsetHeight || 56; // Default height
-         const initialX = parentRect.width - fabWidth - 24; // 24px margin
-         const initialY = parentRect.height - fabHeight - 24; // 24px margin
+     // Initialize FAB position (bottom right corner) based on window size initially
+     const updateInitialFabPosition = () => {
+         const fabWidth = 56; // FAB width
+         const fabHeight = 56; // FAB height
+         const margin = 24; // Margin from edges
+
+         // Get viewport dimensions
+         const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+         const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
+
+         const initialX = vw - fabWidth - margin;
+         const initialY = vh - fabHeight - margin;
          setFabPosition({ x: initialX, y: initialY });
-     } else {
-         // Fallback if parent isn't available immediately
-         const initialX = window.innerWidth - 80;
-         const initialY = window.innerHeight - 80;
-         setFabPosition({ x: initialX, y: initialY });
-     }
+     };
+
+     updateInitialFabPosition(); // Set initial position
+     window.addEventListener('resize', updateInitialFabPosition); // Update on resize
+
+     return () => window.removeEventListener('resize', updateInitialFabPosition); // Cleanup listener
+
   }, []);
 
   // Derived state: current project
@@ -820,6 +826,11 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
      }
    };
 
+   // Placeholder for Preview function
+   const handlePreview = () => {
+        toast({ title: "Preview (Coming Soon)", description: "This will show a preview of the generated report." });
+    };
+
 
     // --- FAB Drag Handlers ---
     const onFabMouseDown = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -839,9 +850,11 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     const onFabMouseMove = useCallback((e: MouseEvent) => {
         if (!isDraggingFab || !fabRef.current) return;
         const parentRect = fabRef.current.parentElement?.getBoundingClientRect();
-        if (!parentRect) return;
+        // Use viewport dimensions as the boundary
+        const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+        const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
 
-        let newX = e.clientX - dragOffset.current.x; // Use clientX/Y directly
+        let newX = e.clientX - dragOffset.current.x;
         let newY = e.clientY - dragOffset.current.y;
 
         // Constrain within viewport bounds (considering FAB size)
@@ -849,8 +862,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         const fabHeight = fabRef.current.offsetHeight;
          const margin = 16; // Keep FAB away from edges
 
-        newX = Math.max(margin, Math.min(newX, window.innerWidth - fabWidth - margin));
-        newY = Math.max(margin, Math.min(newY, window.innerHeight - fabHeight - margin));
+        newX = Math.max(margin, Math.min(newX, vw - fabWidth - margin));
+        newY = Math.max(margin, Math.min(newY, vh - fabHeight - margin));
 
 
         setFabPosition({ x: newX, y: newY });
@@ -963,6 +976,18 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
               {project.storageType === 'local' ? <CloudOff className="h-4 w-4" /> : <Cloud className="h-4 w-4 text-green-500" />}
               <span>{project.storageType === 'local' ? 'Local' : 'Cloud'}</span>
             </div>
+            {/* Preview Button (Placeholder) */}
+             <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePreview}
+                disabled={true} // Disabled for now
+                className="ml-2"
+                title="Preview Report (Coming Soon)"
+              >
+                <Eye className="mr-2 h-4 w-4" />
+                Preview
+             </Button>
             <Button
               variant="outline"
               size="sm"
@@ -1174,8 +1199,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
           </ScrollArea>
         </div>
 
-        {/* Floating Action Button (FAB) for Mobile/Draggable Sidebar Toggle */}
-        {/* This button now triggers the Sheet */}
+        {/* Floating Action Button (FAB) for Mobile Project Sidebar Toggle */}
+        {/* Placed within the main `relative` container */}
          <SheetTrigger asChild>
              <Button
                 ref={fabRef}
@@ -1206,6 +1231,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
              </Button>
          </SheetTrigger>
 
+
         {/* Context Warning Dialog */}
         <AlertDialog open={showOutlineContextAlert} onOpenChange={setShowOutlineContextAlert}>
           <AlertDialogContent>
@@ -1227,5 +1253,3 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     </Sheet>
   );
 }
-
-    
