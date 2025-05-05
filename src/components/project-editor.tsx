@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, FileWarning, Eye, Projector } from 'lucide-react';
+import { Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, FileWarning, Eye, Projector } from 'lucide-react'; // Corrected icons
 import Link from 'next/link';
 import type { Project, HierarchicalProjectSection, GeneratedSectionOutline, SectionIdentifier, OutlineSection } from '@/types/project'; // Use hierarchical type, Import OutlineSection
 import { findSectionById, updateSectionById, deleteSectionById, STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, TOC_SECTION_NAME } from '@/lib/project-utils'; // Import helpers from lib
@@ -289,6 +289,17 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
    }, [projectId, project, setProjects, setHistory, setHistoryIndex, historyIndex]);
 
 
+  // --- Event Handlers for UI interactions ---
+
+  // Set active section in the sidebar
+    const handleSetActiveSection = useCallback((idOrIndex: SectionIdentifier) => {
+      const newActiveId = String(idOrIndex); // Always treat as string ID internally
+       if (activeSectionId !== newActiveId) {
+            setActiveSectionId(newActiveId);
+            setShowDiagramGenerator(false); // Hide diagram generator when changing sections
+        }
+    }, [activeSectionId]); // Depend only on activeSectionId
+
   // Check if project exists on mount and handle redirects
   useEffect(() => {
     // Prevent running this effect if project state is being updated by history changes
@@ -345,19 +356,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   }, [historyIndex, history, setProjects, projectId, toast]);
 
   const canUndo = historyIndex > 0;
-
-
-  // --- Event Handlers for UI interactions ---
-
-  // Set active section in the sidebar
-    const handleSetActiveSection = useCallback((idOrIndex: SectionIdentifier) => {
-      const newActiveId = String(idOrIndex); // Always treat as string ID internally
-       if (activeSectionId !== newActiveId) {
-            setActiveSectionId(newActiveId);
-            setShowDiagramGenerator(false); // Hide diagram generator when changing sections
-        }
-    }, [activeSectionId]); // Depend only on activeSectionId
-
 
   // Update section content (e.g., from textarea) - no history save on every change
   const handleSectionContentChange = (id: string, content: string) => {
