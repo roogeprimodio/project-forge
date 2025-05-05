@@ -1,9 +1,8 @@
-// src/components/main-layout.tsx
 "use client";
 
-import React, { useState, useEffect } from 'react'; // Added useState, useEffect
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation'; // To handle logout redirection
+import { useRouter } from 'next/navigation';
 import {
   SidebarProvider,
   Sidebar,
@@ -16,10 +15,11 @@ import {
   SidebarMenuButton,
   SidebarInset,
 } from '@/components/ui/sidebar';
-import { LayoutDashboard, User, Image as ImageIcon, Settings, LogIn, LogOut } from 'lucide-react'; // Added LogIn, LogOut
+import { LayoutDashboard, User, Image as ImageIcon, Settings, LogIn, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePathname } from 'next/navigation';
-import { useToast } from '@/hooks/use-toast'; // Added useToast
+import { useToast } from '@/hooks/use-toast';
+import { ThemeToggle } from '@/components/theme-toggle'; // Import ThemeToggle
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -34,45 +34,36 @@ export function MainLayout({ children }: MainLayoutProps) {
 
   useEffect(() => {
     setHasMounted(true);
-    // Simulate checking login status (replace with real auth check)
-    // For now, assume logged in if not on login/register pages
     setIsLoggedIn(!(pathname === '/login' || pathname === '/register'));
   }, [pathname]);
 
   const handleLogout = () => {
-    // Simulate logout
     console.log('Logging out...');
-    setIsLoggedIn(false); // Update placeholder state
+    setIsLoggedIn(false);
     toast({
         title: 'Logged Out',
         description: 'You have been successfully logged out.',
     });
-    router.push('/login'); // Redirect to login page
+    router.push('/login');
   };
 
   const handleLogin = () => {
      router.push('/login');
   }
 
-  // Determine if the sidebar should be shown based on the route
   const showSidebar = !(pathname === '/login' || pathname === '/register') && hasMounted;
 
   if (!hasMounted) {
-      // Optional: Render a loading state or null while waiting for mount
-      // This helps prevent hydration mismatches related to login state
-      return null; // Or a loading component
+      return null;
   }
 
   if (!showSidebar) {
-      // Render only children if sidebar shouldn't be shown (login/register pages)
       return <>{children}</>;
   }
 
-  // Render the full layout with sidebar
   return (
     <SidebarProvider defaultOpen={true}>
       <div className="flex min-h-screen">
-        {/* --- Global Sidebar --- */}
         <Sidebar side="left" collapsible="icon" className="border-r bg-sidebar text-sidebar-foreground">
           <SidebarHeader className="p-4">
              <div className="flex items-center justify-between">
@@ -81,13 +72,12 @@ export function MainLayout({ children }: MainLayoutProps) {
                     Project Forge
                   </a>
                 </Link>
-                {/* Sidebar Trigger for Icon Collapse - visible when expanded */}
                 <SidebarTrigger className="hidden group-data-[state=expanded]:flex text-sidebar-foreground" />
             </div>
           </SidebarHeader>
 
-          <SidebarContent className="flex-1 flex flex-col"> {/* Ensure content takes available space */}
-            <SidebarMenu className="flex-1"> {/* Make menu flexible */}
+          <SidebarContent className="flex-1 flex flex-col">
+            <SidebarMenu className="flex-1">
               <SidebarMenuItem>
                 <Link href="/" passHref legacyBehavior>
                     <SidebarMenuButton
@@ -119,18 +109,15 @@ export function MainLayout({ children }: MainLayoutProps) {
                         tooltip="Canvas"
                         className="text-sidebar-foreground hover:bg-sidebar-accent data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground"
                     >
-                        {/* Using ImageIcon as a placeholder for Canva */}
                         <ImageIcon />
                         <span className="group-data-[state=collapsed]:hidden">Canva</span>
                     </SidebarMenuButton>
                  </Link>
               </SidebarMenuItem>
-              {/* Add other menu items here */}
             </SidebarMenu>
           </SidebarContent>
 
-           <SidebarFooter className="p-4 border-t border-sidebar-border">
-                {/* Show Logout if logged in, Login otherwise */}
+           <SidebarFooter className="p-4 border-t border-sidebar-border space-y-2">
                 {isLoggedIn ? (
                     <Button variant="ghost" size="sm" onClick={handleLogout} className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-data-[state=collapsed]:justify-center group-data-[state=collapsed]:px-0 group-data-[state=collapsed]:aspect-square" title="Log Out">
                         <LogOut />
@@ -142,24 +129,17 @@ export function MainLayout({ children }: MainLayoutProps) {
                         <span className="group-data-[state=collapsed]:hidden ml-2">Log In</span>
                     </Button>
                  )}
-                {/* Example Settings Button (visible when expanded) */}
-                 <Button variant="ghost" size="sm" className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground mt-2 group-data-[state=collapsed]:hidden">
+                 <Button variant="ghost" size="sm" className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-data-[state=collapsed]:hidden">
                      <Settings className="mr-2"/> Settings
                  </Button>
+                 <ThemeToggle /> {/* Add ThemeToggle component here */}
            </SidebarFooter>
         </Sidebar>
 
-        {/* --- Main Content Area --- */}
         <SidebarInset className="flex-1 flex flex-col bg-background">
-             {/* Header inside the main content area */}
            <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/95 backdrop-blur-sm px-4 lg:h-[60px] lg:px-6">
-                {/* Sidebar Trigger for Desktop View */}
                <SidebarTrigger className="hidden md:flex text-foreground" />
-               {/* Mobile trigger remains if needed, or remove if FAB is sufficient */}
-               {/* <SidebarTrigger className="md:hidden text-foreground" /> */}
-               {/* Maybe add breadcrumbs or page title here */}
            </header>
-           {/* Page content renders here */}
            <div className="flex-1 overflow-auto">
                 {children}
            </div>
