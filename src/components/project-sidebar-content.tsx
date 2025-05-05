@@ -4,21 +4,20 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'; // Import ScrollBar
 import { Separator } from '@/components/ui/separator';
-import { Settings, Undo, Lightbulb, Cloud, CloudOff, PlusCircle, FileText, Loader2, ChevronRight, ChevronDown, Edit3, Trash2 } from 'lucide-react'; // Import necessary icons
+import { Settings, Undo, Lightbulb, Cloud, CloudOff, PlusCircle, FileText, Loader2, ChevronRight, ChevronDown, Edit3, Trash2 } from 'lucide-react';
 import type { Project, SectionIdentifier, HierarchicalProjectSection } from '@/types/project';
-import { STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, findSectionById } from '@/lib/project-utils'; // Import utils
-import { HierarchicalSectionItem } from './hierarchical-section-item'; // Import the hierarchical item
+import { STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, findSectionById } from '@/lib/project-utils';
+import { HierarchicalSectionItem } from './hierarchical-section-item';
 import { useToast } from '@/hooks/use-toast';
-import { v4 as uuidv4 } from 'uuid'; // Import uuid for generating unique IDs
-import { cn } from '@/lib/utils'; // Import cn for conditional classes
-
+import { v4 as uuidv4 } from 'uuid';
+import { cn } from '@/lib/utils';
 
 // Props interface for ProjectSidebarContent
 export interface ProjectSidebarContentProps {
     project: Project;
-    updateProject: (updatedData: Partial<Project> | ((prev: Project) => Project), saveToHistory?: boolean) => void; // Pass updateProject function
+    updateProject: (updatedData: Partial<Project> | ((prev: Project) => Project), saveToHistory?: boolean) => void;
     activeSectionId: string | null;
     setActiveSectionId: (id: SectionIdentifier) => void;
     handleGenerateTocClick: () => void;
@@ -30,11 +29,11 @@ export interface ProjectSidebarContentProps {
     canUndo: boolean;
     handleUndo: () => void;
     onCloseSheet?: () => void;
-    isEditingSections: boolean; // Manage edit mode state
+    isEditingSections: boolean;
     setIsEditingSections: (editing: boolean) => void;
     onEditSectionName: (id: string, newName: string) => void;
-    onDeleteSection: (id: string) => void; // Handler for deleting sections
-    onAddSubSection: (parentId: string) => void; // Added prop for adding sub-sections
+    onDeleteSection: (id: string) => void;
+    onAddSubSection: (parentId: string) => void;
 }
 
 /**
@@ -58,7 +57,7 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
     setIsEditingSections,
     onEditSectionName,
     onDeleteSection,
-    onAddSubSection, // Destructure the new prop
+    onAddSubSection,
 }) => {
      const { toast } = useToast();
 
@@ -159,12 +158,11 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
             </div>
             <Separator className="my-0 flex-shrink-0" />
 
-            {/* Standard Report Pages Section with its own vertical scroll */}
+            {/* Standard Report Pages Section with horizontal scroll */}
             <div className="px-2 py-2 flex-shrink-0">
                 <p className="px-2 text-xs font-semibold text-muted-foreground mb-1 text-left">STANDARD PAGES</p>
-                {/* Vertical scroll for Standard Pages */}
-                <ScrollArea className="h-48 w-full"> {/* Adjust height as needed */}
-                    <nav className="flex flex-col gap-1 pr-2"> {/* Add padding-right */}
+                <ScrollArea className="w-full whitespace-nowrap"> {/* Enable horizontal scroll */}
+                    <nav className="flex flex-col gap-1 min-w-max text-left"> {/* Ensure nav takes minimum width needed */}
                         {STANDARD_REPORT_PAGES.map((pageName) => {
                             const pageId = String(STANDARD_PAGE_INDICES[pageName]);
                             return (
@@ -183,11 +181,12 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                             );
                         })}
                     </nav>
+                     <ScrollBar orientation="horizontal" /> {/* Add horizontal scrollbar */}
                 </ScrollArea>
             </div>
             <Separator className="my-0 flex-shrink-0" />
 
-            {/* Report Sections Section with its own vertical scroll */}
+            {/* Report Sections Section with horizontal scroll */}
             <div className="flex-1 flex flex-col min-h-0"> {/* Use flex-1 and min-h-0 */}
                  <div className="flex justify-between items-center pl-2 pr-4 py-2 flex-shrink-0">
                     <p className="text-xs font-semibold text-muted-foreground text-left">REPORT SECTIONS</p>
@@ -201,11 +200,11 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                     </Button>
                  </div>
                  {/* Vertical Scroll for Report Sections */}
-                 <ScrollArea className="flex-1"> {/* flex-1 to fill remaining space */}
+                 <ScrollArea className="flex-1"> {/* flex-1 to fill remaining vertical space */}
                      <div className="px-2 py-2">
-                         {/* Horizontal Scroll remains within the vertical scroll */}
-                         <ScrollArea className="w-full whitespace-nowrap">
-                            <nav className="flex flex-col gap-1 min-w-max text-left">
+                         {/* Horizontal Scroll for the actual content */}
+                         <ScrollArea className="w-full whitespace-nowrap"> {/* Enable horizontal scroll */}
+                            <nav className="flex flex-col gap-1 min-w-max text-left"> {/* Ensure nav takes minimum width needed */}
                                {project.sections?.length > 0 ? (
                                   renderSectionsRecursive(project.sections, 0)
                                ) : (
@@ -225,7 +224,7 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                                     </Button>
                                 )}
                             </nav>
-                            <ScrollBar orientation="horizontal" />
+                            <ScrollBar orientation="horizontal" /> {/* Add horizontal scrollbar */}
                          </ScrollArea>
                      </div>
                  </ScrollArea>
