@@ -1,32 +1,46 @@
-export interface ProjectSection {
+export type SectionIdentifier = string | number; // ID (string) or standard page index (number)
+
+// Update ProjectSection to be hierarchical and include an ID
+export interface HierarchicalProjectSection {
+  id: string; // Unique identifier for the section
   name: string;
   prompt: string;
   content: string;
   lastGenerated?: Date | string;
+  subSections?: HierarchicalProjectSection[]; // Array for sub-sections
 }
+
+// Interface for the structure expected from the AI outline generation
+export interface GeneratedSectionOutline {
+  sections: {
+    name: string;
+    subSections?: GeneratedSectionOutline['sections']; // Recursive definition
+  }[];
+}
+
 
 export interface Project {
   id: string;
   title: string;
-  projectType: 'mini-project' | 'internship'; // Added project type
-  projectContext: string; // Added field to store initial project context
-  teamDetails: string; // Simple string for now, represents team members & enrollments. TODO: Refactor to Array<{name: string, enrollment: string}>
-  instituteName?: string; // Optional institute name
-  collegeInfo?: string; // Optional, potentially redundant with instituteName but kept for compatibility if used elsewhere
-  universityLogoUrl?: string; // Will store Data URL if image is uploaded
-  collegeLogoUrl?: string; // Will store Data URL if image is uploaded
-  teamId?: string; // Optional team ID
-  subject?: string; // e.g., Design Engineering - 1A
-  semester?: string; // e.g., 5
-  branch?: string; // e.g., Computer Engineering
-  guideName?: string; // Name of the faculty guide
-  sections: ProjectSection[];
+  projectType: 'mini-project' | 'internship';
+  projectContext: string;
+  teamDetails: string;
+  instituteName?: string;
+  collegeInfo?: string;
+  universityLogoUrl?: string;
+  collegeLogoUrl?: string;
+  teamId?: string;
+  subject?: string;
+  semester?: string;
+  branch?: string;
+  guideName?: string;
+  sections: HierarchicalProjectSection[]; // Use hierarchical structure
   createdAt: Date | string;
   updatedAt: Date | string;
-  storageType: 'local' | 'cloud'; // Added to indicate where the project is stored
+  storageType: 'local' | 'cloud';
 }
 
-// Name for the specific Table of Contents section
+// Name for the specific Table of Contents section (still relevant for standard pages)
 export const TOC_SECTION_NAME = "Table of Contents";
 
 // Predefined standard report pages/sections
@@ -39,12 +53,17 @@ export const STANDARD_REPORT_PAGES = [
   "List of Figures",
   "List of Tables",
   "Abbreviations",
-  TOC_SECTION_NAME, // Included here for consistency, but handled separately in UI
+  // TOC is implicitly handled by the hierarchical section structure now
 ];
 
+// Assign negative indices to standard pages for sidebar identification
+export const STANDARD_PAGE_INDICES: { [key: string]: number } = {};
+STANDARD_REPORT_PAGES.forEach((page, index) => {
+  STANDARD_PAGE_INDICES[page] = -(index + 2); // Start from -2 (-1 is Project Details)
+});
 
-// Predefined common sections (used as suggestions if needed, but primary source is AI outline)
-// Excluded Table of Contents and other standard pages as they are handled separately
+
+// Predefined common sections (less critical now with AI generation, but kept for potential future use)
 export const COMMON_SECTIONS = [
   "Introduction",
   "Literature Review",
@@ -56,4 +75,77 @@ export const COMMON_SECTIONS = [
   "Appendix",
 ];
 
-    
+// --- Helper Functions for Hierarchical Sections ---
+
+/**
+ * Finds a section (or sub-section) by its unique ID within a hierarchical structure.
+ * @param sections The array of top-level sections to search within.
+ * @param id The ID of the section to find.
+ * @returns The found section object or null if not found.
+ */
+export function findSectionById(sections: HierarchicalProjectSection[], id: string): HierarchicalProjectSection | null {
+    for (const section of sections) {
+        if (section.id === id) {
+            return section;
+        }
+        if (section.subSections) {
+            const foundInSection = findSectionById(section.subSections, id);
+            if (foundInSection) {
+                return foundInSection;
+            }
+        }
+    }
+    return null;
+}
+
+/**
+ * Updates a section (or sub-section) by its ID with new data. Returns a new array with the update.
+ * @param sections The original array of top-level sections.
+ * @param id The ID of the section to update.
+ * @param updates An object containing the properties to update.
+ * @returns A new array of sections with the specified section updated.
+ */
+export function updateSectionById(
+    sections: HierarchicalProjectSection[],
+    id: string,
+    updates: Partial<Omit<HierarchicalProjectSection, 'id' | 'subSections'>>
+): HierarchicalProjectSection[] {
+    return sections.map(section => {
+        if (section.id === id) {
+            return { ...section, ...updates };
+        }
+        if (section.subSections) {
+            // Recursively update sub-sections
+            const updatedSubSections = updateSectionById(section.subSections, id, updates);
+            // Only create a new object if sub-sections actually changed
+            if (updatedSubSections !== section.subSections) {
+                return { ...section, subSections: updatedSubSections };
+            }
+        }
+        return section; // Return unchanged section if ID doesn't match and no sub-sections changed
+    });
+}
+
+/**
+ * Deletes a section (or sub-section) by its ID. Returns a new array without the deleted section.
+ * @param sections The original array of top-level sections.
+ * @param id The ID of the section to delete.
+ * @returns A new array of sections with the specified section removed.
+ */
+export function deleteSectionById(sections: HierarchicalProjectSection[], id: string): HierarchicalProjectSection[] {
+    return sections.reduce((acc, section) => {
+        if (section.id === id) {
+            return acc; // Skip adding the section to delete
+        }
+        if (section.subSections) {
+            // Recursively delete from sub-sections
+            const updatedSubSections = deleteSectionById(section.subSections, id);
+            // Add the section back with potentially updated sub-sections
+            acc.push({ ...section, subSections: updatedSubSections });
+        } else {
+            // Add the section back if it doesn't match the ID and has no sub-sections
+            acc.push(section);
+        }
+        return acc;
+    }, [] as HierarchicalProjectSection[]); // Initialize accumulator as an empty array
+}

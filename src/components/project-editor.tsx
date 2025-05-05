@@ -9,10 +9,10 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { BookOpen, Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, List, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, FileWarning, Eye } from 'lucide-react'; // Added Eye icon
+import { BookOpen, Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, List, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, FileWarning, Eye, Trash2, Edit3, PlusCircle } from 'lucide-react'; // Added Trash2, Edit3, PlusCircle
 import Link from 'next/link';
-import type { Project, ProjectSection } from '@/types/project';
-import { STANDARD_REPORT_PAGES, TOC_SECTION_NAME } from '@/types/project'; // Import standard pages and TOC name
+import type { Project, HierarchicalProjectSection, GeneratedSectionOutline, SectionIdentifier } from '@/types/project'; // Use hierarchical type, import SectionIdentifier
+import { STANDARD_REPORT_PAGES, TOC_SECTION_NAME, STANDARD_PAGE_INDICES, findSectionById, updateSectionById, deleteSectionById } from '@/types/project'; // Import project utils
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { useToast } from '@/hooks/use-toast';
 import { generateSectionAction, summarizeSectionAction, generateOutlineAction, suggestImprovementsAction } from '@/app/actions';
@@ -22,6 +22,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTr
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { marked } from 'marked'; // For rendering markdown suggestions
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { v4 as uuidv4 } from 'uuid'; // For generating unique IDs for new sections
+
 
 interface ProjectEditorProps {
   projectId: string;
@@ -31,17 +33,110 @@ interface ProjectEditorProps {
 const MIN_CONTEXT_LENGTH = 50;
 const MAX_HISTORY_LENGTH = 10; // Limit undo history
 
-// Assign negative indices to standard pages for sidebar identification
-const STANDARD_PAGE_INDICES: { [key: string]: number } = {};
-STANDARD_REPORT_PAGES.forEach((page, index) => {
-  STANDARD_PAGE_INDICES[page] = -(index + 2); // Start from -2 (-1 is Project Details)
-});
 
-// New component for the local sidebar content (details, Standard Pages, ToC, actions)
+// Hierarchical Section Item Component (for Sidebar)
+interface HierarchicalSectionItemProps {
+    section: HierarchicalProjectSection;
+    level: number;
+    activeSectionId: string | null;
+    setActiveSectionId: (id: string) => void;
+    onEditSectionName: (id: string) => void;
+    onDeleteSection: (id: string) => void; // New prop for delete handler
+    isEditing: boolean;
+    onCloseSheet?: () => void;
+}
+
+const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = ({
+    section,
+    level,
+    activeSectionId,
+    setActiveSectionId,
+    onEditSectionName,
+    onDeleteSection, // New prop
+    isEditing,
+    onCloseSheet,
+}) => {
+    const isActive = section.id === activeSectionId;
+
+    const handleSectionClick = () => {
+        setActiveSectionId(section.id);
+        onCloseSheet?.(); // Close sheet on selection (mobile)
+    };
+
+    const handleEditClick = (e: React.MouseEvent) => {
+         e.stopPropagation(); // Prevent triggering section click
+         onEditSectionName(section.id);
+    };
+
+    const handleDeleteClick = (e: React.MouseEvent) => {
+        e.stopPropagation(); // Prevent triggering section click
+        onDeleteSection(section.id); // Call the delete handler passed from parent
+    };
+
+    return (
+        <div>
+            <Button
+                variant={isActive ? "secondary" : "ghost"}
+                size="sm"
+                onClick={handleSectionClick}
+                className={cn("justify-start truncate w-full group", isEditing && 'pr-16')} // Add padding if editing
+                aria-current={isActive ? "page" : undefined}
+                style={{ paddingLeft: `${1 + level * 1.5}rem` }} // Indentation
+                title={section.name}
+            >
+                <FileText className="mr-2 h-4 w-4 flex-shrink-0" />
+                <span className="truncate flex-1">{section.name}</span>
+                 {/* Edit and Delete Buttons - only show when editing is enabled */}
+                 {isEditing && (
+                    <div className="absolute right-1 top-1/2 transform -translate-y-1/2 flex gap-1 opacity-100 group-hover:opacity-100 transition-opacity">
+                         <Button
+                             variant="ghost"
+                             size="icon"
+                             className="h-6 w-6 text-muted-foreground hover:text-primary"
+                             onClick={handleEditClick}
+                             aria-label={`Edit section ${section.name}`}
+                         >
+                             <Edit3 className="h-4 w-4" />
+                         </Button>
+                         <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                            onClick={handleDeleteClick} // Use the specific handler
+                            aria-label={`Delete section ${section.name}`}
+                        >
+                            <Trash2 className="h-4 w-4" />
+                        </Button>
+                    </div>
+                 )}
+            </Button>
+            {section.subSections && section.subSections.length > 0 && (
+                <div className="ml-0"> {/* No extra margin here, padding handled by button style */}
+                    {section.subSections.map((subSection) => (
+                        <HierarchicalSectionItem
+                            key={subSection.id}
+                            section={subSection}
+                            level={level + 1}
+                            activeSectionId={activeSectionId}
+                            setActiveSectionId={setActiveSectionId}
+                            onEditSectionName={onEditSectionName}
+                            onDeleteSection={onDeleteSection} // Pass down delete handler
+                            isEditing={isEditing}
+                            onCloseSheet={onCloseSheet}
+                        />
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
+
+// New component for the local sidebar content
 function ProjectSidebarContent({
     project,
-    activeSectionIndex,
-    setActiveSectionIndex,
+    activeSectionId, // Changed from index to ID
+    setActiveSectionId, // Changed signature
     handleGenerateTocClick,
     isGeneratingOutline,
     isGenerating,
@@ -50,11 +145,16 @@ function ProjectSidebarContent({
     handleSaveOnline,
     canUndo,
     handleUndo,
-    onCloseSheet
+    onCloseSheet,
+    isEditingSections,
+    setIsEditingSections,
+    onEditSectionName,
+    onDeleteSection, // Pass delete handler
+    onAddSection, // Handler for adding new sections
 }: {
     project: Project;
-    activeSectionIndex: number | null; // Includes negative indices for standard pages
-    setActiveSectionIndex: (index: number) => void; // Now only accepts number
+    activeSectionId: string | null; // Use string ID
+    setActiveSectionId: (id: string | number) => void; // Accept ID or standard page index
     handleGenerateTocClick: () => void;
     isGeneratingOutline: boolean;
     isGenerating: boolean;
@@ -64,11 +164,26 @@ function ProjectSidebarContent({
     canUndo: boolean;
     handleUndo: () => void;
     onCloseSheet?: () => void;
+    isEditingSections: boolean;
+    setIsEditingSections: (editing: boolean) => void;
+    onEditSectionName: (id: string) => void;
+    onDeleteSection: (id: string) => void; // Define delete handler prop
+    onAddSection: (parentId?: string) => void; // Define add handler prop
 }) {
-     const handleSectionClick = (index: number) => {
-        setActiveSectionIndex(index);
-        onCloseSheet?.(); // Close sheet on selection (mobile)
+     const handleSectionClick = (id: string | number) => {
+         // If editing, clicking a section shouldn't change active selection, but might close sheet
+         if (isEditingSections) {
+             onCloseSheet?.();
+             return;
+         }
+         setActiveSectionId(id); // Pass string ID or numeric standard index
+         onCloseSheet?.(); // Close sheet on selection (mobile)
      };
+
+     const handleAddNewSection = () => {
+          onAddSection(); // Add top-level section
+          onCloseSheet?.(); // Close sheet if open
+      };
 
      return (
         <div className="flex flex-col h-full border-r bg-card">
@@ -96,11 +211,12 @@ function ProjectSidebarContent({
                  <nav className="flex flex-col gap-1">
                      {/* Project Details Button */}
                      <Button
-                         variant={activeSectionIndex === -1 ? "secondary" : "ghost"}
+                         variant={activeSectionId === String(-1) ? "secondary" : "ghost"} // Compare as string
                          size="sm"
                          onClick={() => handleSectionClick(-1)}
                          className="justify-start"
-                         aria-current={activeSectionIndex === -1 ? "page" : undefined}
+                         aria-current={activeSectionId === String(-1) ? "page" : undefined} // Compare as string
+                         disabled={isEditingSections} // Disable during edit mode
                      >
                          <Settings className="mr-2 h-4 w-4" />
                          Project Details
@@ -111,19 +227,17 @@ function ProjectSidebarContent({
                      <p className="px-2 text-xs font-semibold text-muted-foreground mb-1">STANDARD PAGES</p>
                      {STANDARD_REPORT_PAGES.map((pageName) => {
                         const pageIndex = STANDARD_PAGE_INDICES[pageName];
-                        // Skip rendering TOC button here if it's managed by the sections list below
-                        if (pageName === TOC_SECTION_NAME && project.sections.some(s => s.name === TOC_SECTION_NAME)) {
-                            return null;
-                        }
+                        const pageId = String(pageIndex); // Use string representation
                         return (
                             <Button
-                                key={pageName}
-                                variant={activeSectionIndex === pageIndex ? "secondary" : "ghost"}
+                                key={pageId}
+                                variant={activeSectionId === pageId ? "secondary" : "ghost"}
                                 size="sm"
-                                onClick={() => handleSectionClick(pageIndex)}
+                                onClick={() => handleSectionClick(pageIndex)} // Pass numeric index
                                 className="justify-start truncate"
-                                aria-current={activeSectionIndex === pageIndex ? "page" : undefined}
+                                aria-current={activeSectionId === pageId ? "page" : undefined}
                                 title={pageName}
+                                disabled={isEditingSections} // Disable during edit mode
                             >
                                 <FileText className="mr-2 h-4 w-4 flex-shrink-0" />
                                 <span className="truncate">{pageName}</span>
@@ -134,24 +248,47 @@ function ProjectSidebarContent({
                      <Separator className="my-2" />
 
                       {/* Table of Contents (Generated Sections List) */}
-                      <p className="px-2 text-xs font-semibold text-muted-foreground mb-1">REPORT SECTIONS</p>
-                       {project.sections?.length > 0 ? (
-                          project.sections.map((section, index) => (
+                       <div className="flex justify-between items-center px-2 mb-1">
+                            <p className="text-xs font-semibold text-muted-foreground">REPORT SECTIONS</p>
                             <Button
-                                key={`${section.name}-${index}`}
-                                variant={activeSectionIndex === index ? "secondary" : "ghost"}
+                                variant="ghost"
                                 size="sm"
-                                onClick={() => handleSectionClick(index)} // Use index >= 0 for regular sections
-                                className="justify-start truncate"
-                                aria-current={activeSectionIndex === index ? "page" : undefined}
+                                onClick={() => setIsEditingSections(!isEditingSections)}
+                                className="text-xs h-auto py-0 px-1 text-primary hover:bg-primary/10"
                             >
-                                <FileText className="mr-2 h-4 w-4 flex-shrink-0"/>
-                                <span className="truncate">{section.name}</span>
+                                {isEditingSections ? 'Done' : 'Edit'}
                             </Button>
+                       </div>
+                       {project.sections?.length > 0 ? (
+                          project.sections.map((section) => (
+                            <HierarchicalSectionItem
+                                key={section.id} // Use unique section ID
+                                section={section}
+                                level={0}
+                                activeSectionId={activeSectionId}
+                                setActiveSectionId={(id) => handleSectionClick(id)} // Pass string ID
+                                onEditSectionName={onEditSectionName}
+                                onDeleteSection={onDeleteSection} // Pass handler
+                                isEditing={isEditingSections}
+                                onCloseSheet={onCloseSheet}
+                            />
                           ))
                        ) : (
-                         <p className="px-2 text-xs text-muted-foreground italic">Generate a ToC to populate sections.</p>
+                         <p className="px-2 text-xs text-muted-foreground italic">Generate or add sections.</p>
                        )}
+                       {/* Add New Section Button (visible in edit mode or if no sections) */}
+                        {(isEditingSections || (project.sections?.length ?? 0) === 0) && (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handleAddNewSection}
+                                className="justify-start mt-2 text-muted-foreground hover:text-primary"
+                                title="Add new top-level section"
+                            >
+                                <PlusCircle className="mr-2 h-4 w-4" />
+                                Add Section
+                            </Button>
+                        )}
 
                  </nav>
              </ScrollArea>
@@ -324,7 +461,7 @@ const StandardPagePlaceholder = ({ pageName }: { pageName: string }) => (
 export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const [projects, setProjects] = useLocalStorage<Project[]>('projects', []);
   const { toast } = useToast();
-  const [activeSectionIndex, setActiveSectionIndex] = useState<number | null>(null); // null initially, -1 for Details, <-1 for standard, >=0 for sections
+  const [activeSectionId, setActiveSectionId] = useState<string | null>(null); // Use string ID, null initially
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [isGeneratingOutline, setIsGeneratingOutline] = useState(false);
@@ -337,6 +474,12 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const [showOutlineContextAlert, setShowOutlineContextAlert] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState<Record<'universityLogoUrl' | 'collegeLogoUrl', boolean>>({ universityLogoUrl: false, collegeLogoUrl: false });
   const router = useRouter();
+
+  // State for editing section names
+  const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
+  const [editingSectionName, setEditingSectionName] = useState('');
+  const [isEditingSections, setIsEditingSections] = useState(false); // State to toggle section edit mode
+  const [sectionToDelete, setSectionToDelete] = useState<string | null>(null); // ID of section pending deletion
 
   // Undo/Redo state
   const [history, setHistory] = useState<Project[]>([]);
@@ -482,9 +625,11 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
     if (projectExists && isProjectFound !== true) {
       setIsProjectFound(true);
-      if (activeSectionIndex === null) {
-        setActiveSectionIndex(-1); // Default to Project Details
-      }
+       if (activeSectionId === null) {
+          // Default to Project Details (-1) converted to string
+          const defaultSectionId = String(-1);
+          setActiveSectionId(defaultSectionId);
+        }
     } else if (!projectExists && isProjectFound !== false) {
         setIsProjectFound(false);
         toast({
@@ -495,7 +640,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         const timer = setTimeout(() => router.push('/'), 2000);
         return () => clearTimeout(timer);
     }
-   }, [projectId, projects, activeSectionIndex, toast, router, isProjectFound, hasMounted]);
+   }, [projectId, projects, activeSectionId, toast, router, isProjectFound, hasMounted]);
 
     // --- Undo/Redo Handlers ---
     const handleUndo = useCallback(() => {
@@ -525,23 +670,30 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
     const canUndo = historyIndex > 0;
 
+   // Function to change the active section based on ID (string) or standard page index (number)
+   const handleSetActiveSection = useCallback((idOrIndex: string | number) => {
+        const newActiveId = String(idOrIndex); // Convert numbers to string for consistency
+        if (activeSectionId !== newActiveId) {
+            setActiveSectionId(newActiveId);
+            setEditingSectionId(null); // Stop editing when changing sections
+        }
+   }, [activeSectionId]);
 
-  const handleSectionContentChange = (index: number, content: string) => {
-    if (!project || index < 0 || index >= project.sections.length) return;
-     updateProject(prev => {
-         const updatedSections = [...prev.sections];
-         updatedSections[index] = { ...updatedSections[index], content };
-         return { ...prev, sections: updatedSections };
-     });
+
+  const handleSectionContentChange = (id: string, content: string) => {
+    if (!project) return;
+    updateProject(prev => ({
+        ...prev,
+        sections: updateSectionById(prev.sections, id, { content }),
+    }));
   };
 
-  const handleSectionPromptChange = (index: number, prompt: string) => {
-    if (!project || index < 0 || index >= project.sections.length) return;
-     updateProject(prev => {
-         const updatedSections = [...prev.sections];
-         updatedSections[index] = { ...updatedSections[index], prompt };
-         return { ...prev, sections: updatedSections };
-     });
+  const handleSectionPromptChange = (id: string, prompt: string) => {
+    if (!project) return;
+     updateProject(prev => ({
+         ...prev,
+         sections: updateSectionById(prev.sections, id, { prompt }),
+     }));
   }
 
   const handleProjectDetailChange = (field: keyof Project, value: string) => {
@@ -592,91 +744,115 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
    };
 
 
-  const updateSectionsFromToc = useCallback((newSectionNames: string[]) => {
+ const updateSectionsFromToc = useCallback((outline: GeneratedSectionOutline) => {
     if (!project) return;
 
-    const existingSectionsMap = new Map(project.sections.map(s => [s.name.toLowerCase(), s]));
-    const updatedSections: ProjectSection[] = [];
-    let addedCount = 0;
-    let preservedCount = 0;
-    let sectionOrderChanged = false;
-    let sectionsRemoved = false;
+    // Function to recursively update/add sections based on the outline
+    const processOutline = (
+        outlineSections: GeneratedSectionOutline['sections'],
+        existingSections: HierarchicalProjectSection[] = []
+    ): [HierarchicalProjectSection[], boolean, number, number] => {
+        const updatedSections: HierarchicalProjectSection[] = [];
+        let structureChanged = false;
+        let addedCount = 0;
+        let preservedCount = 0;
+        const existingMap = new Map(existingSections.map(s => [s.name.toLowerCase(), s]));
 
-    const originalIndices = new Map(project.sections.map((s, i) => [s.name.toLowerCase(), i]));
-
-    newSectionNames.forEach((name, newIndex) => {
-        const trimmedName = name.trim();
-        // Exclude standard pages and empty names from being added as regular sections
-         // Keep TOC if it's explicitly generated
-        if (!trimmedName || (STANDARD_REPORT_PAGES.map(p => p.toLowerCase()).includes(trimmedName.toLowerCase()) && trimmedName.toLowerCase() !== TOC_SECTION_NAME.toLowerCase())) return;
-
-
-        const existingSection = existingSectionsMap.get(trimmedName.toLowerCase());
-
-        if (existingSection) {
-            updatedSections.push(existingSection);
-            if (originalIndices.get(trimmedName.toLowerCase()) !== newIndex) {
-                sectionOrderChanged = true;
+        outlineSections.forEach((outlineSection) => {
+            const trimmedName = outlineSection.name.trim();
+             // Skip standard pages (handled separately) and empty names
+            if (!trimmedName || STANDARD_REPORT_PAGES.map(p => p.toLowerCase()).includes(trimmedName.toLowerCase())) {
+                return;
             }
-            existingSectionsMap.delete(trimmedName.toLowerCase());
-            preservedCount++;
-        } else {
-            updatedSections.push({
-                name: trimmedName,
-                prompt: `Generate the ${trimmedName} section for the project titled "${project.title}". Consider the project context: ${project.projectContext || '[No context provided]'}. [Add more specific instructions here if needed]`,
-                content: '',
-                lastGenerated: undefined,
-            });
-            addedCount++;
-            sectionOrderChanged = true;
-        }
-    });
 
-     // Check if any non-standard sections were removed
-     for (const [removedName] of existingSectionsMap.entries()) {
-        if (!STANDARD_REPORT_PAGES.map(p => p.toLowerCase()).includes(removedName)) {
-             sectionsRemoved = true;
-             sectionOrderChanged = true; // Order changes if sections are removed
-             break;
-        }
-     }
+            const existingSection = existingMap.get(trimmedName.toLowerCase());
 
-    if (addedCount === 0 && !sectionOrderChanged && !sectionsRemoved) {
+            if (existingSection) {
+                const [updatedSubSections, subChanged, subAdded, subPreserved] = processOutline(
+                    outlineSection.subSections || [],
+                    existingSection.subSections || []
+                );
+                updatedSections.push({ ...existingSection, subSections: updatedSubSections });
+                if (subChanged) structureChanged = true;
+                addedCount += subAdded;
+                preservedCount += subPreserved;
+                existingMap.delete(trimmedName.toLowerCase()); // Remove from map to track removals later
+                preservedCount++; // Count the parent section itself
+            } else {
+                const newId = uuidv4();
+                const [newSubSections, subChanged, subAdded, subPreserved] = processOutline(outlineSection.subSections || []);
+                updatedSections.push({
+                    id: newId,
+                    name: trimmedName,
+                    prompt: `Generate the ${trimmedName} section for the project titled "${project.title}". Consider the project context: ${project.projectContext || '[No context provided]'}. [Add specific instructions here.]`,
+                    content: '',
+                    lastGenerated: undefined,
+                    subSections: newSubSections,
+                });
+                structureChanged = true; // New section added
+                addedCount += 1 + subAdded; // Count new parent + subs
+                preservedCount += subPreserved;
+            }
+        });
+
+         // Check if any non-standard sections were removed at this level
+         for (const [removedName] of existingMap.entries()) {
+            if (!STANDARD_REPORT_PAGES.map(p => p.toLowerCase()).includes(removedName)) {
+                 structureChanged = true; // Section removed
+                 break;
+            }
+         }
+
+         // Check if order changed at this level
+         if (!structureChanged && existingSections.length === updatedSections.length) {
+             for (let i = 0; i < updatedSections.length; i++) {
+                 if (updatedSections[i].id !== existingSections[i].id) {
+                     structureChanged = true;
+                     break;
+                 }
+             }
+         }
+
+
+        return [updatedSections, structureChanged, addedCount, preservedCount];
+    };
+
+    const [finalSections, structureChanged, addedCount, preservedCount] = processOutline(outline.sections, project.sections);
+
+    if (!structureChanged && addedCount === 0) {
         toast({ title: "Sections Unchanged", description: "The generated outline matches the current section structure." });
         return;
     }
 
     updateProject(prev => ({
         ...prev,
-        sections: updatedSections,
-    }), true); // Save this change to history
+        sections: finalSections,
+    }), true); // Save change to history
 
     let toastDescription = "Report sections updated.";
-    if (addedCount > 0) toastDescription += ` ${addedCount} new section(s) added.`;
-    if (preservedCount > 0) toastDescription += ` ${preservedCount} existing section(s) preserved.`;
-    if (sectionsRemoved) toastDescription += ` Some sections removed.`;
-    if (sectionOrderChanged && addedCount === 0 && !sectionsRemoved) toastDescription = "Section order updated.";
+    if (addedCount > 0) toastDescription += ` ${addedCount} section(s) added/updated.`;
+    // More detailed counts can be added if needed
 
     toast({ title: "Sections Updated", description: toastDescription, duration: 7000 });
 
     // If the currently active section was removed, switch to Project Details
-     const currentActiveSectionName = activeSectionIndex !== null && activeSectionIndex >= 0 && activeSectionIndex < project.sections.length ? project.sections[activeSectionIndex]?.name : null;
-     if (currentActiveSectionName && sectionsRemoved && !updatedSections.some(s => s.name === currentActiveSectionName)) {
-         setActiveSectionIndex(-1);
-     } else if (updatedSections.length > 0 && activeSectionIndex === null) {
-         // If sections were just added and nothing was selected, select the first section
-         setActiveSectionIndex(0);
-     }
+    const currentActiveSection = activeSectionId ? findSectionById(project.sections, activeSectionId) : null;
+    if (currentActiveSection && !findSectionById(finalSections, activeSectionId)) {
+        handleSetActiveSection(String(-1));
+    } else if (finalSections.length > 0 && activeSectionId === null) {
+        // If sections were just added and nothing was selected, select the first section
+        handleSetActiveSection(finalSections[0].id);
+    }
 
     setIsMobileSheetOpen(false);
 
-}, [project, updateProject, toast, setActiveSectionIndex, activeSectionIndex]);
+}, [project, updateProject, toast, activeSectionId, handleSetActiveSection]);
 
 
-  const handleGenerateSection = async (index: number) => {
-    if (!project || index < 0 || index >= project.sections.length || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting) return;
+  const handleGenerateSection = async (id: string) => {
+      const section = project ? findSectionById(project.sections, id) : null;
+      if (!project || !section || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting) return;
 
-    const section = project.sections[index];
     setIsGenerating(true);
 
     try {
@@ -697,15 +873,13 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
       if ('error' in result) throw new Error(result.error);
 
-       updateProject(prev => {
-           const updatedSections = [...prev.sections];
-           updatedSections[index] = {
-               ...updatedSections[index],
-               content: result.reportSectionContent,
-               lastGenerated: new Date().toISOString(),
-           };
-           return { ...prev, sections: updatedSections };
-       }, true); // Save change to history
+       updateProject(prev => ({
+            ...prev,
+            sections: updateSectionById(prev.sections, id, {
+                content: result.reportSectionContent,
+                lastGenerated: new Date().toISOString(),
+            }),
+       }), true); // Save change to history
 
 
       toast({ title: "Section Generated", description: `"${section.name}" content updated.` });
@@ -718,10 +892,10 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     }
   };
 
-  const handleSummarizeSection = async (index: number) => {
-      if (!project || index < 0 || index >= project.sections.length || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting) return;
+  const handleSummarizeSection = async (id: string) => {
+      const section = project ? findSectionById(project.sections, id) : null;
+      if (!project || !section || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting) return;
 
-      const section = project.sections[index];
       if (!section.content?.trim()) {
           toast({ variant: "destructive", title: "Summarization Failed", description: "Section content is empty." });
           return;
@@ -751,13 +925,16 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         const result = await generateOutlineAction({ projectTitle: project.title, projectContext: project.projectContext || '' });
         if ('error' in result) throw new Error(result.error);
 
-        if (!result.suggestedSections?.length) {
+        // The AI now returns a hierarchical structure
+         const outlineResult: GeneratedSectionOutline = { sections: result.suggestedSections || [] }; // Adapt to expected structure
+
+        if (!outlineResult.sections?.length) {
              toast({ variant: "destructive", title: "Section Generation Failed", description: "AI did not return suggested sections." });
              setIsGeneratingOutline(false);
              return;
         }
 
-        updateSectionsFromToc(result.suggestedSections);
+        updateSectionsFromToc(outlineResult);
 
     } catch (error) {
         console.error("Section generation failed:", error);
@@ -786,9 +963,15 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
      setIsSuggesting(true);
      setSuggestions(null);
      try {
-       const allSectionsContent = project.sections
-         .map(s => `## ${s.name}\n\n${s.content || '[Empty Section]'}`)
-         .join('\n\n---\n\n');
+        // Flatten hierarchical content for suggestion prompt
+        const flattenSections = (sections: HierarchicalProjectSection[], level = 0): string => {
+            return sections.map(s =>
+                `${'#'.repeat(level + 2)} ${s.name}\n\n${s.content || '[Empty Section]'}\n\n` +
+                (s.subSections ? flattenSections(s.subSections, level + 1) : '')
+            ).join('---\n\n');
+        };
+       const allSectionsContent = flattenSections(project.sections);
+
 
        const result = await suggestImprovementsAction({
          projectTitle: project.title,
@@ -809,6 +992,103 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
        setIsSuggesting(false);
      }
    };
+
+
+   // --- Section Editing Handlers ---
+   const handleEditSectionName = (id: string) => {
+      const section = project ? findSectionById(project.sections, id) : null;
+      if (section) {
+          setEditingSectionId(id);
+          setEditingSectionName(section.name);
+          // Optionally, focus the input field after state update
+          setTimeout(() => document.getElementById(`edit-section-input-${id}`)?.focus(), 0);
+      }
+   };
+
+   const handleSaveSectionName = (id: string) => {
+       if (!project || !editingSectionName.trim()) {
+           toast({ variant: "destructive", title: "Invalid Name", description: "Section name cannot be empty." });
+           return;
+       }
+       updateProject(prev => ({
+           ...prev,
+           sections: updateSectionById(prev.sections, id, { name: editingSectionName.trim() }),
+       }), true); // Save change
+       setEditingSectionId(null);
+       setEditingSectionName('');
+       toast({ title: "Section Renamed" });
+   };
+
+   const handleCancelEditSectionName = () => {
+       setEditingSectionId(null);
+       setEditingSectionName('');
+   };
+
+    // --- Section Deletion Handlers ---
+    const handleDeleteSection = (id: string) => {
+        setSectionToDelete(id); // Open confirmation dialog
+    };
+
+    const confirmDeleteSection = () => {
+        if (!project || !sectionToDelete) return;
+
+        updateProject(prev => ({
+            ...prev,
+            sections: deleteSectionById(prev.sections, sectionToDelete),
+        }), true); // Save deletion to history
+
+        toast({ title: "Section Deleted" });
+        setSectionToDelete(null); // Close dialog
+
+         // If the deleted section was the active one, switch to project details
+         if (activeSectionId === sectionToDelete) {
+             handleSetActiveSection(String(-1));
+         }
+    };
+
+    const cancelDeleteSection = () => {
+        setSectionToDelete(null); // Close dialog without deleting
+    };
+
+    // --- Add Section Handler ---
+     const handleAddSection = (parentId?: string) => {
+        if (!project) return;
+        const newSection: HierarchicalProjectSection = {
+            id: uuidv4(),
+            name: 'New Section',
+            prompt: `Generate content for New Section...`,
+            content: '',
+            subSections: [],
+        };
+
+        updateProject(prev => {
+            const addRecursive = (sections: HierarchicalProjectSection[]): HierarchicalProjectSection[] => {
+                // Add as top-level if no parentId
+                if (!parentId) {
+                    return [...sections, newSection];
+                }
+                // Otherwise, find the parent and add as sub-section
+                return sections.map(section => {
+                    if (section.id === parentId) {
+                        return {
+                            ...section,
+                            subSections: [...(section.subSections || []), newSection]
+                        };
+                    }
+                    if (section.subSections) {
+                        return { ...section, subSections: addRecursive(section.subSections) };
+                    }
+                    return section;
+                });
+            };
+            return { ...prev, sections: addRecursive(prev.sections) };
+        }, true); // Save addition to history
+
+        toast({ title: "Section Added" });
+        setIsEditingSections(true); // Stay in edit mode
+        // Optionally, start editing the name of the new section immediately
+        handleEditSectionName(newSection.id);
+     };
 
 
   const handleSaveOnline = () => {
@@ -902,106 +1182,17 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
        return ( <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,60px))] text-center p-4"><CloudOff className="h-16 w-16 text-destructive mb-4" /><h2 className="text-2xl font-semibold text-destructive mb-2">Project Not Found</h2><p className="text-muted-foreground mb-6">The project with ID <code className="bg-muted px-1 rounded">{projectId}</code> could not be found.</p><Button onClick={() => router.push('/')}><Home className="mr-2 h-4 w-4" /> Go to Dashboard</Button></div> );
    }
 
-   const activeSection = activeSectionIndex !== null && activeSectionIndex >= 0 && activeSectionIndex < project.sections.length
-    ? project.sections[activeSectionIndex]
-    : null;
-
-   // Determine the name of the currently active view (Details, Standard Page, or Section)
+    // Find the currently active section or determine if it's a standard page
+    let activeViewContent: React.ReactNode = null;
     let activeViewName = project.title ?? 'Project';
-    if (activeSectionIndex === -1) {
+    let isStandardPage = false;
+    const activeSection = activeSectionId ? findSectionById(project.sections, activeSectionId) : null;
+    const standardPageIndex = parseInt(activeSectionId ?? '', 10);
+
+    if (activeSectionId === String(-1)) {
         activeViewName = 'Project Details';
-    } else if (activeSectionIndex < -1) {
-        // Find the standard page name corresponding to the negative index
-        const standardPageEntry = Object.entries(STANDARD_PAGE_INDICES).find(([, index]) => index === activeSectionIndex);
-        activeViewName = standardPageEntry ? standardPageEntry[0] : 'Standard Page';
-    } else if (activeSection) {
-        activeViewName = activeSection.name;
-    }
-
-  return (
-    <Sheet open={isMobileSheetOpen} onOpenChange={setIsMobileSheetOpen}>
-      <div className="flex h-full relative"> {/* Added relative for FAB positioning context */}
-
-        {/* Mobile: Sidebar inside Sheet */}
-        <SheetContent side="left" className="p-0 w-64 bg-card md:hidden">
-          <SheetHeader className="sr-only">
-            <SheetTitle>Project Menu</SheetTitle>
-            <SheetDescription>Navigate project sections and details</SheetDescription>
-          </SheetHeader>
-          <ProjectSidebarContent
-            project={project}
-            activeSectionIndex={activeSectionIndex}
-            setActiveSectionIndex={setActiveSectionIndex}
-            handleGenerateTocClick={handleGenerateTocClick}
-            isGeneratingOutline={isGeneratingOutline}
-            isGenerating={isGenerating}
-            isSummarizing={isSummarizing}
-            isSuggesting={isSuggesting}
-            handleSaveOnline={handleSaveOnline}
-            canUndo={canUndo}
-            handleUndo={handleUndo}
-            onCloseSheet={() => setIsMobileSheetOpen(false)}
-          />
-        </SheetContent>
-
-        {/* Desktop: Static Sidebar */}
-        <div
-          className={cn(
-            "hidden md:flex md:flex-col transition-all duration-300 ease-in-out overflow-y-auto overflow-x-hidden",
-            "w-64 border-r" // Fixed width for desktop sidebar
-          )}
-        >
-           <ProjectSidebarContent
-              project={project}
-              activeSectionIndex={activeSectionIndex}
-              setActiveSectionIndex={setActiveSectionIndex}
-              handleGenerateTocClick={handleGenerateTocClick}
-              isGeneratingOutline={isGeneratingOutline}
-              isGenerating={isGenerating}
-              isSummarizing={isSummarizing}
-              isSuggesting={isSuggesting}
-              handleSaveOnline={handleSaveOnline}
-              canUndo={canUndo}
-              handleUndo={handleUndo}
-            />
-        </div>
-
-        {/* --- Main Content Area --- */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/95 backdrop-blur-sm px-4 lg:px-6 flex-shrink-0">
-            <h1 className="flex-1 text-lg font-semibold md:text-xl text-primary truncate text-glow-primary">
-              {activeViewName} {/* Use dynamic view name */}
-            </h1>
-            <div className="flex items-center gap-1 text-xs text-muted-foreground ml-auto mr-2" title={`Project stored ${project.storageType === 'local' ? 'locally' : 'in the cloud'}`}>
-              {project.storageType === 'local' ? <CloudOff className="h-4 w-4" /> : <Cloud className="h-4 w-4 text-green-500" />}
-              <span>{project.storageType === 'local' ? 'Local' : 'Cloud'}</span>
-            </div>
-            {/* Preview Button (Placeholder) */}
-             <Button
-                variant="outline"
-                size="sm"
-                onClick={handlePreview}
-                disabled={true} // Disabled for now
-                className="ml-2"
-                title="Preview Report (Coming Soon)"
-              >
-                <Eye className="mr-2 h-4 w-4" />
-                Preview
-             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleNavigateToExport}
-              className="hover:glow-accent focus-visible:glow-accent ml-2"
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Export Report
-            </Button>
-          </header>
-
-          <ScrollArea className="flex-1 p-4 md:p-6">
-            {activeSectionIndex === -1 ? (
-              // Project Details Form
+        activeViewContent = (
+             // Project Details Form (Existing Code)
               <Card className="shadow-md mb-6">
                 <CardHeader>
                   <CardTitle className="text-glow-primary">Project Details</CardTitle>
@@ -1111,12 +1302,18 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                   </Button>
                 </CardFooter>
               </Card>
-            ) : activeSectionIndex < -1 ? (
-                 // Standard Page Placeholder
-                 <StandardPagePlaceholder pageName={activeViewName} />
-            ) : activeSection ? (
-              // Section Editor
-              <div className="space-y-6">
+        );
+    } else if (!isNaN(standardPageIndex) && standardPageIndex < -1) {
+        // Find the standard page name corresponding to the negative index
+        const standardPageEntry = Object.entries(STANDARD_PAGE_INDICES).find(([, index]) => index === standardPageIndex);
+        activeViewName = standardPageEntry ? standardPageEntry[0] : 'Standard Page';
+        isStandardPage = true;
+        activeViewContent = <StandardPagePlaceholder pageName={activeViewName} />;
+    } else if (activeSection) {
+        activeViewName = activeSection.name;
+        activeViewContent = (
+            // Section Editor (Existing Code)
+             <div className="space-y-6">
                   <Card className="shadow-md">
                     <CardHeader>
                       <CardTitle className="text-primary text-glow-primary">{activeSection.name} - AI Prompt</CardTitle>
@@ -1126,10 +1323,10 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div>
-                        <Label htmlFor={`section-prompt-${activeSectionIndex}`}>Generation Prompt</Label>
-                        <Textarea id={`section-prompt-${activeSectionIndex}`} value={activeSection.prompt} onChange={(e) => handleSectionPromptChange(activeSectionIndex, e.target.value)} placeholder="Instructions for the AI..." className="mt-1 min-h-[100px] font-mono text-sm focus-visible:glow-primary" />
+                        <Label htmlFor={`section-prompt-${activeSection.id}`}>Generation Prompt</Label>
+                        <Textarea id={`section-prompt-${activeSection.id}`} value={activeSection.prompt} onChange={(e) => handleSectionPromptChange(activeSection.id, e.target.value)} placeholder="Instructions for the AI..." className="mt-1 min-h-[100px] font-mono text-sm focus-visible:glow-primary" />
                       </div>
-                      <Button onClick={() => handleGenerateSection(activeSectionIndex)} disabled={isGenerating || isSummarizing || isGeneratingOutline || isSuggesting} className="hover:glow-primary focus-visible:glow-primary">
+                      <Button onClick={() => handleGenerateSection(activeSection.id)} disabled={isGenerating || isSummarizing || isGeneratingOutline || isSuggesting} className="hover:glow-primary focus-visible:glow-primary">
                         {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
                         {isGenerating ? 'Generating...' : 'Generate Content'}
                       </Button>
@@ -1142,26 +1339,28 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                     <CardDescription>Edit the content below.</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <Textarea id={`section-content-${activeSectionIndex}`} value={activeSection.content} onChange={(e) => handleSectionContentChange(activeSectionIndex, e.target.value)} placeholder={"Generated content appears here..."} className="min-h-[400px] text-base focus-visible:glow-primary" />
+                    <Textarea id={`section-content-${activeSection.id}`} value={activeSection.content} onChange={(e) => handleSectionContentChange(activeSection.id, e.target.value)} placeholder={"Generated content appears here..."} className="min-h-[400px] text-base focus-visible:glow-primary" />
                   </CardContent>
                     <CardFooter className="flex justify-end">
-                      <Button variant="outline" onClick={() => handleSummarizeSection(activeSectionIndex)} disabled={isSummarizing || isGenerating || isGeneratingOutline || isSuggesting || !activeSection.content?.trim()} className="hover:glow-accent focus-visible:glow-accent">
+                      <Button variant="outline" onClick={() => handleSummarizeSection(activeSection.id)} disabled={isSummarizing || isGenerating || isGeneratingOutline || isSuggesting || !activeSection.content?.trim()} className="hover:glow-accent focus-visible:glow-accent">
                         {isSummarizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ScrollText className="mr-2 h-4 w-4" />}
                         {isSummarizing ? 'Summarizing...' : 'Summarize'}
                       </Button>
                     </CardFooter>
                 </Card>
               </div>
-            ) : (
-              // Initial state or section not found
-              <div className="flex items-center justify-center h-full">
+        );
+    } else {
+        // Initial state or section not found
+        activeViewContent = (
+            <div className="flex items-center justify-center h-full">
                  <Card className="text-center py-8 px-6 max-w-md mx-auto shadow-md">
                     <CardHeader>
                       <CardTitle className="text-xl text-primary text-glow-primary">Select or Generate Sections</CardTitle>
                       <CardDescription className="mt-2">Choose an item from the sidebar or generate sections if none exist.</CardDescription>
                     </CardHeader>
                     <CardContent className="mt-4 space-y-4">
-                       <p>Go to <Button variant="link" className="p-0 h-auto text-base" onClick={() => setActiveSectionIndex(-1)}>Project Details</Button>, provide context, then click "Generate Sections".</p>
+                       <p>Go to <Button variant="link" className="p-0 h-auto text-base" onClick={() => handleSetActiveSection(String(-1))}>Project Details</Button>, provide context, then click "Generate Sections".</p>
                       <Button variant="default" size="sm" onClick={handleGenerateTocClick} disabled={isGeneratingOutline || isGenerating || isSummarizing || isSuggesting || !project.projectContext?.trim()} className="hover:glow-primary focus-visible:glow-primary">
                         {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
                         {isGeneratingOutline ? 'Generating...' : 'Generate Sections'}
@@ -1170,31 +1369,141 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                     </CardContent>
                   </Card>
               </div>
-            )}
+        );
+    }
 
-            {/* AI Suggestions Section */}
-            <Card className="shadow-md mt-6">
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-primary text-glow-primary"><Sparkles className="w-5 h-5" /> AI Suggestions</CardTitle>
-                    <CardDescription>Ask the AI for feedback on your report.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div>
-                        <Label htmlFor="suggestion-input">Focus area (Optional)</Label>
-                        <Input id="suggestion-input" value={suggestionInput} onChange={(e) => setSuggestionInput(e.target.value)} placeholder="e.g., Improve flow, Check clarity..." className="mt-1 focus-visible:glow-primary" />
-                    </div>
-                    <Button onClick={handleGetSuggestions} disabled={isSuggesting || isGenerating || isSummarizing || isGeneratingOutline} className="hover:glow-primary focus-visible:glow-primary">
-                        {isSuggesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquareQuote className="mr-2 h-4 w-4" />}
-                        {isSuggesting ? 'Getting Suggestions...' : 'Get Suggestions'}
-                    </Button>
-                    {suggestions && (
-                        <div className="mt-4 p-4 border rounded-md bg-muted/30">
-                             <h4 className="font-semibold mb-2 text-foreground">Suggestions:</h4>
-                             <div className="prose prose-sm max-w-none dark:prose-invert text-foreground" dangerouslySetInnerHTML={{ __html: marked.parse(suggestions) }} />
+  return (
+    <Sheet open={isMobileSheetOpen} onOpenChange={setIsMobileSheetOpen}>
+      <div className="flex h-full relative"> {/* Added relative for FAB positioning context */}
+
+        {/* Mobile: Sidebar inside Sheet */}
+        <SheetContent side="left" className="p-0 w-64 bg-card md:hidden">
+          <SheetHeader className="sr-only">
+            <SheetTitle>Project Menu</SheetTitle>
+            <SheetDescription>Navigate project sections and details</SheetDescription>
+          </SheetHeader>
+          <ProjectSidebarContent
+            project={project}
+            activeSectionId={activeSectionId}
+            setActiveSectionId={handleSetActiveSection}
+            handleGenerateTocClick={handleGenerateTocClick}
+            isGeneratingOutline={isGeneratingOutline}
+            isGenerating={isGenerating}
+            isSummarizing={isSummarizing}
+            isSuggesting={isSuggesting}
+            handleSaveOnline={handleSaveOnline}
+            canUndo={canUndo}
+            handleUndo={handleUndo}
+            onCloseSheet={() => setIsMobileSheetOpen(false)}
+            isEditingSections={isEditingSections}
+            setIsEditingSections={setIsEditingSections}
+            onEditSectionName={handleEditSectionName}
+            onDeleteSection={handleDeleteSection} // Pass handler
+            onAddSection={handleAddSection} // Pass handler
+          />
+        </SheetContent>
+
+        {/* Desktop: Static Sidebar */}
+        <div
+          className={cn(
+            "hidden md:flex md:flex-col transition-all duration-300 ease-in-out overflow-y-auto overflow-x-hidden",
+            "w-64 border-r" // Fixed width for desktop sidebar
+          )}
+        >
+           <ProjectSidebarContent
+              project={project}
+              activeSectionId={activeSectionId}
+              setActiveSectionId={handleSetActiveSection}
+              handleGenerateTocClick={handleGenerateTocClick}
+              isGeneratingOutline={isGeneratingOutline}
+              isGenerating={isGenerating}
+              isSummarizing={isSummarizing}
+              isSuggesting={isSuggesting}
+              handleSaveOnline={handleSaveOnline}
+              canUndo={canUndo}
+              handleUndo={handleUndo}
+              isEditingSections={isEditingSections}
+              setIsEditingSections={setIsEditingSections}
+              onEditSectionName={handleEditSectionName}
+              onDeleteSection={handleDeleteSection} // Pass handler
+              onAddSection={handleAddSection} // Pass handler
+            />
+        </div>
+
+        {/* --- Main Content Area --- */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/95 backdrop-blur-sm px-4 lg:px-6 flex-shrink-0">
+            <h1 className="flex-1 text-lg font-semibold md:text-xl text-primary truncate text-glow-primary">
+               {editingSectionId && activeSection ? (
+                   // Input field for editing section name
+                   <Input
+                        id={`edit-section-input-${editingSectionId}`}
+                        value={editingSectionName}
+                        onChange={(e) => setEditingSectionName(e.target.value)}
+                        onBlur={() => handleSaveSectionName(editingSectionId)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleSaveSectionName(editingSectionId); else if (e.key === 'Escape') handleCancelEditSectionName(); }}
+                        className="h-8 text-lg md:text-xl font-semibold bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:border-b focus-visible:border-primary p-0 truncate"
+                        autoFocus
+                    />
+               ) : (
+                  activeViewName
+               )}
+            </h1>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground ml-auto mr-2" title={`Project stored ${project.storageType === 'local' ? 'locally' : 'in the cloud'}`}>
+              {project.storageType === 'local' ? <CloudOff className="h-4 w-4" /> : <Cloud className="h-4 w-4 text-green-500" />}
+              <span>{project.storageType === 'local' ? 'Local' : 'Cloud'}</span>
+            </div>
+            {/* Preview Button */}
+             <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePreview}
+                disabled={true} // Re-enable when preview is implemented
+                className="ml-2"
+                title="Preview Report (Coming Soon)"
+              >
+                <Eye className="mr-2 h-4 w-4" />
+                Preview
+             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleNavigateToExport}
+              className="hover:glow-accent focus-visible:glow-accent ml-2"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Export Report
+            </Button>
+          </header>
+
+          <ScrollArea className="flex-1 p-4 md:p-6">
+              {activeViewContent}
+
+            {/* AI Suggestions Section - Only show if not editing details/standard page */}
+            {activeSectionId !== String(-1) && !isStandardPage && (
+                <Card className="shadow-md mt-6">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-primary text-glow-primary"><Sparkles className="w-5 h-5" /> AI Suggestions</CardTitle>
+                        <CardDescription>Ask the AI for feedback on your report.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div>
+                            <Label htmlFor="suggestion-input">Focus area (Optional)</Label>
+                            <Input id="suggestion-input" value={suggestionInput} onChange={(e) => setSuggestionInput(e.target.value)} placeholder="e.g., Improve flow, Check clarity..." className="mt-1 focus-visible:glow-primary" />
                         </div>
-                    )}
-                </CardContent>
-            </Card>
+                        <Button onClick={handleGetSuggestions} disabled={isSuggesting || isGenerating || isSummarizing || isGeneratingOutline} className="hover:glow-primary focus-visible:glow-primary">
+                            {isSuggesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquareQuote className="mr-2 h-4 w-4" />}
+                            {isSuggesting ? 'Getting Suggestions...' : 'Get Suggestions'}
+                        </Button>
+                        {suggestions && (
+                            <div className="mt-4 p-4 border rounded-md bg-muted/30">
+                                <h4 className="font-semibold mb-2 text-foreground">Suggestions:</h4>
+                                <div className="prose prose-sm max-w-none dark:prose-invert text-foreground" dangerouslySetInnerHTML={{ __html: marked.parse(suggestions) }} />
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+             )}
 
           </ScrollArea>
         </div>
@@ -1248,6 +1557,22 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Delete Section Confirmation Dialog */}
+         <AlertDialog open={!!sectionToDelete} onOpenChange={(open) => !open && setSectionToDelete(null)}>
+           <AlertDialogContent>
+             <AlertDialogHeader>
+               <AlertDialogTitle>Delete Section?</AlertDialogTitle>
+               <AlertDialogDescription>
+                 Are you sure you want to delete the section "{sectionToDelete ? findSectionById(project.sections, sectionToDelete)?.name : ''}" and all its sub-sections? This action cannot be undone.
+               </AlertDialogDescription>
+             </AlertDialogHeader>
+             <AlertDialogFooter>
+               <AlertDialogCancel onClick={cancelDeleteSection}>Cancel</AlertDialogCancel>
+               <AlertDialogAction onClick={confirmDeleteSection} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+             </AlertDialogFooter>
+           </AlertDialogContent>
+         </AlertDialog>
 
       </div>
     </Sheet>
