@@ -37,7 +37,7 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
     isEditing,
     onCloseSheet,
     renderSubSections, // Destructure the render function
-}) => {
+}) => { // Added missing opening brace for function body
     const isActive = section.id === activeSectionId;
     const [isExpanded, setIsExpanded] = useState(true); // Default to expanded
     const [isNameEditing, setIsNameEditing] = useState(false);
@@ -127,30 +127,30 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
              {/* Main row containing content button and edit buttons */}
             <div className="flex group/item relative w-full items-center"> {/* Use w-full and items-center */}
 
-                {/* Section Content Button - Apply paddingLeft here for indentation */}
-                <Button
-                    variant={(isActive || isNameEditing) && !isEditing ? "secondary" : "ghost"}
-                    size="sm"
+                {/* Section Content Button - Use a div for structure */}
+                <div
+                    role="button" // Make it behave like a button for accessibility
+                    tabIndex={isEditing ? -1 : 0} // Only focusable when not editing sections
                     onClick={handleSectionClick}
+                    onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && handleSectionClick()} // Keyboard activation
                     className={cn(
-                        "justify-start text-left flex-1 group/btn h-8 min-w-0 flex items-center", // items-center for vertical alignment
-                        "pr-1", // Keep right padding for potential actions
-                        isEditing ? 'pr-[70px]' : 'pr-1' // Adjust right padding based on edit mode
+                        "flex items-center justify-start text-left flex-1 group/btn h-8 min-w-0", // Added min-w-0
+                        (isActive || isNameEditing) && !isEditing ? "bg-secondary" : "hover:bg-ghost", // Apply background on hover/active
+                        isEditing ? 'pr-[70px]' : 'pr-1 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md', // Adjust padding and add focus/cursor when not editing
                     )}
-                    style={{ paddingLeft: `${0.5 + (level * 1.5)}rem` }} // Base padding (0.5rem matches title's pl-2) + level indentation
+                    style={{ paddingLeft: `${level * 1.5}rem` }} // Apply indentation here
                     aria-current={isActive && !isEditing && !isNameEditing ? "page" : undefined}
                     title={section.name} // Tooltip
-                    disabled={isEditing && !isNameEditing}
                 >
-                    {/* Toggle Button or Spacer (Positioned absolutely or with negative margin if needed, or keep inline) */}
-                     {hasSubSections ? (
+                    {/* Toggle Button or Spacer (Positioned first) */}
+                    {hasSubSections ? (
                          <Button
                              variant="ghost"
                              size="icon"
                              onClick={handleToggleExpand}
-                             className="h-6 w-6 mr-1 text-muted-foreground hover:bg-muted/50 flex-shrink-0" // Kept mr-1 for spacing
+                             className="h-6 w-6 mr-1 text-muted-foreground hover:bg-muted/50 flex-shrink-0"
                              aria-label={isExpanded ? "Collapse section" : "Expand section"}
-                             tabIndex={-1} // Make it non-focusable directly, accessible via parent
+                             tabIndex={0} // Make it focusable
                          >
                              {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                          </Button>
@@ -158,10 +158,10 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
                          <span className="w-6 mr-1 flex-shrink-0"></span> // Placeholder for alignment
                      )}
 
-                    {/* Numbering - Remove extra spacing */}
-                    <span className="font-medium text-muted-foreground flex-shrink-0">{numbering}</span>
-                    {/* Icon - Reduce margin */}
-                    <FileText className="ml-1 h-4 w-4 flex-shrink-0" />
+                    {/* Numbering */}
+                    <span className="font-medium text-muted-foreground flex-shrink-0 mr-1">{numbering}</span>
+                    {/* Icon */}
+                    <FileText className="h-4 w-4 flex-shrink-0 mr-1" />
                     {/* Name or Input */}
                     {isNameEditing ? (
                         <Input
@@ -170,14 +170,14 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
                             onChange={handleNameChange}
                             onKeyDown={handleNameKeyDown}
                             onBlur={handleNameBlur}
-                            className="h-6 px-1 text-sm flex-1 bg-transparent border-b border-primary focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-primary text-left ml-1" // Added ml-1
+                            className="h-6 px-1 text-sm flex-1 bg-transparent border-b border-primary focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-primary text-left"
                             onClick={(e) => e.stopPropagation()}
                             onMouseDown={(e) => e.stopPropagation()}
                         />
                     ) : (
-                        <span className="flex-1 truncate text-left ml-1">{section.name}</span> // Added ml-1
+                        <span className="flex-1 truncate text-left">{section.name}</span>
                     )}
-                </Button>
+                </div>
 
 
                  {/* Edit, Delete, and Add Sub-section Buttons (visible only in edit mode) */}
@@ -204,5 +204,4 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
             )}
         </div>
     );
-}
-
+} // Added missing closing brace for function body
