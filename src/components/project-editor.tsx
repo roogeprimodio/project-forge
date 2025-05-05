@@ -299,7 +299,7 @@ function ProjectSidebarContent({
                        </div>
                        {project.sections?.length > 0 ? (
                           project.sections.map((section) => (
-                            // Key directly on the HierarchicalSectionItem component
+                            // Apply the key directly to the HierarchicalSectionItem component
                             <HierarchicalSectionItem
                                 key={section.id} // Ensure key is unique and directly on the component rendered by map
                                 section={section}
