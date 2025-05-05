@@ -294,6 +294,7 @@ function ProjectSidebarContent({
                        </div>
                        {project.sections?.length > 0 ? (
                           project.sections.map((section) => (
+                            // Ensure the key is on the outermost element returned by map
                             <HierarchicalSectionItem
                                 key={section.id} // Key directly on the list item component
                                 section={section}
@@ -608,7 +609,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                  }
                 if (newHistory.length > MAX_HISTORY_LENGTH) {
                     newHistory.shift();
-                }
+                 }
                  // Update index to the latest state
                 const newIndex = Math.min(newHistory.length - 1, MAX_HISTORY_LENGTH - 1);
                  setHistoryIndex(newIndex); // Always set to the new latest index
@@ -1515,9 +1516,9 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 variant="outline"
                 size="sm"
                 onClick={handlePreview}
-                disabled={true} // Re-enable when preview is implemented
+                // disabled={true} // Re-enable when preview is implemented
                 className="ml-2"
-                title="Preview Report (Coming Soon)"
+                title="Preview Report (PDF Only)"
               >
                 <Eye className="mr-2 h-4 w-4" />
                 Preview
