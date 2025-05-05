@@ -9,7 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { Settings, Undo, Lightbulb, Cloud, CloudOff, PlusCircle, FileText, Loader2 } from 'lucide-react'; // Removed unused icons, kept Loader2
 import type { Project, SectionIdentifier, HierarchicalProjectSection } from '@/types/project';
 // Import constants and utility function from the correct location
-import { STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, findSectionById, updateProject as updateProjectHelper } from '@/lib/project-utils'; // Corrected import path
+import { STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, findSectionById, updateProject as updateProjectHelper } from '@/lib/project-utils';
 import { HierarchicalSectionItem } from './hierarchical-section-item'; // Import the hierarchical item
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid'; // Import uuid for generating unique IDs
@@ -35,6 +35,7 @@ export interface ProjectSidebarContentProps {
     setIsEditingSections: (editing: boolean) => void;
     onEditSectionName: (id: string, newName: string) => void;
     onDeleteSection: (id: string) => void; // Handler for deleting sections
+    // Removed onAddSection as it's handled locally
 }
 
 /**
@@ -120,12 +121,9 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
          setIsEditingSections(true); // Ensure edit mode is active after adding
          // Automatically activate the newly added section for editing its name
           setTimeout(() => {
-            const newSectionElement = document.getElementById(`edit-section-input-${newSection.id}`);
-             if (newSectionElement) {
-                // This assumes HierarchicalSectionItem handles enabling edit mode and focusing
-                 setActiveSectionId(newSection.id); // Make it active
-                 // The HierarchicalSectionItem should handle the edit state based on isEditing prop
-             }
+             // We need HierarchicalSectionItem to expose a way to start editing, or manually handle focus
+             // For now, just set active and let the user click edit
+             setActiveSectionId(newSection.id);
           }, 0);
      };
 
@@ -225,7 +223,8 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
 
             {/* Report Sections Section */}
             <div className="flex-1 flex flex-col min-h-0"> {/* Allow this section to grow and enable internal scroll */}
-                 <div className="flex justify-between items-center px-4 py-2 flex-shrink-0">
+                 {/* Adjusted padding: pl-2 to align with HierarchicalSectionItem's content */}
+                 <div className="flex justify-between items-center pl-2 pr-4 py-2 flex-shrink-0">
                     <p className="text-xs font-semibold text-muted-foreground text-left">REPORT SECTIONS</p> {/* Ensured text-left */}
                     <Button
                         variant="ghost"
@@ -236,8 +235,9 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                         {isEditingSections ? 'Done' : 'Edit'}
                     </Button>
                  </div>
-                 <ScrollArea className="flex-1 px-2 py-2 overflow-x-auto"> {/* Takes remaining space and allows horizontal scroll for sections */}
-                     <nav className="flex flex-col gap-1 whitespace-nowrap"> {/* Add whitespace-nowrap */}
+                 {/* Note: px-2 on ScrollArea combined with HierarchicalSectionItem's internal padding might need fine-tuning */}
+                 <ScrollArea className="flex-1 px-2 py-2 overflow-x-auto">
+                     <nav className="flex flex-col gap-1 whitespace-nowrap">
                        {project.sections?.length > 0 ? (
                           // Call the recursive rendering function starting at level 0
                           renderSectionsRecursive(project.sections, 0)
@@ -294,3 +294,4 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
         </div>
      );
 };
+    
