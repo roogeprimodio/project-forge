@@ -18,7 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import { generateSectionAction, summarizeSectionAction, generateOutlineAction, suggestImprovementsAction } from '@/app/actions';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger, SheetClose } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet"; // Removed SheetClose - not typically needed for side sheets
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { marked } from 'marked'; // For rendering markdown suggestions
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -146,7 +146,7 @@ const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = ({
                 <div className="ml-0"> {/* No extra margin here, padding handled by button style */}
                     {section.subSections.map((subSection) => (
                         <HierarchicalSectionItem
-                            key={subSection.id} // Ensure sub-sections also have unique keys
+                            key={subSection.id} // Apply unique key here for sub-sections
                             section={subSection}
                             level={level + 1}
                             activeSectionId={activeSectionId}
@@ -1577,7 +1577,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         </div>
 
         {/* Floating Action Button (FAB) for Mobile Project Sidebar Toggle */}
-        {/* Wrap the FAB with SheetTrigger */}
         <SheetTrigger asChild>
             <Button
                 ref={fabRef}
