@@ -85,8 +85,8 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                     <Undo className="h-4 w-4" />
                 </Button>
             </div>
-             <ScrollArea className="flex-1 px-2 py-2 overflow-x-auto">
-                 <nav className="flex flex-col gap-1 whitespace-nowrap">
+             <ScrollArea className="flex-1 px-2 py-2 overflow-x-auto"> {/* Add overflow-x-auto here */}
+                 <nav className="flex flex-col gap-1 whitespace-nowrap"> {/* Add whitespace-nowrap here */}
                      {/* Project Details Button */}
                      <Button
                          key="-1"
@@ -109,7 +109,7 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                         const pageId = String(pageIndex);
                         return (
                             <Button
-                                key={pageId}
+                                key={pageId} // Key for standard page buttons
                                 variant={activeSectionId === pageId ? "secondary" : "ghost"}
                                 size="sm"
                                 onClick={() => handleSectionClick(pageIndex)}
@@ -140,6 +140,7 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                        </div>
                        {project.sections?.length > 0 ? (
                           project.sections.map((section) => (
+                            // ** Ensure the key prop is DIRECTLY on HierarchicalSectionItem **
                             <HierarchicalSectionItem
                                 key={section.id} // Apply key here to the component rendered by map
                                 section={section}
@@ -155,10 +156,10 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                        ) : (
                          <p className="px-2 text-xs text-muted-foreground italic">Generate or add sections.</p>
                        )}
-                       {/* Add New Section Button */}
+                       {/* Add New Section Button (visible in edit mode or if no sections) */}
                         {isEditingSections && (
                             <Button
-                                key="add-new-section-button"
+                                key="add-new-section-button" // Added key for stability if needed
                                 variant="outline"
                                 size="sm"
                                 onClick={handleAddNewSection}
