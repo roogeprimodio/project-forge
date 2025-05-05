@@ -6,12 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'; // Import ScrollBar
 import { Separator } from '@/components/ui/separator';
-import { Settings, Undo, Lightbulb, Cloud, CloudOff, PlusCircle, FileText, Loader2, ChevronRight, ChevronDown, Edit3, Trash2 } from 'lucide-react';
+import { Settings, Undo, Lightbulb, Cloud, CloudOff, PlusCircle, FileText, Loader2, ChevronRight, ChevronDown, Edit3, Trash2 } from 'lucide-react'; // Import necessary icons
 import type { Project, SectionIdentifier, HierarchicalProjectSection } from '@/types/project';
-import { STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, findSectionById } from '@/lib/project-utils';
-import { HierarchicalSectionItem } from './hierarchical-section-item';
+import { STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, findSectionById } from '@/lib/project-utils'; // Import from lib
+import { HierarchicalSectionItem } from './hierarchical-section-item'; // Import the hierarchical item
 import { useToast } from '@/hooks/use-toast';
-import { v4 as uuidv4 } from 'uuid';
+import { v4 as uuidv4 } from 'uuid'; // Import uuid for generating unique IDs
 import { cn } from '@/lib/utils';
 
 // Props interface for ProjectSidebarContent
@@ -33,7 +33,8 @@ export interface ProjectSidebarContentProps {
     setIsEditingSections: (editing: boolean) => void;
     onEditSectionName: (id: string, newName: string) => void;
     onDeleteSection: (id: string) => void;
-    onAddSubSection: (parentId: string) => void;
+    onAddSubSection: (parentId: string) => void; // Add sub-section handler prop
+    handleAddNewSection: () => void; // Handler for adding top-level sections
 }
 
 /**
@@ -57,7 +58,8 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
     setIsEditingSections,
     onEditSectionName,
     onDeleteSection,
-    onAddSubSection,
+    onAddSubSection, // Destructure the handler
+    handleAddNewSection, // Destructure the handler
 }) => {
      const { toast } = useToast();
 
@@ -66,35 +68,8 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
          onCloseSheet?.();
      };
 
-     // Add a new top-level section locally
-      const handleAddTopLevelSection = () => {
-         if (!project) return;
-
-         const newSection: HierarchicalProjectSection = {
-             id: uuidv4(),
-             name: 'New Section',
-             prompt: `Generate content for New Section... [Add specific instructions here, considering context: ${project.projectContext || ''}]`,
-             content: '',
-             lastGenerated: undefined,
-             subSections: [],
-         };
-
-         updateProject(prev => ({
-             ...prev,
-             sections: [...(prev.sections || []), newSection]
-         }), true);
-
-         toast({ title: "Section Added" });
-         setIsEditingSections(true); // Ensure edit mode is active
-         // Activate the new section
-          setTimeout(() => {
-             setActiveSectionId(newSection.id);
-             // Optionally focus the edit input if needed
-          }, 50);
-     };
-
-
      // Recursive function to render sections and sub-sections
+     // This function is passed down to HierarchicalSectionItem
     const renderSectionsRecursive = (sections: HierarchicalProjectSection[], level: number, parentNumbering: string = ''): React.ReactNode[] => {
         return sections.map((section, index) => {
             const currentNumbering = parentNumbering ? `${parentNumbering}.${index + 1}` : `${index + 1}`;
@@ -105,7 +80,7 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                     level={level}
                     numbering={currentNumbering}
                     activeSectionId={activeSectionId}
-                    setActiveSectionId={setActiveSectionId}
+                    setActiveSectionId={setActiveSectionId} // Pass setActiveSectionId down
                     onEditSectionName={onEditSectionName}
                     onDeleteSection={onDeleteSection}
                     onAddSubSection={onAddSubSection} // Pass the add sub-section handler
@@ -120,7 +95,7 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
 
      return (
         <div className="flex flex-col h-full border-r bg-card">
-            {/* Header */}
+            {/* Header - Uses project.title which updates when parent re-renders */}
             <div className="p-4 border-b flex justify-between items-center flex-shrink-0">
                  <Input
                         id="projectTitleSidebar"
@@ -161,6 +136,7 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
             {/* Standard Report Pages Section with horizontal scroll */}
             <div className="px-2 py-2 flex-shrink-0">
                 <p className="px-2 text-xs font-semibold text-muted-foreground mb-1 text-left">STANDARD PAGES</p>
+                {/* Wrap STANDARD PAGES with ScrollArea and add horizontal ScrollBar */}
                 <ScrollArea className="w-full whitespace-nowrap"> {/* Enable horizontal scroll */}
                     <nav className="flex flex-col gap-1 min-w-max text-left"> {/* Ensure nav takes minimum width needed */}
                         {STANDARD_REPORT_PAGES.map((pageName) => {
@@ -202,20 +178,20 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                  {/* Vertical Scroll for Report Sections */}
                  <ScrollArea className="flex-1"> {/* flex-1 to fill remaining vertical space */}
                      <div className="px-2 py-2">
-                         {/* Horizontal Scroll for the actual content */}
+                         {/* Wrap REPORT SECTIONS with ScrollArea and add horizontal ScrollBar */}
                          <ScrollArea className="w-full whitespace-nowrap"> {/* Enable horizontal scroll */}
                             <nav className="flex flex-col gap-1 min-w-max text-left"> {/* Ensure nav takes minimum width needed */}
                                {project.sections?.length > 0 ? (
-                                  renderSectionsRecursive(project.sections, 0)
+                                    renderSectionsRecursive(project.sections, 0)
                                ) : (
                                  <p className="text-xs text-muted-foreground italic text-left">Generate or add sections.</p>
                                )}
                                 {isEditingSections && (
                                     <Button
-                                        key="add-new-section-button"
+                                        key="add-new-section-button" // Added key for stability if needed
                                         variant="outline"
                                         size="sm"
-                                        onClick={handleAddTopLevelSection} // Add top-level section
+                                        onClick={handleAddNewSection} // Use the passed handler
                                         className="justify-start mt-2 text-muted-foreground hover:text-primary text-left"
                                         title="Add new top-level section"
                                     >
