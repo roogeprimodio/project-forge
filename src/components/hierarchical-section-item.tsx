@@ -118,10 +118,10 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
         <div className="group">
              {/* Main row containing toggle, content button, and edit buttons */}
             <div className="flex items-center group/item relative pr-1"> {/* Ensure space for edit buttons */}
-                {/* Indentation and Toggle Button */}
+                {/* Indentation and Toggle Button - This div provides the indentation */}
                 <div
                     className="flex items-center flex-shrink-0 h-8" // Fixed height for alignment
-                    style={{ paddingLeft: `${1 + level * 1.5}rem` }} // Use level for indentation
+                    style={{ paddingLeft: `${1 + level * 1.5}rem` }} // Apply indentation here
                 >
                     {hasSubSections ? (
                         <Button
@@ -140,21 +140,21 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
                     )}
                 </div>
 
-                {/* Section Content Button */}
+                {/* Section Content Button - Starts immediately after the indented toggle area */}
                 <Button
-                    variant={(isActive || isNameEditing) && !isEditing ? "secondary" : "ghost"} // Highlight if active or being edited (name)
+                    variant={(isActive || isNameEditing) && !isEditing ? "secondary" : "ghost"}
                     size="sm"
                     onClick={handleSectionClick}
                     className={cn(
-                        "justify-start flex-1 group/btn h-8 min-w-0", // Ensure it fills space, min-w-0 for truncate
-                        isEditing ? 'pr-[70px]' : 'pr-2' // Adjust padding when edit buttons are visible
+                        "justify-start flex-1 group/btn h-8 min-w-0 px-1", // Use px-1 instead of default padding
+                        isEditing ? 'pr-[70px]' : 'pr-2' // Adjust right padding when edit buttons are visible
                     )}
                     aria-current={isActive && !isEditing && !isNameEditing ? "page" : undefined}
                     title={section.name} // Tooltip for long names
                     disabled={isEditing && !isNameEditing} // Disable main button click when editing structure (except when editing name)
                 >
                     {/* Numbering */}
-                    <span className="mr-2 font-medium text-muted-foreground min-w-[2em] text-right">{numbering}</span>
+                    <span className="mr-2 font-medium text-muted-foreground min-w-[2em] text-right flex-shrink-0">{numbering}</span>
                     <FileText className="mr-2 h-4 w-4 flex-shrink-0" />
                     {isNameEditing ? (
                         <Input
@@ -168,7 +168,7 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
                             onMouseDown={(e) => e.stopPropagation()} // Prevent drag/select issues
                         />
                     ) : (
-                        <span className="flex-1 truncate">{section.name}</span>
+                        <span className="flex-1 truncate">{section.name}</span> // This now starts right after the icon
                     )}
                 </Button>
 
