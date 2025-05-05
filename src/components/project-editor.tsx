@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'; // Import ScrollBar
 import { Separator } from '@/components/ui/separator';
-import { BookOpen, Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, List, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, FileWarning, Eye, Trash2, Edit3, PlusCircle, ChevronDown, ChevronRight } from 'lucide-react'; // Added ChevronDown, ChevronRight
+import { BookOpen, Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, List, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, FileWarning, Eye, Trash2, Edit3, PlusCircle, ChevronDown, ChevronRight } from 'lucide-react'; // Added icons
 import Link from 'next/link';
 import type { Project, HierarchicalProjectSection, GeneratedSectionOutline, SectionIdentifier } from '@/types/project'; // Use hierarchical type, import SectionIdentifier
 import { STANDARD_REPORT_PAGES, TOC_SECTION_NAME, STANDARD_PAGE_INDICES, findSectionById, updateSectionById, deleteSectionById } from '@/types/project'; // Import project utils
@@ -301,7 +301,7 @@ function ProjectSidebarContent({
                           project.sections.map((section) => (
                             // Key directly on the HierarchicalSectionItem component
                             <HierarchicalSectionItem
-                                key={section.id} // Key directly on the list item component
+                                key={section.id} // Ensure key is unique and directly on the component rendered by map
                                 section={section}
                                 level={0}
                                 activeSectionId={activeSectionId}
