@@ -28,6 +28,7 @@ import MermaidDiagram from './mermaid-diagram'; // Import diagram renderer
 import { ProjectSidebarContent } from '@/components/project-sidebar-content'; // Correct import path
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // Import Tabs
 import { updateProject as updateProjectHelper } from '@/lib/project-utils'; // Import the helper function
+import MarkdownPreview from '@/components/markdown-preview'; // Import the MarkdownPreview component
 
 
 interface ProjectEditorProps {
@@ -176,42 +177,7 @@ const StandardPagePlaceholder = ({ pageName }: { pageName: string }) => (
     </Card>
 );
 
-// Component for rendering Markdown preview
-const MarkdownPreview = React.memo(({ content }: { content: string }) => {
-    const [renderedHtml, setRenderedHtml] = useState('');
-    const [isClient, setIsClient] = useState(false);
-
-    useEffect(() => {
-        setIsClient(true); // Mark as client-side
-    }, []);
-
-    useEffect(() => {
-        if (isClient && content) {
-            // Ensure marked runs only on the client after mount
-             try {
-                setRenderedHtml(marked.parse(content));
-             } catch (error) {
-                 console.error("Error parsing Markdown:", error);
-                 setRenderedHtml("<p class='text-destructive'>Error rendering preview.</p>");
-             }
-        } else {
-            setRenderedHtml(''); // Clear if no content or on server
-        }
-    }, [content, isClient]); // Re-render when content changes on the client
-
-    if (!isClient) {
-        // Render nothing or a placeholder on the server/during hydration
-        return <div className="prose prose-sm dark:prose-invert max-w-none p-4 border rounded min-h-[400px] bg-muted/20 flex items-center justify-center"><Loader2 className="animate-spin h-6 w-6 text-muted-foreground"/></div>;
-    }
-
-    return (
-        <div
-            className="prose prose-sm dark:prose-invert max-w-none p-4 border rounded min-h-[400px] bg-muted/20" // Added background for contrast
-            dangerouslySetInnerHTML={{ __html: renderedHtml || '<p class="italic text-muted-foreground">Nothing to preview yet.</p>' }}
-        />
-    );
-});
-MarkdownPreview.displayName = 'MarkdownPreview';
+// Component for rendering Markdown preview (Moved to separate file: markdown-preview.tsx)
 
 
 export function ProjectEditor({ projectId }: ProjectEditorProps) {
@@ -603,12 +569,27 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 return; // Stop execution
             }
 
-            // Basic validation of the AI response format (now expecting hierarchical)
+            // ** Enhanced Validation **
              if (!result || typeof result !== 'object' || !Array.isArray(result.sections)) {
                  toast({ variant: "destructive", title: "Section Generation Failed", description: "AI did not return the expected hierarchical section structure." });
                  setIsGeneratingOutline(false);
                  return; // Stop execution
              }
+
+             // Validate the structure more deeply (optional but recommended)
+             const isValidStructure = (sections: any[]): boolean => {
+                 return sections.every(s =>
+                     typeof s === 'object' && s !== null && typeof s.name === 'string' &&
+                     (!s.subSections || (Array.isArray(s.subSections) && isValidStructure(s.subSections)))
+                 );
+             };
+
+             if (!isValidStructure(result.sections)) {
+                  toast({ variant: "destructive", title: "Section Generation Failed", description: "AI returned an invalid hierarchical section structure." });
+                  setIsGeneratingOutline(false);
+                  return; // Stop execution
+             }
+
 
             // Type assertion to match the expected hierarchical structure
              const outlineResult = result as GeneratedSectionOutline;
@@ -662,12 +643,20 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
        const allSectionsContent = flattenSections(project.sections);
 
-       const result = await suggestImprovementsAction({
+       // ** Enhance input with more context **
+       const suggestionActionInput = {
          projectTitle: project.title,
          projectContext: project.projectContext,
          allSectionsContent: allSectionsContent,
-         focusArea: suggestionInput || undefined, // Pass focus area if provided
-       });
+         focusArea: suggestionInput || undefined,
+         // ** Add existing section names to give AI structure context **
+         existingSections: project.sections.map(s => s.name).join(', '),
+         // ** Add project type for context **
+         projectType: project.projectType,
+       };
+
+
+       const result = await suggestImprovementsAction(suggestionActionInput);
 
        if ('error' in result) {
          throw new Error(result.error);
@@ -1110,12 +1099,12 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
              <Card className="shadow-md mt-6">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-primary text-glow-primary"><Sparkles className="w-5 h-5" /> AI Suggestions</CardTitle>
-                    <CardDescription>Ask the AI for feedback on your report.</CardDescription>
+                    <CardDescription>Ask the AI for feedback on your report. Consider providing details from "Project Details" for better suggestions.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div>
                         <Label htmlFor="suggestion-input">Focus area (Optional)</Label>
-                        <Input id="suggestion-input" value={suggestionInput} onChange={(e) => setSuggestionInput(e.target.value)} placeholder="e.g., Improve flow, Check clarity..." className="mt-1 focus-visible:glow-primary" />
+                        <Input id="suggestion-input" value={suggestionInput} onChange={(e) => setSuggestionInput(e.target.value)} placeholder="e.g., Improve flow, Check clarity, Add technical details..." className="mt-1 focus-visible:glow-primary" />
                     </div>
                     <Button onClick={handleGetSuggestions} disabled={isSuggesting || isGenerating || isSummarizing || isGeneratingOutline} className="hover:glow-primary focus-visible:glow-primary">
                         {isSuggesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquareQuote className="mr-2 h-4 w-4" />}

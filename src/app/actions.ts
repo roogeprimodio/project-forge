@@ -6,7 +6,7 @@ import { summarizeReportSection, SummarizeReportSectionInput } from '@/ai/flows/
 import type { SummarizeReportSectionOutput } from '@/ai/flows/summarize-report-section';
 import { generateProjectOutline, GenerateProjectOutlineInput } from '@/ai/flows/generate-project-outline';
 import type { GenerateProjectOutlineOutput } from '@/ai/flows/generate-project-outline';
-import { suggestImprovements, SuggestImprovementsInput } from '@/ai/flows/suggest-improvements';
+import { suggestImprovements, SuggestImprovementsInput } from '@/ai/flows/suggest-improvements'; // Type SuggestImprovementsInput is already imported
 import type { SuggestImprovementsOutput } from '@/ai/flows/suggest-improvements';
 import { generateDiagramMermaid, GenerateDiagramMermaidInput } from '@/ai/flows/generate-diagram-mermaid'; // Import diagram flow
 import type { GenerateDiagramMermaidOutput } from '@/ai/flows/generate-diagram-mermaid'; // Import diagram flow types
@@ -80,9 +80,18 @@ export async function generateOutlineAction(input: GenerateProjectOutlineInput):
  * Server action to suggest improvements for the project report using the AI flow.
  * Handles potential errors during the AI call.
  */
+ // Ensure this function accepts the updated SuggestImprovementsInput type
 export async function suggestImprovementsAction(input: SuggestImprovementsInput): Promise<SuggestImprovementsOutput | { error: string }> {
   try {
-    console.log("Suggesting improvements with input:", input);
+    // Log the enhanced input
+    console.log("Suggesting improvements with input:", {
+        projectTitle: input.projectTitle,
+        projectContextLength: input.projectContext?.length,
+        allSectionsContentLength: input.allSectionsContent.length,
+        focusArea: input.focusArea,
+        existingSections: input.existingSections,
+        projectType: input.projectType,
+    });
     const result = await suggestImprovements(input);
     console.log("Suggestion result:", result);
     return result;

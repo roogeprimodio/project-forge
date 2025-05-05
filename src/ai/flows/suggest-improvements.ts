@@ -10,6 +10,7 @@
 import { ai } from '@/ai/ai-instance';
 import { z } from 'genkit';
 
+// Updated input schema to include more context
 const SuggestImprovementsInputSchema = z.object({
   projectTitle: z.string().describe('The title of the project.'),
   projectContext: z
@@ -23,6 +24,13 @@ const SuggestImprovementsInputSchema = z.object({
     .string()
     .optional()
     .describe('Specific area or question the user wants suggestions on (e.g., "Improve clarity of introduction", "Suggest missing sections").'),
+  // ** NEW: Add existing section names for structural context **
+  existingSections: z
+    .string()
+    .optional()
+    .describe('Comma-separated list of the current top-level section names.'),
+  // ** NEW: Add project type for context **
+  projectType: z.enum(['mini-project', 'internship']).optional().describe('The type of project (mini-project or internship).'),
 });
 export type SuggestImprovementsInput = z.infer<typeof SuggestImprovementsInputSchema>;
 
@@ -39,10 +47,11 @@ export async function suggestImprovements(
   return suggestImprovementsFlow(input);
 }
 
+// Updated prompt to use the new context fields
 const prompt = ai.definePrompt({
   name: 'suggestImprovementsPrompt',
   input: {
-    schema: SuggestImprovementsInputSchema,
+    schema: SuggestImprovementsInputSchema, // Use updated schema
   },
   output: {
     schema: SuggestImprovementsOutputSchema,
@@ -51,20 +60,23 @@ const prompt = ai.definePrompt({
 
   Project Title: {{{projectTitle}}}
   {{#if projectContext}}Project Context: {{{projectContext}}}{{/if}}
+  {{#if projectType}}Project Type: {{{projectType}}}{{/if}}
+  {{#if existingSections}}Current Sections: {{{existingSections}}}{{/if}}
 
   Current Report Content:
   {{{allSectionsContent}}}
 
   {{#if focusArea}}The user specifically wants feedback on: {{{focusArea}}}{{/if}}
 
-  Please review the provided project title, context (if available), and the current content of the report sections.
+  Please review the provided project title, context, type, current section structure (if available), and the content of the report sections.
   Provide constructive feedback and actionable suggestions for improvement. Focus on areas such as:
   - Clarity and coherence of the writing.
-  - Logical structure and flow between sections.
-  - Completeness of information relevant to the project context.
+  - Logical structure and flow between sections (consider the project type).
+  - Completeness of information relevant to the project context and type.
   - Identification of potential gaps or areas needing more detail.
   - Suggestions for additional relevant sections or content.
   - Refinements to existing content for better impact.
+  - Consistency with standard report structures for the given project type.
 
   Format your response as helpful suggestions in Markdown. Use bullet points or numbered lists where appropriate. Be specific and provide examples if possible. Do not just criticize; offer solutions or alternative approaches.
   `,
