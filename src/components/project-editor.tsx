@@ -11,8 +11,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, FileWarning, Eye, Projector, Undo } from 'lucide-react'; // Added Projector, Undo icons
 import Link from 'next/link';
-import type { Project, HierarchicalProjectSection, GeneratedSectionOutline, SectionIdentifier } from '@/types/project'; // Use hierarchical type
-import { findSectionById, updateSectionById, deleteSectionById, STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES } from '@/types/project'; // Import helpers and standard pages/indices
+import type { Project, HierarchicalProjectSection, GeneratedSectionOutline, SectionIdentifier, OutlineSection } from '@/types/project'; // Use hierarchical type, Import OutlineSection
+import { findSectionById, updateSectionById, deleteSectionById, STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, TOC_SECTION_NAME } from '@/types/project'; // Import helpers and standard pages/indices
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { useToast } from '@/hooks/use-toast';
 import { generateSectionAction, summarizeSectionAction, generateOutlineAction, suggestImprovementsAction } from '@/app/actions';
@@ -90,7 +90,7 @@ const LogoUpload = ({
                     "flex flex-col items-center justify-center w-full border-2 border-dashed rounded-lg cursor-pointer bg-muted/50 hover:bg-muted/80 transition-colors duration-200",
                     !logoUrl && "p-4 text-center",
                     logoUrl && "relative overflow-hidden",
-                    "aspect-square h-32"
+                    "aspect-square h-32" // Fixed aspect ratio and height
                 )}
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
@@ -152,7 +152,7 @@ const StandardPagePlaceholder = ({ pageName }: { pageName: string }) => (
                 <FileWarning className="w-5 h-5 text-amber-500" /> {pageName}
             </CardTitle>
             <CardDescription>
-                This is a standard report page. Its content is typically generated automatically or requires specific formatting.
+                This is a standard report page. Its content is typically generated automatically or requires specific formatting based on project details.
             </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 min-h-[200px] flex flex-col items-center justify-center text-center">
@@ -163,6 +163,11 @@ const StandardPagePlaceholder = ({ pageName }: { pageName: string }) => (
             <p className="text-xs text-muted-foreground">
                 (Direct editing is not available for this standard page type here.)
             </p>
+             {pageName === TOC_SECTION_NAME && (
+                <p className="text-xs text-muted-foreground mt-2">
+                    The Table of Contents is automatically generated based on the sections defined in the sidebar.
+                </p>
+             )}
         </CardContent>
     </Card>
 );
@@ -489,103 +494,45 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
    };
 
 
-  // Function to process the generated outline and update project sections
+  // Function to process the generated hierarchical outline and update project sections
     const updateSectionsFromToc = useCallback((outline: GeneratedSectionOutline) => {
         if (!project) return;
 
-        // Recursive function to process outline and merge with existing sections
-        const processOutline = (
-            outlineSections: GeneratedSectionOutline['sections'],
-            existingSections: HierarchicalProjectSection[] = []
-        ): [HierarchicalProjectSection[], boolean, number, number] => {
-            const updatedSections: HierarchicalProjectSection[] = [];
-            let structureChanged = false;
-            let addedCount = 0;
-            let preservedCount = 0;
+        // Recursive function to convert AI outline structure to Project Section structure
+         const convertOutlineToSections = (outlineSections: OutlineSection[]): HierarchicalProjectSection[] => {
+             return outlineSections.map(outlineSection => {
+                 const newId = uuidv4();
+                 return {
+                     id: newId,
+                     name: outlineSection.name.trim(),
+                     prompt: `Generate the ${outlineSection.name.trim()} section for the project titled "${project.title}". Consider the project context: ${project.projectContext || '[No context provided]'}. [Add specific instructions here.]`,
+                     content: '',
+                     lastGenerated: undefined,
+                     // Recursively convert sub-sections
+                     subSections: outlineSection.subSections ? convertOutlineToSections(outlineSection.subSections) : [],
+                 };
+             });
+         };
 
-            // Create a map of existing sections for efficient lookup (case-insensitive)
-            const existingMap = new Map(existingSections.map(s => [s.name.toLowerCase(), s]));
+         // Convert the entire received outline
+         const newSections = convertOutlineToSections(outline.sections);
 
-            outlineSections.forEach((outlineSection) => {
-                const trimmedName = outlineSection.name.trim();
-                if (!trimmedName) return; // Skip empty names
-
-                const existingSection = existingMap.get(trimmedName.toLowerCase());
-
-                if (existingSection) {
-                     // Section exists: process sub-sections recursively
-                     const [updatedSubSections, subChanged, subAdded, subPreserved] = processOutline(
-                        outlineSection.subSections || [],
-                        existingSection.subSections || []
-                     );
-                     // Add the existing section back with potentially updated sub-sections
-                    updatedSections.push({ ...existingSection, subSections: updatedSubSections });
-                    if (subChanged) structureChanged = true;
-                    addedCount += subAdded;
-                    preservedCount += subPreserved;
-                    existingMap.delete(trimmedName.toLowerCase()); // Remove from map as it's processed
-                    preservedCount++; // Count the preserved parent section
-                } else {
-                    // Section is new: create it and process its sub-sections
-                    const newId = uuidv4();
-                     const [newSubSections, subChanged, subAdded, subPreserved] = processOutline(outlineSection.subSections || []);
-                     updatedSections.push({
-                        id: newId,
-                        name: trimmedName,
-                        prompt: `Generate the ${trimmedName} section for the project titled "${project.title}". Consider the project context: ${project.projectContext || '[No context provided]'}. [Add specific instructions here.]`,
-                        content: '',
-                        lastGenerated: undefined,
-                        subSections: newSubSections,
-                    });
-                    structureChanged = true; // Structure changed because a new section was added
-                    addedCount += 1 + subAdded; // Count the new parent and its subs
-                    preservedCount += subPreserved;
-                }
-            });
-
-            // Check if any sections were removed (still present in existingMap)
-             if (existingMap.size > 0) {
-                 structureChanged = true;
-             }
-
-            // Check if the order changed even if no sections were added/removed
-            if (!structureChanged && existingSections.length === updatedSections.length) {
-                for (let i = 0; i < updatedSections.length; i++) {
-                    if (updatedSections[i].id !== existingSections[i].id) {
-                        structureChanged = true;
-                        break;
-                    }
-                }
-            }
-
-            return [updatedSections, structureChanged, addedCount, preservedCount];
-        };
-
-        // Process the outline starting from the root
-        const [finalSections, structureChanged, addedCount, preservedCount] = processOutline(outline.sections, project.sections);
-
-         if (!structureChanged && addedCount === 0) {
-             toast({ title: "Sections Unchanged", description: "The generated outline matches the current section structure." });
-             return; // No update needed
-         }
-
-        // Update the project state with the new sections structure
+        // Replace the existing sections entirely with the new hierarchical structure
         updateProject(prev => ({
             ...prev,
-            sections: finalSections,
+            sections: newSections, // Replace completely
         }), true); // saveToHistory = true
 
-        let toastDescription = "Report sections updated.";
-        if (addedCount > 0) toastDescription += ` ${addedCount} section(s) added/updated.`;
-        // if (preservedCount > 0) toastDescription += ` ${preservedCount} section(s) preserved.`;
-        toast({ title: "Sections Updated", description: toastDescription, duration: 7000 });
+        toast({ title: "Sections Generated", description: `Hierarchical sections created based on AI outline.`, duration: 7000 });
 
         // Reset active section if it was deleted, or select first if none was active
         const currentActiveSection = activeSectionId ? findSectionById(project.sections, activeSectionId) : null;
-        if (currentActiveSection && !findSectionById(finalSections, activeSectionId)) {
+        if (currentActiveSection && !findSectionById(newSections, activeSectionId)) {
             handleSetActiveSection(String(-1)); // Set back to Project Details
-        } else if (finalSections.length > 0 && activeSectionId === null) {
-            handleSetActiveSection(finalSections[0].id); // Select the first section
+        } else if (newSections.length > 0 && activeSectionId === null) {
+            handleSetActiveSection(newSections[0].id); // Select the first section
+        } else if (newSections.length === 0) {
+            handleSetActiveSection(String(-1)); // No sections, go to details
         }
         setIsMobileSheetOpen(false); // Close mobile sheet if open
 
@@ -694,18 +641,15 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                  return; // Stop execution
             }
 
-            // Basic validation of the AI response format
-            if (!result || typeof result !== 'object' || !Array.isArray(result.suggestedSections)) {
-                 toast({ variant: "destructive", title: "Section Generation Failed", description: "AI did not return the expected section structure." });
+            // Basic validation of the AI response format (now expecting hierarchical)
+            if (!result || typeof result !== 'object' || !Array.isArray(result.sections)) {
+                 toast({ variant: "destructive", title: "Section Generation Failed", description: "AI did not return the expected hierarchical section structure." });
                  setIsGeneratingOutline(false);
                  return; // Stop execution
              }
 
-            // Convert flat list to hierarchical structure expected by updateSectionsFromToc
-            const outlineResult: GeneratedSectionOutline = {
-                 sections: (result.suggestedSections || []).map(name => ({ name, subSections: [] }))
-            };
-
+            // Type assertion to match the expected hierarchical structure
+             const outlineResult = result as GeneratedSectionOutline;
 
             if (!outlineResult.sections?.length) {
                 toast({ variant: "destructive", title: "Section Generation Failed", description: "AI did not return suggested sections." });
@@ -713,7 +657,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 return; // Stop execution
             }
 
-            updateSectionsFromToc(outlineResult); // Update project state
+            updateSectionsFromToc(outlineResult); // Update project state with hierarchical structure
 
         } catch (error) {
             console.error("Section generation failed:", error);

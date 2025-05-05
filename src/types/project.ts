@@ -10,12 +10,13 @@ export interface HierarchicalProjectSection {
   subSections?: HierarchicalProjectSection[]; // Array for sub-sections
 }
 
-// Interface for the structure expected from the AI outline generation
+// Interface for the structure expected from the AI outline generation (Hierarchical)
+interface OutlineSection {
+  name: string;
+  subSections?: OutlineSection[]; // Recursive definition
+}
 export interface GeneratedSectionOutline {
-  sections: {
-    name: string;
-    subSections?: GeneratedSectionOutline['sections']; // Recursive definition
-  }[];
+  sections: OutlineSection[];
 }
 
 
@@ -26,9 +27,9 @@ export interface Project {
   projectContext: string;
   teamDetails: string;
   instituteName?: string;
-  collegeInfo?: string;
-  universityLogoUrl?: string;
-  collegeLogoUrl?: string;
+  collegeInfo?: string; // Potentially redundant if instituteName is used
+  universityLogoUrl?: string; // URL or Base64 Data URI
+  collegeLogoUrl?: string; // URL or Base64 Data URI
   teamId?: string;
   subject?: string;
   semester?: string;
@@ -41,7 +42,7 @@ export interface Project {
 }
 
 // Name for the specific Table of Contents section (still relevant for standard pages)
-export const TOC_SECTION_NAME = "Table of Contents";
+export const TOC_SECTION_NAME = "Table of Contents"; // Make sure this is exported
 
 // Predefined standard report pages/sections
 export const STANDARD_REPORT_PAGES = [
@@ -53,7 +54,8 @@ export const STANDARD_REPORT_PAGES = [
   "List of Figures",
   "List of Tables",
   "Abbreviations",
-  // TOC is implicitly handled by the hierarchical section structure now
+  // TOC is implicitly handled by the hierarchical section structure now for generated sections
+  // but we keep the constant for identifying the standard page if needed.
 ];
 
 // Assign negative indices to standard pages for sidebar identification
@@ -61,6 +63,7 @@ export const STANDARD_PAGE_INDICES: { [key: string]: number } = {};
 STANDARD_REPORT_PAGES.forEach((page, index) => {
   STANDARD_PAGE_INDICES[page] = -(index + 2); // Start from -2 (-1 is Project Details)
 });
+STANDARD_PAGE_INDICES[TOC_SECTION_NAME] = -100; // Assign a distinct index for TOC if needed as a standard page concept
 
 
 // Predefined common sections (less critical now with AI generation, but kept for potential future use)

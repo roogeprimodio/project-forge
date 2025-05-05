@@ -9,7 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { Settings, Undo, Lightbulb, Cloud, CloudOff, PlusCircle, FileText, Loader2, Edit3, Trash2, ChevronRight, ChevronDown } from 'lucide-react';
 import type { Project, SectionIdentifier, HierarchicalProjectSection } from '@/types/project';
 import { STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, findSectionById } from '@/types/project';
-import { HierarchicalSectionItem } from './hierarchical-section-item';
+import { HierarchicalSectionItem } from './hierarchical-section-item'; // Import the hierarchical item
 import { useToast } from '@/hooks/use-toast';
 
 // Props interface for ProjectSidebarContent
@@ -26,11 +26,11 @@ export interface ProjectSidebarContentProps {
     canUndo: boolean;
     handleUndo: () => void;
     onCloseSheet?: () => void;
-    isEditingSections: boolean;
+    isEditingSections: boolean; // Manage edit mode state
     setIsEditingSections: (editing: boolean) => void;
     onEditSectionName: (id: string, newName: string) => void;
-    onDeleteSection: (id: string) => void;
-    onAddSection: (parentId?: string) => void;
+    onDeleteSection: (id: string) => void; // Handler for deleting sections
+    onAddSection: (parentId?: string) => void; // Handler for adding sections/sub-sections
 }
 
 /**
@@ -56,8 +56,8 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
     isEditingSections,
     setIsEditingSections,
     onEditSectionName,
-    onDeleteSection,
-    onAddSection,
+    onDeleteSection, // Get delete handler
+    onAddSection, // Get add handler
 }) => {
      const { toast } = useToast();
 
@@ -66,8 +66,9 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
          onCloseSheet?.();
      };
 
-     const handleAddNewSection = (parentId?: string) => {
-          onAddSection(parentId);
+     // Add Section (Top Level)
+     const handleAddNewSection = () => {
+          onAddSection(); // Call parent handler without parentId for top-level
       };
 
      // Recursive function to render sections and sub-sections
@@ -76,15 +77,15 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
             const currentNumbering = parentNumbering ? `${parentNumbering}.${index + 1}` : `${index + 1}`;
             return (
                 <HierarchicalSectionItem
-                    key={section.id} // Key directly on the list item component
+                    key={section.id} // ** Ensure key is unique and stable **
                     section={section}
                     level={level}
-                    numbering={currentNumbering}
+                    numbering={currentNumbering} // Pass numbering
                     activeSectionId={activeSectionId}
                     setActiveSectionId={setActiveSectionId} // Pass function directly
                     onEditSectionName={onEditSectionName}
                     onDeleteSection={onDeleteSection} // Pass handler
-                    onAddSubSection={handleAddNewSection} // Pass add sub-section handler
+                    onAddSubSection={onAddSection} // Pass add sub-section handler
                     isEditing={isEditingSections}
                     onCloseSheet={onCloseSheet}
                     renderSubSections={renderSectionsRecursive} // Pass the render function for recursion
@@ -178,16 +179,18 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                  <ScrollArea className="flex-1 w-full overflow-x-auto px-2 pb-2"> {/* Take remaining space */}
                      <nav className="flex flex-col gap-1 whitespace-nowrap">
                        {project.sections?.length > 0 ? (
-                          renderSectionsRecursive(project.sections, 0) // Use the render function
+                          // Call the recursive rendering function
+                          renderSectionsRecursive(project.sections, 0)
                        ) : (
                          <p className="px-2 text-xs text-muted-foreground italic">Generate or add sections.</p>
                        )}
-                       {isEditingSections && (
+                       {/* Add New Section Button (visible in edit mode) */}
+                        {isEditingSections && (
                             <Button
-                                key="add-new-section-button"
+                                key="add-new-section-button" // Stable key
                                 variant="outline"
                                 size="sm"
-                                onClick={() => handleAddNewSection()}
+                                onClick={handleAddNewSection}
                                 className="justify-start mt-2 text-muted-foreground hover:text-primary"
                                 title="Add new top-level section"
                             >
