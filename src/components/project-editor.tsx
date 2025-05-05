@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'; // Import ScrollBar
 import { Separator } from '@/components/ui/separator';
 import { BookOpen, Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, List, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, FileWarning, Eye, Trash2, Edit3, PlusCircle, ChevronDown, ChevronRight } from 'lucide-react'; // Added ChevronDown, ChevronRight
 import Link from 'next/link';
@@ -186,7 +186,7 @@ function ProjectSidebarContent({
 }: {
     project: Project;
     activeSectionId: string | null; // Use string ID
-    setActiveSectionId: (id: string | number) => void; // Accept ID or standard page index
+    setActiveSectionId: (id: string | number) => void; // Accept ID or numeric standard page index
     handleGenerateTocClick: () => void;
     isGeneratingOutline: boolean;
     isGenerating: boolean;
@@ -331,6 +331,7 @@ function ProjectSidebarContent({
                         )}
 
                  </nav>
+                 <ScrollBar orientation="horizontal" /> {/* Add horizontal scrollbar */}
              </ScrollArea>
              <div className="p-4 border-t space-y-2">
                  {/* Generate/Update Outline Button */}
