@@ -113,17 +113,19 @@ const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = ({
             {section.subSections && section.subSections.length > 0 && (
                 <div className="ml-0"> {/* No extra margin here, padding handled by button style */}
                     {section.subSections.map((subSection) => (
-                        <HierarchicalSectionItem
-                            key={subSection.id}
-                            section={subSection}
-                            level={level + 1}
-                            activeSectionId={activeSectionId}
-                            setActiveSectionId={setActiveSectionId}
-                            onEditSectionName={onEditSectionName}
-                            onDeleteSection={onDeleteSection} // Pass down delete handler
-                            isEditing={isEditing}
-                            onCloseSheet={onCloseSheet}
-                        />
+                       <React.Fragment key={subSection.id}> {/* Add key to Fragment */}
+                            <HierarchicalSectionItem
+                                key={subSection.id}
+                                section={subSection}
+                                level={level + 1}
+                                activeSectionId={activeSectionId}
+                                setActiveSectionId={setActiveSectionId}
+                                onEditSectionName={onEditSectionName}
+                                onDeleteSection={onDeleteSection} // Pass down delete handler
+                                isEditing={isEditing}
+                                onCloseSheet={onCloseSheet}
+                            />
+                       </React.Fragment>
                     ))}
                 </div>
             )}
@@ -229,19 +231,21 @@ function ProjectSidebarContent({
                         const pageIndex = STANDARD_PAGE_INDICES[pageName];
                         const pageId = String(pageIndex); // Use string representation
                         return (
-                            <Button
-                                key={pageId}
-                                variant={activeSectionId === pageId ? "secondary" : "ghost"}
-                                size="sm"
-                                onClick={() => handleSectionClick(pageIndex)} // Pass numeric index
-                                className="justify-start truncate"
-                                aria-current={activeSectionId === pageId ? "page" : undefined}
-                                title={pageName}
-                                disabled={isEditingSections} // Disable during edit mode
-                            >
-                                <FileText className="mr-2 h-4 w-4 flex-shrink-0" />
-                                <span className="truncate">{pageName}</span>
-                            </Button>
+                           <React.Fragment key={pageId}> {/* Add key to Fragment */}
+                                <Button
+                                    key={pageId}
+                                    variant={activeSectionId === pageId ? "secondary" : "ghost"}
+                                    size="sm"
+                                    onClick={() => handleSectionClick(pageIndex)} // Pass numeric index
+                                    className="justify-start truncate"
+                                    aria-current={activeSectionId === pageId ? "page" : undefined}
+                                    title={pageName}
+                                    disabled={isEditingSections} // Disable during edit mode
+                                >
+                                    <FileText className="mr-2 h-4 w-4 flex-shrink-0" />
+                                    <span className="truncate">{pageName}</span>
+                                </Button>
+                            </React.Fragment>
                         );
                      })}
 
@@ -261,17 +265,19 @@ function ProjectSidebarContent({
                        </div>
                        {project.sections?.length > 0 ? (
                           project.sections.map((section) => (
-                            <HierarchicalSectionItem
-                                key={section.id} // Use unique section ID
-                                section={section}
-                                level={0}
-                                activeSectionId={activeSectionId}
-                                setActiveSectionId={(id) => handleSectionClick(id)} // Pass string ID
-                                onEditSectionName={onEditSectionName}
-                                onDeleteSection={onDeleteSection} // Pass handler
-                                isEditing={isEditingSections}
-                                onCloseSheet={onCloseSheet}
-                            />
+                            <React.Fragment key={section.id}> {/* Add key to Fragment */}
+                                <HierarchicalSectionItem
+                                    key={section.id} // Use unique section ID
+                                    section={section}
+                                    level={0}
+                                    activeSectionId={activeSectionId}
+                                    setActiveSectionId={(id) => handleSectionClick(id)} // Pass string ID
+                                    onEditSectionName={onEditSectionName}
+                                    onDeleteSection={onDeleteSection} // Pass handler
+                                    isEditing={isEditingSections}
+                                    onCloseSheet={onCloseSheet}
+                                />
+                            </React.Fragment>
                           ))
                        ) : (
                          <p className="px-2 text-xs text-muted-foreground italic">Generate or add sections.</p>
@@ -925,8 +931,11 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         const result = await generateOutlineAction({ projectTitle: project.title, projectContext: project.projectContext || '' });
         if ('error' in result) throw new Error(result.error);
 
-        // The AI now returns a hierarchical structure
-         const outlineResult: GeneratedSectionOutline = { sections: result.suggestedSections || [] }; // Adapt to expected structure
+        // Adapt the flat list to the expected hierarchical structure
+        const outlineResult: GeneratedSectionOutline = {
+             sections: (result.suggestedSections || []).map(name => ({ name, subSections: [] })) // Assume flat structure for now
+        };
+
 
         if (!outlineResult.sections?.length) {
              toast({ variant: "destructive", title: "Section Generation Failed", description: "AI did not return suggested sections." });
