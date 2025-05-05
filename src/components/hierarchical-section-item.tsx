@@ -33,6 +33,8 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
     isEditing,
     onCloseSheet,
 }) => {
+    // IMPORTANT: Ensure section.id is always unique across the entire project structure.
+    // If duplicate IDs exist, React's reconciliation will fail, causing "key" prop warnings.
     const isActive = section.id === activeSectionId;
     const [isExpanded, setIsExpanded] = useState(true);
     const [isNameEditing, setIsNameEditing] = useState(false); // State for inline name editing
@@ -201,7 +203,8 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
             {hasSubSections && isExpanded && (
                 <div className="ml-0"> {/* No extra margin */}
                     {section.subSections.map((subSection) => (
-                        // ** Ensure the key prop is DIRECTLY on HierarchicalSectionItem here **
+                        // ** Ensure the key prop is DIRECTLY on the recursively rendered HierarchicalSectionItem **
+                        // Double-check that subSection.id is unique within this parent section's subSections.
                         <HierarchicalSectionItem
                             key={subSection.id} // Key is crucial here!
                             section={subSection}

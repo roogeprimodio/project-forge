@@ -1,3 +1,4 @@
+// src/components/project-sidebar-content.tsx
 "use client";
 
 import React from 'react';
@@ -7,7 +8,7 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Settings, Undo, Lightbulb, Cloud, CloudOff, PlusCircle, FileText } from 'lucide-react';
 import type { Project } from '@/types/project';
-import { STANDARD_REPORT_PAGES} from '@/types/project';
+import { STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES } from '@/types/project';
 import { HierarchicalSectionItem } from './hierarchical-section-item'; // Import the extracted component
 
 // Props interface for ProjectSidebarContent
@@ -35,7 +36,7 @@ export interface ProjectSidebarContentProps {
  * ProjectSidebarContent Component
  *
  * Displays the sidebar content for the project editor, including project details,
- * standard pages, and editable table of contents.  Handles toggling, edits,
+ * standard pages, and editable table of contents. Handles toggling, edits,
  * and new section creation.
  */
 export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
@@ -95,7 +96,7 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                  <nav className="flex flex-col gap-1 whitespace-nowrap"> {/* Add whitespace-nowrap here */}
                      {/* Project Details Button */}
                      <Button
-                         key="-1"
+                         key="-1" // Unique key for this specific button
                          variant={activeSectionId === String(-1) ? "secondary" : "ghost"}
                          size="sm"
                          onClick={() => handleSectionClick(-1)}
@@ -110,11 +111,12 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
 
                      {/* Standard Report Pages */}
                      <p className="px-2 text-xs font-semibold text-muted-foreground mb-1">STANDARD PAGES</p>
-                     {STANDARD_REPORT_PAGES.map((pageName, index) => {
-                        const pageId = String(-(index + 2)); // Standard pages have negative IDs
+                     {STANDARD_REPORT_PAGES.map((pageName) => {
+                        // Use the negative index from STANDARD_PAGE_INDICES as the key
+                        const pageId = String(STANDARD_PAGE_INDICES[pageName]);
                         return (
                             <Button
-                                key={pageId} // Key for standard page buttons
+                                key={pageId} // Key for standard page buttons using the unique index
                                 variant={activeSectionId === pageId ? "secondary" : "ghost"}
                                 size="sm"
                                 onClick={() => handleSectionClick(pageId)}
@@ -145,7 +147,8 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                        </div>
                        {project.sections?.length > 0 ? (
                           project.sections.map((section) => (
-                            // ** Ensure the key prop is DIRECTLY on HierarchicalSectionItem **
+                            // ** Apply the key directly to the HierarchicalSectionItem component **
+                            // Ensure section.id is unique within the project.sections array.
                             <HierarchicalSectionItem
                                 key={section.id} // Apply key here to the component rendered by map
                                 section={section}
@@ -154,7 +157,7 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                                 setActiveSectionId={(id) => handleSectionClick(id)} // Pass string ID
                                 onEditSectionName={onEditSectionName}
                                 onDeleteSection={onDeleteSection} // Pass handler
-                                onAddSubSection={onAddSection}
+                                onAddSubSection={onAddSection} // Pass handler
                                 isEditing={isEditingSections}
                                 onCloseSheet={onCloseSheet}
                             />
@@ -165,13 +168,13 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                        {/* Add New Section Button (visible in edit mode or if no sections) */}
                         {isEditingSections && (
                             <Button
-                                key="add-new-section-button" // Added key for stability if needed
+                                key="add-new-section-button" // Static key for this button
                                 variant="outline"
                                 size="sm"
                                 onClick={handleAddNewSection}
                                 className="justify-start mt-2 text-muted-foreground hover:text-primary"
                                 title="Add new top-level section"
-                            >
+                                >
                                 <PlusCircle className="mr-2 h-4 w-4" />
                                 Add Section
                             </Button>
