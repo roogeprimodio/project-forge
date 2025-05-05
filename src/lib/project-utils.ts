@@ -215,3 +215,4 @@ export const updateProject = (
     // Reset the flag after the state update cycle
     requestAnimationFrame(() => { isUpdatingHistory.current = false; });
 };
+```

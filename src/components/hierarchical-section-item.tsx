@@ -22,7 +22,7 @@ export interface HierarchicalSectionItemProps {
     isEditing: boolean;
     onCloseSheet?: () => void;
     // Prop to pass down the recursive rendering function
-    renderSubSections: (sections: HierarchicalProjectSection[], level: number, parentNumbering: string) => React.ReactNode[];
+    renderSubSections: (sections: HierarchicalProjectSection[], level: number, parentNumbering: string, onAddSubSection: (parentId: string) => void) => React.ReactNode[]; // Pass onAddSubSection recursively
 }
 
 export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = ({
@@ -37,7 +37,7 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
     isEditing,
     onCloseSheet,
     renderSubSections, // Destructure the render function
-}) => { // Added missing opening brace for function body
+}) => {
     const isActive = section.id === activeSectionId;
     const [isExpanded, setIsExpanded] = useState(true); // Default to expanded
     const [isNameEditing, setIsNameEditing] = useState(false);
@@ -81,6 +81,11 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
     // ** UPDATED: Handler for adding a sub-section **
     const handleAddSubSectionClick = (e: React.MouseEvent) => {
         e.stopPropagation(); // Prevent parent button click
+        if (typeof onAddSubSection !== 'function') {
+             console.error("Error: onAddSubSection prop is not a function", { onAddSubSection });
+             toast({ variant: "destructive", title: "Error", description: "Could not add sub-section." });
+             return;
+        }
         onAddSubSection(section.id); // Call the passed handler with the current section's ID as parent
         setIsExpanded(true); // Expand the parent when adding a sub-section
     };
@@ -124,7 +129,7 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
 
 
     // Make sure the return statement is correctly placed within the component function
-    return ( // This is the start of the return statement
+    return (
         <div className="group w-full"> {/* Ensure group takes full width */}
              {/* Main row containing content button and edit buttons */}
             <div className="flex group/item relative w-full items-center"> {/* Use w-full and items-center */}
@@ -143,27 +148,27 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
                     title={section.name} // Tooltip
                     tabIndex={isEditing ? -1 : 0} // Focusable only when not editing
                 >
-                    {/* Indentation and Toggle */}
-                    <div
-                        className="flex items-center flex-shrink-0 h-full" // Use h-full for vertical alignment
-                        style={{ paddingLeft: `${level * 1.5}rem` }} // Apply indentation here
-                        onClick={(e) => e.stopPropagation()} // Prevent clicks on this div from triggering parent button during edit
-                    >
-                        {hasSubSections ? (
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={handleToggleExpand} // Separate toggle handler
-                                className="h-6 w-6 mr-1 text-muted-foreground hover:bg-muted/50 flex-shrink-0"
-                                aria-label={isExpanded ? "Collapse section" : "Expand section"}
-                                tabIndex={0} // Make toggle focusable independently
-                            >
-                                {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                            </Button>
-                        ) : (
-                            <span className="w-6 mr-1 flex-shrink-0"></span> // Placeholder for alignment
-                        )}
-                    </div>
+                     {/* Indentation and Toggle */}
+                     <div
+                         className="flex items-center flex-shrink-0 h-full" // Use h-full for vertical alignment
+                         style={{ paddingLeft: `${level * 1.5}rem` }} // Apply indentation here
+                         onClick={(e) => e.stopPropagation()} // Prevent clicks on this div from triggering parent button during edit
+                     >
+                         {hasSubSections ? (
+                             <Button
+                                 variant="ghost"
+                                 size="icon"
+                                 onClick={handleToggleExpand} // Separate toggle handler
+                                 className="h-6 w-6 mr-1 text-muted-foreground hover:bg-muted/50 flex-shrink-0"
+                                 aria-label={isExpanded ? "Collapse section" : "Expand section"}
+                                 tabIndex={0} // Make toggle focusable independently
+                             >
+                                 {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                             </Button>
+                         ) : (
+                             <span className="w-6 mr-1 flex-shrink-0"></span> // Placeholder for alignment
+                         )}
+                     </div>
 
                     {/* Numbering */}
                     <span className="font-medium text-muted-foreground flex-shrink-0 mr-1">{numbering}</span>
@@ -208,9 +213,9 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
             {/* Render Sub-sections recursively */}
             {hasSubSections && isExpanded && (
                 <div className="w-full"> {/* Ensure sub-section container takes full width */}
-                    {renderSubSections(section.subSections!, level + 1, numbering)}
+                    {renderSubSections(section.subSections!, level + 1, numbering, onAddSubSection)}
                 </div>
             )}
         </div>
     );
-} // Added missing closing brace for function body
+}
