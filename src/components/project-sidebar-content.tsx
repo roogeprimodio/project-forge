@@ -39,6 +39,8 @@ export interface ProjectSidebarContentProps {
 
 /**
  * ProjectSidebarContent Component
+ * Renders the sidebar content for the project editor, including project details,
+ * standard pages, and the hierarchical report sections.
  */
 export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
     project,
@@ -95,7 +97,7 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
 
      return (
         <div className="flex flex-col h-full border-r bg-card">
-            {/* Header - Uses project.title which updates when parent re-renders */}
+            {/* Header */}
             <div className="p-4 border-b flex justify-between items-center flex-shrink-0">
                  <Input
                         id="projectTitleSidebar"
@@ -133,12 +135,12 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
             </div>
             <Separator className="my-0 flex-shrink-0" />
 
-            {/* Standard Report Pages Section with horizontal scroll */}
+            {/* Standard Report Pages Section */}
             <div className="px-2 py-2 flex-shrink-0">
                 <p className="px-2 text-xs font-semibold text-muted-foreground mb-1 text-left">STANDARD PAGES</p>
-                {/* Wrap STANDARD PAGES with ScrollArea and add horizontal ScrollBar */}
-                <ScrollArea className="w-full whitespace-nowrap"> {/* Enable horizontal scroll */}
-                    <nav className="flex flex-col gap-1 min-w-max text-left"> {/* Ensure nav takes minimum width needed */}
+                {/* ScrollArea for STANDARD PAGES */}
+                <ScrollArea className="w-full whitespace-nowrap max-h-[200px]"> {/* Added max-height for independent scroll */}
+                    <nav className="flex flex-col gap-1 min-w-max text-left">
                         {STANDARD_REPORT_PAGES.map((pageName) => {
                             const pageId = String(STANDARD_PAGE_INDICES[pageName]);
                             return (
@@ -157,12 +159,13 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                             );
                         })}
                     </nav>
-                     <ScrollBar orientation="horizontal" /> {/* Add horizontal scrollbar */}
+                     <ScrollBar orientation="horizontal" />
+                     <ScrollBar orientation="vertical" /> {/* Explicitly add vertical scrollbar if needed */}
                 </ScrollArea>
             </div>
             <Separator className="my-0 flex-shrink-0" />
 
-            {/* Report Sections Section with horizontal scroll */}
+            {/* Report Sections Section */}
             <div className="flex-1 flex flex-col min-h-0"> {/* Use flex-1 and min-h-0 */}
                  <div className="flex justify-between items-center pl-2 pr-4 py-2 flex-shrink-0">
                     <p className="text-xs font-semibold text-muted-foreground text-left">REPORT SECTIONS</p>
@@ -175,34 +178,32 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                         {isEditingSections ? 'Done' : 'Edit'}
                     </Button>
                  </div>
-                 {/* Vertical Scroll for Report Sections */}
-                 <ScrollArea className="flex-1"> {/* flex-1 to fill remaining vertical space */}
+                 {/* ScrollArea for REPORT SECTIONS */}
+                 <ScrollArea className="flex-1 w-full"> {/* flex-1 to fill space, w-full */}
                      <div className="px-2 py-2">
-                         {/* Wrap REPORT SECTIONS with ScrollArea and add horizontal ScrollBar */}
-                         <ScrollArea className="w-full whitespace-nowrap"> {/* Enable horizontal scroll */}
-                            <nav className="flex flex-col gap-1 min-w-max text-left"> {/* Ensure nav takes minimum width needed */}
-                               {project.sections?.length > 0 ? (
-                                    renderSectionsRecursive(project.sections, 0)
-                               ) : (
-                                 <p className="text-xs text-muted-foreground italic text-left">Generate or add sections.</p>
-                               )}
-                                {isEditingSections && (
-                                    <Button
-                                        key="add-new-section-button" // Added key for stability if needed
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={handleAddNewSection} // Use the passed handler
-                                        className="justify-start mt-2 text-muted-foreground hover:text-primary text-left"
-                                        title="Add new top-level section"
-                                    >
-                                        <PlusCircle className="mr-2 h-4 w-4" />
-                                        Add Section
-                                    </Button>
-                                )}
-                            </nav>
-                            <ScrollBar orientation="horizontal" /> {/* Add horizontal scrollbar */}
-                         </ScrollArea>
+                        <nav className="flex flex-col gap-1 min-w-max text-left whitespace-nowrap"> {/* min-w-max and whitespace-nowrap */}
+                           {project.sections?.length > 0 ? (
+                                renderSectionsRecursive(project.sections, 0)
+                           ) : (
+                             <p className="text-xs text-muted-foreground italic text-left">Generate or add sections.</p>
+                           )}
+                           {isEditingSections && (
+                               <Button
+                                   key="add-new-section-button"
+                                   variant="outline"
+                                   size="sm"
+                                   onClick={handleAddNewSection}
+                                   className="justify-start mt-2 text-muted-foreground hover:text-primary text-left"
+                                   title="Add new top-level section"
+                               >
+                                   <PlusCircle className="mr-2 h-4 w-4" />
+                                   Add Section
+                               </Button>
+                           )}
+                        </nav>
                      </div>
+                     <ScrollBar orientation="horizontal" />
+                     <ScrollBar orientation="vertical" /> {/* Explicitly add vertical scrollbar */}
                  </ScrollArea>
              </div>
 
