@@ -25,7 +25,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { v4 as uuidv4 } from 'uuid';
 import AiDiagramGenerator from './ai-diagram-generator'; // Import the new component
 import MermaidDiagram from './mermaid-diagram'; // Import diagram renderer
-import { ProjectSidebarContent } from '../project-sidebar-content'; // Correct import path
+import { ProjectSidebarContent } from './project-sidebar-content'; // Correct import path
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // Import Tabs
 import { updateProject as updateProjectHelper } from '@/lib/project-utils'; // Import the helper function
 
@@ -1032,6 +1032,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         <SheetContent side="left" className="p-0 w-64 bg-card md:hidden">
           <SheetHeader className="p-4 border-b">
             <SheetTitle>Project Menu</SheetTitle>
+            <SheetDescription>Navigate and manage your project sections.</SheetDescription>
           </SheetHeader>
           {/* Render Sidebar Content Component */}
           <ProjectSidebarContent

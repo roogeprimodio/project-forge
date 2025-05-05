@@ -8,11 +8,12 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Settings, Undo, Lightbulb, Cloud, CloudOff, PlusCircle, FileText, Loader2, ChevronRight, ChevronDown, Edit3, Trash2 } from 'lucide-react'; // Import necessary icons
 import type { Project, SectionIdentifier, HierarchicalProjectSection } from '@/types/project';
-import { STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, findSectionById } from '@/types/project';
+// Import constants and utility function from the correct location
+import { STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, findSectionById, updateProject as updateProjectHelper } from '@/lib/project-utils'; // Corrected import path
 import { HierarchicalSectionItem } from './hierarchical-section-item'; // Import the hierarchical item
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid'; // Import uuid for generating unique IDs
-import { updateProject as updateProjectHelper } from '@/lib/project-utils'; // Import the helper function
+
 
 // Props interface for ProjectSidebarContent
 export interface ProjectSidebarContentProps {
@@ -33,7 +34,6 @@ export interface ProjectSidebarContentProps {
     setIsEditingSections: (editing: boolean) => void;
     onEditSectionName: (id: string, newName: string) => void;
     onDeleteSection: (id: string) => void; // Handler for deleting sections
-    // onAddSection is now handled internally by handleAddSectionLocal
 }
 
 /**
@@ -117,6 +117,15 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
 
          toast({ title: parentId ? "Sub-section Added" : "Section Added" });
          setIsEditingSections(true); // Ensure edit mode is active after adding
+         // Automatically activate the newly added section for editing its name
+          setTimeout(() => {
+            const newSectionElement = document.getElementById(`edit-section-input-${newSection.id}`);
+             if (newSectionElement) {
+                // This assumes HierarchicalSectionItem handles enabling edit mode and focusing
+                 setActiveSectionId(newSection.id); // Make it active
+                 // The HierarchicalSectionItem should handle the edit state based on isEditing prop
+             }
+          }, 0);
      };
 
 
@@ -188,8 +197,8 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
             {/* Standard Report Pages Section */}
             <div className="px-2 py-2 flex-shrink-0">
                 <p className="px-2 text-xs font-semibold text-muted-foreground mb-1">STANDARD PAGES</p>
-                <ScrollArea className="w-full overflow-x-auto">
-                    <nav className="flex flex-col gap-1 whitespace-nowrap">
+                <ScrollArea className="w-full"> {/* No explicit horizontal scroll needed here usually */}
+                    <nav className="flex flex-col gap-1">
                         {STANDARD_REPORT_PAGES.map((pageName) => {
                             const pageId = String(STANDARD_PAGE_INDICES[pageName]);
                             return (
@@ -208,7 +217,6 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                             );
                         })}
                     </nav>
-                    <ScrollBar orientation="horizontal" />
                 </ScrollArea>
             </div>
             <Separator className="my-0 flex-shrink-0" />
@@ -226,8 +234,8 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                         {isEditingSections ? 'Done' : 'Edit'}
                     </Button>
                  </div>
-                 <ScrollArea className="flex-1 w-full overflow-x-auto px-2 pb-2"> {/* Take remaining space */}
-                     <nav className="flex flex-col gap-1 whitespace-nowrap">
+                 <ScrollArea className="flex-1 px-2 py-2 overflow-x-auto"> {/* Take remaining space and allow horizontal scroll */}
+                     <nav className="flex flex-col gap-1 whitespace-nowrap"> {/* Add whitespace-nowrap */}
                        {project.sections?.length > 0 ? (
                           // Call the recursive rendering function starting at level 0
                           renderSectionsRecursive(project.sections, 0)
@@ -249,7 +257,7 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                             </Button>
                         )}
                      </nav>
-                     <ScrollBar orientation="horizontal" />
+                     <ScrollBar orientation="horizontal" /> {/* Add horizontal scrollbar */}
                  </ScrollArea>
              </div>
 
