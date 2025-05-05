@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Settings, Undo, Lightbulb, Cloud, CloudOff, PlusCircle, FileText, Loader2, ChevronRight, ChevronDown, Edit3, Trash2 } from 'lucide-react'; // Import necessary icons
+import { Settings, Undo, Lightbulb, Cloud, CloudOff, PlusCircle, FileText, Loader2 } from 'lucide-react'; // Removed unused icons, kept Loader2
 import type { Project, SectionIdentifier, HierarchicalProjectSection } from '@/types/project';
 // Import constants and utility function from the correct location
 import { STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, findSectionById, updateProject as updateProjectHelper } from '@/lib/project-utils'; // Corrected import path
@@ -127,7 +127,7 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                  // The HierarchicalSectionItem should handle the edit state based on isEditing prop
              }
           }, 0);
-     }; // <-- This closing brace might have been missing or misplaced
+     };
 
 
      // Recursive function to render sections and sub-sections
@@ -197,8 +197,8 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
 
             {/* Standard Report Pages Section */}
             <div className="px-2 py-2 flex-shrink-0">
-                <p className="px-2 text-xs font-semibold text-muted-foreground mb-1 text-left">STANDARD PAGES</p> {/* Ensure text-left */}
-                <ScrollArea className="w-full"> {/* No explicit horizontal scroll needed here usually */}
+                <p className="px-2 text-xs font-semibold text-muted-foreground mb-1 text-left">STANDARD PAGES</p>
+                <ScrollArea className="w-full"> {/* Scroll only for this section */}
                     <nav className="flex flex-col gap-1">
                         {STANDARD_REPORT_PAGES.map((pageName) => {
                             const pageId = String(STANDARD_PAGE_INDICES[pageName]);
@@ -218,6 +218,7 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                             );
                         })}
                     </nav>
+                    <ScrollBar orientation="horizontal" /> {/* Horizontal scroll for standard pages */}
                 </ScrollArea>
             </div>
             <Separator className="my-0 flex-shrink-0" />
@@ -225,7 +226,7 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
             {/* Report Sections Section */}
             <div className="flex-1 flex flex-col min-h-0"> {/* Allow this section to grow and enable internal scroll */}
                  <div className="flex justify-between items-center px-4 py-2 flex-shrink-0">
-                    <p className="text-xs font-semibold text-muted-foreground text-left">REPORT SECTIONS</p> {/* Ensure text-left */}
+                    <p className="text-xs font-semibold text-muted-foreground text-left">REPORT SECTIONS</p> {/* Ensured text-left */}
                     <Button
                         variant="ghost"
                         size="sm"
@@ -235,13 +236,13 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                         {isEditingSections ? 'Done' : 'Edit'}
                     </Button>
                  </div>
-                 <ScrollArea className="flex-1 px-2 py-2 overflow-x-auto"> {/* Takes remaining space and allows horizontal scroll */}
+                 <ScrollArea className="flex-1 px-2 py-2 overflow-x-auto"> {/* Takes remaining space and allows horizontal scroll for sections */}
                      <nav className="flex flex-col gap-1 whitespace-nowrap"> {/* Add whitespace-nowrap */}
                        {project.sections?.length > 0 ? (
                           // Call the recursive rendering function starting at level 0
                           renderSectionsRecursive(project.sections, 0)
                        ) : (
-                         <p className="px-2 text-xs text-muted-foreground italic text-left">Generate or add sections.</p> // Ensure text-left
+                         <p className="px-2 text-xs text-muted-foreground italic text-left">Generate or add sections.</p>
                        )}
                        {/* Add New Section Button (visible in edit mode) */}
                         {isEditingSections && (
@@ -258,7 +259,7 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                             </Button>
                         )}
                      </nav>
-                     <ScrollBar orientation="horizontal" /> {/* Add horizontal scrollbar */}
+                     <ScrollBar orientation="horizontal" /> {/* Horizontal scroll for report sections */}
                  </ScrollArea>
              </div>
 
