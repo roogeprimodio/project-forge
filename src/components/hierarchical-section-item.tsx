@@ -154,14 +154,14 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
                         size="sm"
                         onClick={handleSectionClick}
                         className={cn(
-                            "justify-start text-left flex-1 group/btn h-full min-w-0 px-1 flex items-center", // Use h-full, flex items-center
+                            "justify-start text-left flex-1 group/btn h-full min-w-0 px-1 flex items-center", // Use h-full, flex items-center, justify-start, text-left
                             isEditing ? 'pr-[70px]' : 'pr-2' // Adjust right padding
                         )}
                         aria-current={isActive && !isEditing && !isNameEditing ? "page" : undefined}
                         title={section.name} // Tooltip
                         disabled={isEditing && !isNameEditing}
                     >
-                        {/* Numbering */}
+                        {/* Numbering - Ensure it's left-aligned within its span */}
                         <span className="mr-1.5 font-medium text-muted-foreground min-w-[2em] text-right flex-shrink-0">{numbering}</span>
                         <FileText className="mr-1.5 h-4 w-4 flex-shrink-0" />
                         {isNameEditing ? (
@@ -171,12 +171,12 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
                                 onChange={handleNameChange}
                                 onKeyDown={handleNameKeyDown}
                                 onBlur={handleNameBlur}
-                                className="h-6 px-1 text-sm flex-1 bg-transparent border-b border-primary focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-primary text-left"
+                                className="h-6 px-1 text-sm flex-1 bg-transparent border-b border-primary focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-primary text-left" // text-left
                                 onClick={(e) => e.stopPropagation()}
                                 onMouseDown={(e) => e.stopPropagation()}
                             />
                         ) : (
-                            <span className="flex-1 truncate text-left">{section.name}</span>
+                            <span className="flex-1 truncate text-left">{section.name}</span> // text-left
                         )}
                     </Button>
                 </div>
@@ -207,5 +207,3 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
         </div>
     );
 };
-
-    
