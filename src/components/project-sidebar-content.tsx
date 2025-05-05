@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Settings, Undo, Lightbulb, Cloud, CloudOff, PlusCircle, FileText } from 'lucide-react';
+import { Settings, Undo, Lightbulb, Cloud, CloudOff, PlusCircle, FileText, Loader2 } from 'lucide-react'; // Import Loader2
 import type { Project } from '@/types/project';
 import { STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES } from '@/types/project';
 import { HierarchicalSectionItem } from './hierarchical-section-item'; // Import the extracted component
@@ -59,10 +59,7 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
     onAddSection,
 }) => {
      const handleSectionClick = (id: string | number) => {
-         if (isEditingSections) {
-             // Allow selection even in edit mode for easier navigation before editing name/deleting
-             // return;
-         }
+         // No need to check isEditingSections anymore, allow selection
          setActiveSectionId(id);
          onCloseSheet?.();
      };
@@ -103,7 +100,6 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                          onClick={() => handleSectionClick(-1)}
                          className="justify-start"
                          aria-current={activeSectionId === String(-1) ? "page" : undefined}
-                         //disabled={isEditingSections} // Allow clicking even in edit mode
                      >
                          <Settings className="mr-2 h-4 w-4" />
                          Project Details
@@ -124,7 +120,6 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                                 className="justify-start"
                                 aria-current={activeSectionId === pageId ? "page" : undefined}
                                 title={pageName}
-                                //disabled={isEditingSections} // Allow clicking even in edit mode
                             >
                                 <FileText className="mr-2 h-4 w-4 flex-shrink-0" />
                                 <span>{pageName}</span>
@@ -169,7 +164,7 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                        {/* Add New Section Button (visible in edit mode or if no sections) */}
                         {isEditingSections && (
                             <Button
-                                key="add-new-section-button" // Static key for this button
+                                key="add-new-section-button" // Added key for stability if needed
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleAddNewSection()} // Call without parentId for top-level
