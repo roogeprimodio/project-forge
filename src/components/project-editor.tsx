@@ -347,7 +347,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
     newSectionNames.forEach((name, newIndex) => {
         const trimmedName = name.trim();
-        if (!trimmedName || trimmedName.toLowerCase() === TOC_SECTION_NAME.toLowerCase()) return; // Skip empty names & ToC section itself
+        // Skip empty names & ToC section itself if TOC_SECTION_NAME is defined
+        if (!trimmedName || (TOC_SECTION_NAME && trimmedName.toLowerCase() === TOC_SECTION_NAME.toLowerCase())) return;
 
         const existingSection = existingSectionsMap.get(trimmedName.toLowerCase());
 
@@ -373,7 +374,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     });
 
      // Check if any sections were removed (exist in map means they weren't in newSectionNames)
-     if (existingSectionsMap.size > 0 && !existingSectionsMap.has(TOC_SECTION_NAME.toLowerCase())) { // Ignore if only ToC was removed implicitly
+     // Ignore if only ToC was removed implicitly and TOC_SECTION_NAME is defined
+     if (existingSectionsMap.size > 0 && (!TOC_SECTION_NAME || !existingSectionsMap.has(TOC_SECTION_NAME.toLowerCase()))) {
          sectionsRemoved = true;
          sectionOrderChanged = true; // Removal is a change
      }
@@ -966,8 +968,20 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 </CardContent>
             </Card>
 
-
-            {/* REMOVED: Floating Action Button (FAB) for Mobile Sidebar Toggle */}
+            {/* Floating Action Button (FAB) for Mobile Project Sidebar Toggle */}
+             <div className="absolute bottom-6 right-6 z-20"> {/* Keep FAB for mobile */}
+                 {/* Mobile: Sheet Trigger */}
+                 <SheetTrigger asChild>
+                     <Button
+                         variant="default" // Use default style for FAB
+                         size="icon"
+                         className="rounded-full shadow-lg w-14 h-14 hover:glow-primary focus-visible:glow-primary md:hidden" // Hide FAB on desktop
+                         title="Open project menu"
+                     >
+                         <Menu className="h-6 w-6" />
+                     </Button>
+                 </SheetTrigger>
+             </div>
 
           </ScrollArea>
         </div> {/* End Main Content Area */}
