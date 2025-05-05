@@ -7,12 +7,12 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'; // Import ScrollBar
+import { ScrollArea } from '@/components/ui/scroll-area'; // Removed ScrollBar import as it's in ProjectSidebarContent
 import { Separator } from '@/components/ui/separator';
-import { BookOpen, Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, List, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, FileWarning, Eye, Trash2, Edit3, PlusCircle, ChevronDown, ChevronRight } from 'lucide-react'; // Added icons
+import { Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, FileWarning, Eye } from 'lucide-react'; // Removed icons used only in sub-components
 import Link from 'next/link';
 import type { Project, HierarchicalProjectSection, GeneratedSectionOutline, SectionIdentifier } from '@/types/project'; // Use hierarchical type, import SectionIdentifier
-import { STANDARD_REPORT_PAGES, TOC_SECTION_NAME, STANDARD_PAGE_INDICES, findSectionById, updateSectionById, deleteSectionById } from '@/types/project'; // Import project utils
+import { STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, findSectionById, updateSectionById, deleteSectionById } from '@/types/project'; // Import project utils
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { useToast } from '@/hooks/use-toast';
 import { generateSectionAction, summarizeSectionAction, generateOutlineAction, suggestImprovementsAction } from '@/app/actions';
@@ -23,6 +23,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { marked } from 'marked'; // For rendering markdown suggestions
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { v4 as uuidv4 } from 'uuid'; // For generating unique IDs for new sections
+import { ProjectSidebarContent } from './project-sidebar-content'; // Import the extracted sidebar content component
+import { HierarchicalSectionItem } from './hierarchical-section-item'; // Import the extracted section item component
 
 
 interface ProjectEditorProps {
@@ -34,339 +36,10 @@ const MIN_CONTEXT_LENGTH = 50;
 const MAX_HISTORY_LENGTH = 10; // Limit undo history
 
 
-// Hierarchical Section Item Component (for Sidebar)
-interface HierarchicalSectionItemProps {
-    section: HierarchicalProjectSection;
-    level: number;
-    activeSectionId: string | null;
-    setActiveSectionId: (id: string) => void;
-    onEditSectionName: (id: string) => void;
-    onDeleteSection: (id: string) => void;
-    isEditing: boolean;
-    onCloseSheet?: () => void;
-}
+// Removed HierarchicalSectionItemProps interface and component definition (moved to separate file)
+// Removed ProjectSidebarContentProps interface and component definition (moved to separate file)
 
-const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = ({
-    section,
-    level,
-    activeSectionId,
-    setActiveSectionId,
-    onEditSectionName,
-    onDeleteSection,
-    isEditing,
-    onCloseSheet,
-}) => {
-    const isActive = section.id === activeSectionId;
-    const [isExpanded, setIsExpanded] = useState(true); // State for expanding/collapsing sub-sections
-    const hasSubSections = section.subSections && section.subSections.length > 0;
-
-    const handleSectionClick = () => {
-        if (isEditing) return; // Don't change selection in edit mode
-        setActiveSectionId(section.id);
-        onCloseSheet?.(); // Close sheet on selection (mobile)
-    };
-
-    const handleToggleExpand = (e: React.MouseEvent) => {
-         e.stopPropagation(); // Prevent triggering section click
-         setIsExpanded(!isExpanded);
-    };
-
-    const handleEditClick = (e: React.MouseEvent) => {
-         e.stopPropagation(); // Prevent triggering section click
-         onEditSectionName(section.id);
-    };
-
-    const handleDeleteClick = (e: React.MouseEvent) => {
-        e.stopPropagation(); // Prevent triggering section click
-        onDeleteSection(section.id); // Call the delete handler passed from parent
-    };
-
-    return (
-        <div>
-            <div className="flex items-center group relative"> {/* Container for button and icons */}
-                <Button
-                    variant={isActive && !isEditing ? "secondary" : "ghost"}
-                    size="sm"
-                    onClick={handleSectionClick}
-                    className={cn(
-                        "justify-start flex-1 group/btn", // Remove truncate here, rely on parent container scroll
-                        isEditing ? 'pr-16' : 'pr-2' // Adjust padding based on edit mode
-                    )}
-                    aria-current={isActive && !isEditing ? "page" : undefined}
-                    style={{ paddingLeft: `${1 + level * 1.5}rem` }} // Indentation
-                    title={section.name}
-                    disabled={isEditing} // Disable main click in edit mode
-                >
-                     {/* Expand/Collapse Toggle */}
-                    {hasSubSections ? (
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={handleToggleExpand}
-                            className="h-6 w-6 mr-1 text-muted-foreground hover:bg-muted/50 flex-shrink-0"
-                            aria-label={isExpanded ? "Collapse section" : "Expand section"}
-                        >
-                            {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                        </Button>
-                    ) : (
-                        <span className="w-6 mr-1 flex-shrink-0"></span> // Placeholder for alignment
-                    )}
-
-                    <FileText className="mr-2 h-4 w-4 flex-shrink-0" />
-                    {/* Text span should not truncate if parent handles scrolling */}
-                    <span className="flex-1">{section.name}</span>
-                </Button>
-
-                 {/* Edit and Delete Buttons - only show when editing is enabled */}
-                 {isEditing && (
-                     <div className="absolute right-1 top-1/2 transform -translate-y-1/2 flex gap-1 opacity-100 group-hover:opacity-100 transition-opacity z-10">
-                         <Button
-                             variant="ghost"
-                             size="icon"
-                             className="h-6 w-6 text-muted-foreground hover:text-primary"
-                             onClick={handleEditClick}
-                             aria-label={`Edit section ${section.name}`}
-                         >
-                             <Edit3 className="h-4 w-4" />
-                         </Button>
-                         <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                            onClick={handleDeleteClick} // Use the specific handler
-                            aria-label={`Delete section ${section.name}`}
-                        >
-                            <Trash2 className="h-4 w-4" />
-                        </Button>
-                    </div>
-                 )}
-            </div>
-            {/* Render Sub-sections */}
-            {hasSubSections && isExpanded && (
-                <div className="ml-0"> {/* No extra margin here, padding handled by button style */}
-                    {section.subSections.map((subSection) => (
-                        <HierarchicalSectionItem
-                            key={subSection.id} // Apply unique key here for sub-sections
-                            section={subSection}
-                            level={level + 1}
-                            activeSectionId={activeSectionId}
-                            setActiveSectionId={setActiveSectionId}
-                            onEditSectionName={onEditSectionName}
-                            onDeleteSection={onDeleteSection} // Pass down delete handler
-                            isEditing={isEditing}
-                            onCloseSheet={onCloseSheet}
-                        />
-                    ))}
-                </div>
-            )}
-        </div>
-    );
-};
-
-
-// New component for the local sidebar content
-function ProjectSidebarContent({
-    project,
-    activeSectionId, // Changed from index to ID
-    setActiveSectionId, // Changed signature
-    handleGenerateTocClick,
-    isGeneratingOutline,
-    isGenerating,
-    isSummarizing,
-    isSuggesting,
-    handleSaveOnline,
-    canUndo,
-    handleUndo,
-    onCloseSheet,
-    isEditingSections,
-    setIsEditingSections,
-    onEditSectionName,
-    onDeleteSection, // Pass delete handler
-    onAddSection, // Handler for adding new sections
-}: {
-    project: Project;
-    activeSectionId: string | null; // Use string ID
-    setActiveSectionId: (id: string | number) => void; // Accept ID or numeric standard index
-    handleGenerateTocClick: () => void;
-    isGeneratingOutline: boolean;
-    isGenerating: boolean;
-    isSummarizing: boolean;
-    isSuggesting: boolean;
-    handleSaveOnline: () => void;
-    canUndo: boolean;
-    handleUndo: () => void;
-    onCloseSheet?: () => void;
-    isEditingSections: boolean;
-    setIsEditingSections: (editing: boolean) => void;
-    onEditSectionName: (id: string) => void;
-    onDeleteSection: (id: string) => void; // Define delete handler prop
-    onAddSection: (parentId?: string) => void; // Define add handler prop
-}) {
-     const handleSectionClick = (id: string | number) => {
-         // If editing, clicking a section shouldn't change active selection, but might close sheet
-         if (isEditingSections) {
-             // Do nothing or maybe allow selection if needed? For now, prevent selection change.
-             // onCloseSheet?.();
-             return;
-         }
-         setActiveSectionId(id); // Pass string ID or numeric standard index
-         onCloseSheet?.(); // Close sheet on selection (mobile)
-     };
-
-     const handleAddNewSection = () => {
-          onAddSection(); // Add top-level section
-          // Optionally close sheet? Depends on desired UX
-          // onCloseSheet?.();
-      };
-
-     return (
-        <div className="flex flex-col h-full border-r bg-card">
-            <div className="p-4 border-b flex justify-between items-center">
-                 <Input
-                        id="projectTitleSidebar"
-                        value={project.title}
-                        readOnly
-                        className="h-8 text-base font-semibold bg-transparent border-0 shadow-none focus-visible:ring-0 p-0 truncate flex-1 mr-2"
-                        placeholder="Project Title"
-                        aria-label="Project Title (Readonly)"
-                    />
-                <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={handleUndo}
-                    disabled={!canUndo}
-                    className="flex-shrink-0"
-                    title={canUndo ? "Undo last change" : "Nothing to undo"}
-                >
-                    <Undo className="h-4 w-4" />
-                </Button>
-            </div>
-             {/* Ensure ScrollArea handles horizontal overflow */}
-             <ScrollArea className="flex-1 px-2 py-2 overflow-x-auto"> {/* Add overflow-x-auto here */}
-                 {/* Ensure nav prevents wrapping to allow horizontal scroll */}
-                 <nav className="flex flex-col gap-1 whitespace-nowrap"> {/* Add whitespace-nowrap here */}
-                     {/* Project Details Button */}
-                     <Button
-                         key="-1" // Unique key for Project Details button
-                         variant={activeSectionId === String(-1) ? "secondary" : "ghost"} // Compare as string
-                         size="sm"
-                         onClick={() => handleSectionClick(-1)}
-                         className="justify-start"
-                         aria-current={activeSectionId === String(-1) ? "page" : undefined} // Compare as string
-                         disabled={isEditingSections} // Disable during edit mode
-                     >
-                         <Settings className="mr-2 h-4 w-4" />
-                         Project Details
-                     </Button>
-                     <Separator className="my-2" />
-
-                     {/* Standard Report Pages */}
-                     <p className="px-2 text-xs font-semibold text-muted-foreground mb-1">STANDARD PAGES</p>
-                     {STANDARD_REPORT_PAGES.map((pageName) => {
-                        const pageIndex = STANDARD_PAGE_INDICES[pageName];
-                        const pageId = String(pageIndex); // Use string representation
-                        // Ensure key is unique and on the mapped element
-                        return (
-                            <Button
-                                key={pageId} // Key directly on the button using unique pageId
-                                variant={activeSectionId === pageId ? "secondary" : "ghost"}
-                                size="sm"
-                                onClick={() => handleSectionClick(pageIndex)} // Pass numeric index
-                                className="justify-start" // Removed truncate, let parent scroll
-                                aria-current={activeSectionId === pageId ? "page" : undefined}
-                                title={pageName}
-                                disabled={isEditingSections} // Disable during edit mode
-                            >
-                                <FileText className="mr-2 h-4 w-4 flex-shrink-0" />
-                                {/* Text span should not truncate */}
-                                <span className="">{pageName}</span>
-                            </Button>
-                        );
-                     })}
-
-                     <Separator className="my-2" />
-
-                      {/* Table of Contents (Generated Sections List) */}
-                       <div className="flex justify-between items-center px-2 mb-1">
-                            <p className="text-xs font-semibold text-muted-foreground">REPORT SECTIONS</p>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setIsEditingSections(!isEditingSections)}
-                                className="text-xs h-auto py-0 px-1 text-primary hover:bg-primary/10"
-                            >
-                                {isEditingSections ? 'Done' : 'Edit'}
-                            </Button>
-                       </div>
-                       {project.sections?.length > 0 ? (
-                          project.sections.map((section) => (
-                            // Apply the key directly to the HierarchicalSectionItem component
-                            <HierarchicalSectionItem
-                                key={section.id} // Apply key here to the component rendered by map
-                                section={section}
-                                level={0}
-                                activeSectionId={activeSectionId}
-                                setActiveSectionId={(id) => handleSectionClick(id)} // Pass string ID
-                                onEditSectionName={onEditSectionName}
-                                onDeleteSection={onDeleteSection} // Pass handler
-                                isEditing={isEditingSections}
-                                onCloseSheet={onCloseSheet}
-                            />
-                          ))
-                       ) : (
-                         <p className="px-2 text-xs text-muted-foreground italic">Generate or add sections.</p>
-                       )}
-                       {/* Add New Section Button (visible in edit mode or if no sections) */}
-                        {isEditingSections && (
-                            <Button
-                                key="add-new-section-button" // Added key for stability if needed
-                                variant="outline"
-                                size="sm"
-                                onClick={handleAddNewSection}
-                                className="justify-start mt-2 text-muted-foreground hover:text-primary"
-                                title="Add new top-level section"
-                            >
-                                <PlusCircle className="mr-2 h-4 w-4" />
-                                Add Section
-                            </Button>
-                        )}
-
-                 </nav>
-                 <ScrollBar orientation="horizontal" /> {/* Add horizontal scrollbar */}
-             </ScrollArea>
-             <div className="p-4 border-t space-y-2">
-                 {/* Generate/Update Outline Button */}
-                 <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleGenerateTocClick}
-                    disabled={isGeneratingOutline || isGenerating || isSummarizing || isSuggesting || !project.projectContext?.trim()}
-                    className="w-full hover:glow-accent focus-visible:glow-accent"
-                    title={!project.projectContext?.trim() ? "Add project context in Project Details first" : "Generate Table of Contents based on project context"}
-                >
-                    {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
-                    {isGeneratingOutline ? 'Generating Sections...' : 'Generate/Update Sections'}
-                </Button>
-                 <Button
-                     variant="outline"
-                     size="sm"
-                     onClick={handleSaveOnline}
-                     disabled={project.storageType === 'cloud'} // Example disabled state
-                     className="w-full mt-2 hover:glow-accent focus-visible:glow-accent"
-                     title={project.storageType === 'cloud' ? "Project is saved online" : "Save project to the cloud (requires login - coming soon)"}
-                 >
-                     {project.storageType === 'cloud' ? <Cloud className="mr-2 h-4 w-4 text-green-500" /> : <CloudOff className="mr-2 h-4 w-4" />}
-                     {project.storageType === 'cloud' ? 'Saved Online' : 'Save Online'}
-                 </Button>
-                 <p className="text-xs text-muted-foreground text-center mt-2">
-                     Changes are saved automatically {project.storageType === 'local' ? 'locally' : 'to the cloud'}.
-                 </p>
-             </div>
-        </div>
-     );
-}
-
-// Logo Upload Component
+// Logo Upload Component (remains here as it's specific to the Project Details form within the editor)
 const LogoUpload = ({
     label,
     logoUrl,
@@ -476,7 +149,7 @@ const LogoUpload = ({
     );
 };
 
-// Component to display placeholder for standard pages
+// Component to display placeholder for standard pages (remains here)
 const StandardPagePlaceholder = ({ pageName }: { pageName: string }) => (
     <Card className="shadow-md mb-6">
         <CardHeader>
@@ -588,13 +261,11 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         const currentProjectsArray = Array.isArray(prevProjects) ? prevProjects : [];
         const currentProjectIndex = currentProjectsArray.findIndex(p => p.id === projectId);
 
-        // Determine the project to update (current one or the one from the functional update)
          let projectToUpdate: Project | undefined;
          if (currentProjectIndex !== -1) {
              projectToUpdate = currentProjectsArray[currentProjectIndex];
          } else if (typeof updatedData === 'function' && project) {
-             // This case might be problematic if project is null, handle carefully
-              projectToUpdate = project; // Use the project from useMemo if index not found but project exists
+              projectToUpdate = project;
          }
 
          if (!projectToUpdate) {
@@ -611,24 +282,20 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         if (saveToHistory) {
             setHistory(prevHistory => {
                 const newHistory = prevHistory.slice(0, historyIndex + 1);
-                // Avoid adding duplicate states
                  if (newHistory.length === 0 || JSON.stringify(newHistory[newHistory.length - 1]) !== JSON.stringify(updatedProject)) {
                     newHistory.push(updatedProject);
                  }
                 if (newHistory.length > MAX_HISTORY_LENGTH) {
                     newHistory.shift();
                  }
-                 // Update index to the latest state
                 const newIndex = Math.min(newHistory.length - 1, MAX_HISTORY_LENGTH - 1);
-                 setHistoryIndex(newIndex); // Always set to the new latest index
+                 setHistoryIndex(newIndex);
                 return newHistory;
             });
         } else {
-             // Only update the current state in history without adding a new entry
              setHistory(prevHistory => {
                  const newHistory = [...prevHistory];
                  if (historyIndex >= 0 && historyIndex < newHistory.length) {
-                     // Only update if the data is actually different
                     if(JSON.stringify(newHistory[historyIndex]) !== JSON.stringify(updatedProject)) {
                          newHistory[historyIndex] = updatedProject;
                      }
@@ -638,17 +305,14 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         }
 
         const updatedProjects = [...currentProjectsArray];
-        // Ensure we don't mutate the state if the project hasn't actually changed
         if (currentProjectIndex !== -1 && JSON.stringify(updatedProjects[currentProjectIndex]) !== JSON.stringify(updatedProject)) {
             updatedProjects[currentProjectIndex] = updatedProject;
              return updatedProjects;
         } else if (currentProjectIndex === -1) {
-             // If project wasn't found initially (edge case), maybe add it?
-             // Or handle error appropriately. For now, let's just return the original array.
              console.warn("ProjectEditor updateProject: Project index not found, state may not be saved correctly.")
              return currentProjectsArray;
         }
-        return currentProjectsArray; // Return original array if no change
+        return currentProjectsArray;
 
       });
 
@@ -668,7 +332,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     if (projectExists && isProjectFound !== true) {
       setIsProjectFound(true);
        if (activeSectionId === null) {
-          // Default to Project Details (-1) converted to string
           const defaultSectionId = String(-1);
           setActiveSectionId(defaultSectionId);
         }
@@ -691,7 +354,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             const newIndex = historyIndex - 1;
             setHistoryIndex(newIndex);
              const undoneProject = history[newIndex];
-             // Update the main projects array in localStorage WITHOUT adding to history again
              setProjects((prevProjects = []) => {
                   const currentProjectsArray = Array.isArray(prevProjects) ? prevProjects : [];
                   const projectIndex = currentProjectsArray.findIndex(p => p.id === projectId);
@@ -703,7 +365,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                   return currentProjectsArray;
               });
              toast({ title: "Undo successful" });
-             // Use requestAnimationFrame to ensure state updates propagate before allowing next history change
              requestAnimationFrame(() => { isUpdatingHistory.current = false; });
         } else {
              toast({ variant: "destructive", title: "Nothing to undo" });
@@ -712,12 +373,12 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
     const canUndo = historyIndex > 0;
 
-   // Function to change the active section based on ID (string) or standard page index (number)
+   // Function to change the active section
    const handleSetActiveSection = useCallback((idOrIndex: string | number) => {
-        const newActiveId = String(idOrIndex); // Convert numbers to string for consistency
+        const newActiveId = String(idOrIndex);
         if (activeSectionId !== newActiveId) {
             setActiveSectionId(newActiveId);
-            setEditingSectionId(null); // Stop editing when changing sections
+            setEditingSectionId(null);
         }
    }, [activeSectionId]);
 
@@ -727,12 +388,11 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     updateProject(prev => ({
         ...prev,
         sections: updateSectionById(prev.sections, id, { content }),
-    }), false); // Do not save every character change to history for content
+    }), false);
   };
 
   const handleSectionContentBlur = () => {
       if (!project) return;
-      // Save the current state explicitly to history when the textarea loses focus
       updateProject(prev => ({ ...prev }), true);
   };
 
@@ -742,19 +402,19 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
      updateProject(prev => ({
          ...prev,
          sections: updateSectionById(prev.sections, id, { prompt }),
-     }), false); // Do not save prompt changes immediately to history
+     }), false);
   }
 
    const handleSectionPromptBlur = () => {
        if (!project) return;
-       updateProject(prev => ({ ...prev }), true); // Save prompt changes on blur
+       updateProject(prev => ({ ...prev }), true);
    };
 
   const handleProjectDetailChange = (field: keyof Project, value: string) => {
     if (!project) return;
     const validStringFields: (keyof Project)[] = ['title', 'projectContext', 'teamDetails', 'instituteName', 'collegeInfo', 'teamId', 'subject', 'semester', 'branch', 'guideName'];
     if (validStringFields.includes(field)) {
-        updateProject({ [field]: value }, false); // Don't save intermediate changes
+        updateProject({ [field]: value }, false);
     } else {
         console.warn(`Attempted to update non-string/optional field ${String(field)} via handleProjectDetailChange`);
     }
@@ -762,13 +422,13 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
    const handleProjectDetailBlur = () => {
         if (!project) return;
-        updateProject(prev => ({ ...prev }), true); // Save changes on blur
+        updateProject(prev => ({ ...prev }), true);
     };
 
 
    const handleProjectTypeChange = (value: 'mini-project' | 'internship') => {
     if (!project) return;
-    updateProject({ projectType: value }, true); // Save immediately
+    updateProject({ projectType: value }, true);
   };
 
   const handleLogoUpload = (field: 'universityLogoUrl' | 'collegeLogoUrl', file: File | null) => {
@@ -785,7 +445,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     setIsUploadingLogo(prev => ({ ...prev, [field]: true }));
     const reader = new FileReader();
     reader.onloadend = () => {
-        updateProject({ [field]: reader.result as string }, true); // Save logo change
+        updateProject({ [field]: reader.result as string }, true);
         toast({ title: 'Logo Uploaded', description: `${field === 'universityLogoUrl' ? 'University' : 'College'} logo updated.` });
         setIsUploadingLogo(prev => ({ ...prev, [field]: false }));
     };
@@ -799,7 +459,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
   const handleRemoveLogo = (field: 'universityLogoUrl' | 'collegeLogoUrl') => {
        if (!project) return;
-       updateProject({ [field]: undefined }, true); // Save logo removal
+       updateProject({ [field]: undefined }, true);
        toast({ title: 'Logo Removed', description: `${field === 'universityLogoUrl' ? 'University' : 'College'} logo removed.` });
    };
 
@@ -807,7 +467,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
  const updateSectionsFromToc = useCallback((outline: GeneratedSectionOutline) => {
     if (!project) return;
 
-    // Function to recursively update/add sections based on the outline
     const processOutline = (
         outlineSections: GeneratedSectionOutline['sections'],
         existingSections: HierarchicalProjectSection[] = []
@@ -820,7 +479,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
         outlineSections.forEach((outlineSection) => {
             const trimmedName = outlineSection.name.trim();
-             // Skip standard pages (handled separately) and empty names
             if (!trimmedName || STANDARD_REPORT_PAGES.map(p => p.toLowerCase()).includes(trimmedName.toLowerCase())) {
                 return;
             }
@@ -836,8 +494,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 if (subChanged) structureChanged = true;
                 addedCount += subAdded;
                 preservedCount += subPreserved;
-                existingMap.delete(trimmedName.toLowerCase()); // Remove from map to track removals later
-                preservedCount++; // Count the parent section itself
+                existingMap.delete(trimmedName.toLowerCase());
+                preservedCount++;
             } else {
                 const newId = uuidv4();
                 const [newSubSections, subChanged, subAdded, subPreserved] = processOutline(outlineSection.subSections || []);
@@ -849,21 +507,19 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                     lastGenerated: undefined,
                     subSections: newSubSections,
                 });
-                structureChanged = true; // New section added
-                addedCount += 1 + subAdded; // Count new parent + subs
+                structureChanged = true;
+                addedCount += 1 + subAdded;
                 preservedCount += subPreserved;
             }
         });
 
-         // Check if any non-standard sections were removed at this level
          for (const [removedName] of existingMap.entries()) {
             if (!STANDARD_REPORT_PAGES.map(p => p.toLowerCase()).includes(removedName)) {
-                 structureChanged = true; // Section removed
+                 structureChanged = true;
                  break;
             }
          }
 
-         // Check if order changed at this level
          if (!structureChanged && existingSections.length === updatedSections.length) {
              for (let i = 0; i < updatedSections.length; i++) {
                  if (updatedSections[i].id !== existingSections[i].id) {
@@ -887,20 +543,17 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     updateProject(prev => ({
         ...prev,
         sections: finalSections,
-    }), true); // Save change to history
+    }), true);
 
     let toastDescription = "Report sections updated.";
     if (addedCount > 0) toastDescription += ` ${addedCount} section(s) added/updated.`;
-    // More detailed counts can be added if needed
 
     toast({ title: "Sections Updated", description: toastDescription, duration: 7000 });
 
-    // If the currently active section was removed, switch to Project Details
     const currentActiveSection = activeSectionId ? findSectionById(project.sections, activeSectionId) : null;
     if (currentActiveSection && !findSectionById(finalSections, activeSectionId)) {
         handleSetActiveSection(String(-1));
     } else if (finalSections.length > 0 && activeSectionId === null) {
-        // If sections were just added and nothing was selected, select the first section
         handleSetActiveSection(finalSections[0].id);
     }
 
@@ -939,7 +592,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 content: result.reportSectionContent,
                 lastGenerated: new Date().toISOString(),
             }),
-       }), true); // Save change to history
+       }), true);
 
 
       toast({ title: "Section Generated", description: `"${section.name}" content updated.` });
@@ -984,7 +637,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     try {
         const result = await generateOutlineAction({ projectTitle: project.title, projectContext: project.projectContext || '' });
         if ('error' in result) {
-             // Check for specific Genkit/API errors
              if (result.error.includes("Request contains an invalid argument")) {
                  toast({ variant: "destructive", title: "Section Generation Failed", description: "There might be an issue with the project context provided. Please review and try again." });
              } else {
@@ -994,10 +646,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
              return;
         }
 
-        // Adapt the flat list to the expected hierarchical structure
-        // The AI should return a flat list in `suggestedSections`. We convert it.
         const outlineResult: GeneratedSectionOutline = {
-             sections: (result.suggestedSections || []).map(name => ({ name, subSections: [] })) // Assume flat structure for now
+             sections: (result.suggestedSections || []).map(name => ({ name, subSections: [] }))
         };
 
 
@@ -1036,7 +686,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
      setIsSuggesting(true);
      setSuggestions(null);
      try {
-        // Flatten hierarchical content for suggestion prompt
         const flattenSections = (sections: HierarchicalProjectSection[], level = 0): string => {
             return sections.map(s =>
                 `${'#'.repeat(level + 2)} ${s.name}\n\n${s.content || '[Empty Section]'}\n\n` +
@@ -1073,7 +722,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
       if (section) {
           setEditingSectionId(id);
           setEditingSectionName(section.name);
-          // Optionally, focus the input field after state update
           setTimeout(() => document.getElementById(`edit-section-input-${id}`)?.focus(), 0);
       }
    };
@@ -1086,7 +734,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
        updateProject(prev => ({
            ...prev,
            sections: updateSectionById(prev.sections, id, { name: editingSectionName.trim() }),
-       }), true); // Save change
+       }), true);
        setEditingSectionId(null);
        setEditingSectionName('');
        toast({ title: "Section Renamed" });
@@ -1099,7 +747,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
     // --- Section Deletion Handlers ---
     const handleDeleteSection = (id: string) => {
-        setSectionToDelete(id); // Open confirmation dialog
+        setSectionToDelete(id);
     };
 
     const confirmDeleteSection = () => {
@@ -1108,19 +756,18 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         updateProject(prev => ({
             ...prev,
             sections: deleteSectionById(prev.sections, sectionToDelete),
-        }), true); // Save deletion to history
+        }), true);
 
         toast({ title: "Section Deleted" });
-        setSectionToDelete(null); // Close dialog
+        setSectionToDelete(null);
 
-         // If the deleted section was the active one, switch to project details
          if (activeSectionId === sectionToDelete) {
              handleSetActiveSection(String(-1));
          }
     };
 
     const cancelDeleteSection = () => {
-        setSectionToDelete(null); // Close dialog without deleting
+        setSectionToDelete(null);
     };
 
     // --- Add Section Handler ---
@@ -1136,11 +783,9 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
         updateProject(prev => {
             const addRecursive = (sections: HierarchicalProjectSection[]): HierarchicalProjectSection[] => {
-                // Add as top-level if no parentId
                 if (!parentId) {
                     return [...sections, newSection];
                 }
-                // Otherwise, find the parent and add as sub-section
                 return sections.map(section => {
                     if (section.id === parentId) {
                         return {
@@ -1155,11 +800,10 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 });
             };
             return { ...prev, sections: addRecursive(prev.sections) };
-        }, true); // Save addition to history
+        }, true);
 
         toast({ title: "Section Added" });
-        setIsEditingSections(true); // Stay in edit mode
-        // Optionally, start editing the name of the new section immediately
+        setIsEditingSections(true);
         handleEditSectionName(newSection.id);
      };
 
@@ -1167,8 +811,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const handleSaveOnline = () => {
      if (!project) return;
      toast({ title: "Save Online (Coming Soon)", description: "This will save your project to the cloud." });
-     // Placeholder: Update storageType optimistically or after successful save
-     // updateProject({ storageType: 'cloud' });
   };
 
    const handleNavigateToExport = () => {
@@ -1179,7 +821,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
      }
    };
 
-   // Placeholder for Preview function
    const handlePreview = () => {
         toast({ title: "Preview (Coming Soon)", description: "This will show a preview of the generated report." });
     };
@@ -1187,7 +828,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
     // --- FAB Drag Handlers ---
     const onFabMouseDown = (e: React.MouseEvent<HTMLButtonElement>) => {
-        if (e.button !== 0) return; // Only left click
+        if (e.button !== 0) return;
         const target = fabRef.current;
         if (!target) return;
         setIsDraggingFab(true);
@@ -1197,23 +838,21 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             y: e.clientY - rect.top,
         };
         target.style.cursor = 'grabbing';
-        e.preventDefault(); // Prevent text selection
+        e.preventDefault();
     };
 
     const onFabMouseMove = useCallback((e: MouseEvent) => {
         if (!isDraggingFab || !fabRef.current) return;
         const parentRect = fabRef.current.parentElement?.getBoundingClientRect();
-        // Use viewport dimensions as the boundary
         const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
         const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
 
         let newX = e.clientX - dragOffset.current.x;
         let newY = e.clientY - dragOffset.current.y;
 
-        // Constrain within viewport bounds (considering FAB size)
         const fabWidth = fabRef.current.offsetWidth;
         const fabHeight = fabRef.current.offsetHeight;
-         const margin = 16; // Keep FAB away from edges
+         const margin = 16;
 
         newX = Math.max(margin, Math.min(newX, vw - fabWidth - margin));
         newY = Math.max(margin, Math.min(newY, vh - fabHeight - margin));
@@ -1251,11 +890,9 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
    }
 
    if (isProjectFound === false || !project) {
-       // This part should ideally not be reached due to the effect that redirects
        return ( <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,60px))] text-center p-4"><CloudOff className="h-16 w-16 text-destructive mb-4" /><h2 className="text-2xl font-semibold text-destructive mb-2">Project Not Found</h2><p className="text-muted-foreground mb-6">The project with ID <code className="bg-muted px-1 rounded">{projectId}</code> could not be found.</p><Button onClick={() => router.push('/')}><Home className="mr-2 h-4 w-4" /> Go to Dashboard</Button></div> );
    }
 
-    // Find the currently active section or determine if it's a standard page
     let activeViewContent: React.ReactNode = null;
     let activeViewName = project.title ?? 'Project';
     let isStandardPage = false;
@@ -1278,7 +915,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                       id="projectTitleMain"
                       value={project.title}
                       onChange={(e) => handleProjectDetailChange('title', e.target.value)}
-                      onBlur={handleProjectDetailBlur} // Save on blur
+                      onBlur={handleProjectDetailBlur}
                       placeholder="Enter Project Title"
                       className="mt-1 focus-visible:glow-primary"
                       required
@@ -1309,7 +946,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                       id="projectContext"
                       value={project.projectContext}
                       onChange={(e) => handleProjectDetailChange('projectContext', e.target.value)}
-                      onBlur={handleProjectDetailBlur} // Save on blur
+                      onBlur={handleProjectDetailBlur}
                       placeholder="Briefly describe your project, goals, scope, technologies..."
                       className="mt-1 min-h-[120px] focus-visible:glow-primary"
                       required
@@ -1379,7 +1016,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
               </Card>
         );
     } else if (!isNaN(standardPageIndex) && standardPageIndex < -1) {
-        // Find the standard page name corresponding to the negative index
         const standardPageEntry = Object.entries(STANDARD_PAGE_INDICES).find(([, index]) => index === standardPageIndex);
         activeViewName = standardPageEntry ? standardPageEntry[0] : 'Standard Page';
         isStandardPage = true;
@@ -1387,7 +1023,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     } else if (activeSection) {
         activeViewName = activeSection.name;
         activeViewContent = (
-            // Section Editor
+             // Section Editor
              <div className="space-y-6">
                   <Card className="shadow-md">
                     <CardHeader>
@@ -1426,7 +1062,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
               </div>
         );
     } else {
-        // Initial state or section not found
         activeViewContent = (
             <div className="flex items-center justify-center h-full">
                  <Card className="text-center py-8 px-6 max-w-md mx-auto shadow-md">
@@ -1449,7 +1084,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
   return (
     <Sheet open={isMobileSheetOpen} onOpenChange={setIsMobileSheetOpen}>
-      <div className="flex h-full relative"> {/* Added relative for FAB positioning context */}
+      <div className="flex h-full relative">
 
         {/* Mobile: Sidebar inside Sheet */}
         <SheetContent side="left" className="p-0 w-64 bg-card md:hidden">
@@ -1473,8 +1108,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             isEditingSections={isEditingSections}
             setIsEditingSections={setIsEditingSections}
             onEditSectionName={handleEditSectionName}
-            onDeleteSection={handleDeleteSection} // Pass handler
-            onAddSection={handleAddSection} // Pass handler
+            onDeleteSection={handleDeleteSection}
+            onAddSection={handleAddSection}
           />
         </SheetContent>
 
@@ -1482,7 +1117,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         <div
           className={cn(
             "hidden md:flex md:flex-col transition-all duration-300 ease-in-out overflow-y-auto overflow-x-hidden",
-            "w-64 border-r" // Fixed width for desktop sidebar
+            "w-64 border-r"
           )}
         >
            <ProjectSidebarContent
@@ -1500,8 +1135,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
               isEditingSections={isEditingSections}
               setIsEditingSections={setIsEditingSections}
               onEditSectionName={handleEditSectionName}
-              onDeleteSection={handleDeleteSection} // Pass handler
-              onAddSection={handleAddSection} // Pass handler
+              onDeleteSection={handleDeleteSection}
+              onAddSection={handleAddSection}
             />
         </div>
 
@@ -1510,7 +1145,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
           <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/95 backdrop-blur-sm px-4 lg:px-6 flex-shrink-0">
             <h1 className="flex-1 text-lg font-semibold md:text-xl text-primary truncate text-glow-primary">
                {editingSectionId && activeSection ? (
-                   // Input field for editing section name
                    <Input
                         id={`edit-section-input-${editingSectionId}`}
                         value={editingSectionName}
@@ -1528,12 +1162,11 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
               {project.storageType === 'local' ? <CloudOff className="h-4 w-4" /> : <Cloud className="h-4 w-4 text-green-500" />}
               <span>{project.storageType === 'local' ? 'Local' : 'Cloud'}</span>
             </div>
-            {/* Preview Button */}
              <Button
                 variant="outline"
                 size="sm"
                 onClick={handlePreview}
-                disabled={!project || activeSectionId === null || activeSectionId === String(-1) || isStandardPage} // Disable for Project Details or standard pages
+                disabled={!project || activeSectionId === null || activeSectionId === String(-1) || isStandardPage}
                 className="ml-2"
                 title={
                     (!project || activeSectionId === null || activeSectionId === String(-1) || isStandardPage)
@@ -1558,7 +1191,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
           <ScrollArea className="flex-1 p-4 md:p-6">
               {activeViewContent}
 
-            {/* AI Suggestions Section - Now always visible below content */}
              <Card className="shadow-md mt-6">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-primary text-glow-primary"><Sparkles className="w-5 h-5" /> AI Suggestions</CardTitle>
@@ -1585,35 +1217,33 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
           </ScrollArea>
         </div>
 
-        {/* Floating Action Button (FAB) for Mobile Project Sidebar Toggle */}
-        <SheetTrigger asChild>
-            <Button
-                ref={fabRef}
-                variant="default" // Use default style for FAB
-                size="icon"
-                className={cn(
-                    "fixed z-20 rounded-full shadow-lg w-14 h-14 hover:glow-primary focus-visible:glow-primary cursor-grab active:cursor-grabbing",
-                    "md:hidden" // Hide on medium and larger screens
-                )}
-                style={{
-                    left: `${fabPosition.x}px`,
-                    top: `${fabPosition.y}px`,
-                    position: 'fixed', // Ensure it uses fixed positioning relative to viewport
-                }}
-                onMouseDown={onFabMouseDown}
-                onClick={(e) => {
-                    // Prevent sheet opening if it was a drag
-                    if (isDraggingFab) {
-                         e.preventDefault();
-                    }
-                     // Otherwise, let the default SheetTrigger behavior open the sheet
-                }}
-                title="Open project menu"
-                aria-label="Open project menu"
-            >
-                <Menu className="h-6 w-6" />
-            </Button>
-        </SheetTrigger>
+        {/* Floating Action Button */}
+        <Button
+            ref={fabRef}
+            variant="default"
+            size="icon"
+            className={cn(
+                "fixed z-20 rounded-full shadow-lg w-14 h-14 hover:glow-primary focus-visible:glow-primary cursor-grab active:cursor-grabbing",
+                "md:hidden"
+            )}
+            style={{
+                left: `${fabPosition.x}px`,
+                top: `${fabPosition.y}px`,
+                position: 'fixed',
+            }}
+            onMouseDown={onFabMouseDown}
+            onClick={(e) => {
+                if (isDraggingFab) {
+                     e.preventDefault();
+                } else {
+                     setIsMobileSheetOpen(true); // Open the sheet on click if not dragging
+                }
+            }}
+            title="Open project menu"
+            aria-label="Open project menu"
+        >
+            <Menu className="h-6 w-6" />
+        </Button>
 
 
         {/* Context Warning Dialog */}
