@@ -44,14 +44,14 @@ export function updateSectionById(
 export function addSubSectionById(
     sections: HierarchicalProjectSection[],
     parentId: string,
-    newSubSection: Omit<HierarchicalProjectSection, 'subSections'> // New subsection data (ID is generated)
+    newSubSectionData: Omit<HierarchicalProjectSection, 'subSections' | 'id'> // Data for new subsection (ID generated internally)
 ): HierarchicalProjectSection[] {
     return sections.map(section => {
         if (section.id === parentId) {
             // Found the parent, add the new subsection
             const subSectionToAdd: HierarchicalProjectSection = {
-                ...newSubSection,
-                id: newSubSection.id || uuidv4(), // Ensure ID exists or generate one
+                ...newSubSectionData,
+                id: uuidv4(), // Generate unique ID
                 subSections: [], // Initialize empty subSections array for the new item
             };
             return {
@@ -61,7 +61,7 @@ export function addSubSectionById(
         }
         if (section.subSections) {
             // Recursively search in subsections
-            const updatedSubSections = addSubSectionById(section.subSections, parentId, newSubSection);
+            const updatedSubSections = addSubSectionById(section.subSections, parentId, newSubSectionData);
             if (updatedSubSections !== section.subSections) {
                 // If subsections were updated, return the section with the updated list
                 return { ...section, subSections: updatedSubSections };
@@ -215,4 +215,3 @@ export const updateProject = (
     // Reset the flag after the state update cycle
     requestAnimationFrame(() => { isUpdatingHistory.current = false; });
 };
-```
