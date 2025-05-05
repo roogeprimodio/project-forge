@@ -114,20 +114,13 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
 
 
     return (
-        <div>
-            <div className="flex items-center group relative pr-1"> {/* Container for button and icons, added padding right */}
-                <Button
-                    variant={(isActive || isNameEditing) && !isEditing ? "secondary" : "ghost"} // Highlight if active OR editing name
-                    size="sm"
-                    onClick={handleSectionClick}
-                    className={cn(
-                        "justify-start flex-1 group/btn h-8", // Reduced height to h-8
-                        isEditing ? 'pr-[70px]' : 'pr-2' // Adjust padding based on edit mode, increase edit padding slightly
-                    )}
-                    aria-current={isActive && !isEditing && !isNameEditing ? "page" : undefined}
-                    style={{ paddingLeft: `${1 + level * 1.5}rem` }} // Indentation
-                    title={section.name}
-                    disabled={isEditing && !isNameEditing} // Disable main click in edit mode unless editing this specific name
+        <div className="group">
+             {/* Main row containing toggle, content button, and edit buttons */}
+            <div className="flex items-center group/item relative pr-1">
+                {/* Indentation and Toggle Button */}
+                <div
+                    className="flex items-center flex-shrink-0 h-8" // Ensure fixed height
+                    style={{ paddingLeft: `${1 + level * 1.5}rem` }}
                 >
                      {/* Expand/Collapse Toggle */}
                     {hasSubSections ? (
@@ -142,13 +135,28 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
                             {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                         </Button>
                     ) : (
-                        <span className="w-6 mr-1 flex-shrink-0"></span> // Placeholder for alignment
+                        <span className="w-6 mr-1 flex-shrink-0"></span> // Placeholder for alignment if no sub-sections
                     )}
+                </div>
 
-                    {/* Display Numbering */}
+                {/* Section Content Button */}
+                <Button
+                    variant={(isActive || isNameEditing) && !isEditing ? "secondary" : "ghost"} // Highlight if active OR editing name
+                    size="sm"
+                    onClick={handleSectionClick}
+                    className={cn(
+                        "justify-start flex-1 group/btn h-8 min-w-0", // Use min-w-0 to allow shrinking
+                        isEditing ? 'pr-[70px]' : 'pr-2'
+                    )}
+                    aria-current={isActive && !isEditing && !isNameEditing ? "page" : undefined}
+                    title={section.name}
+                    disabled={isEditing && !isNameEditing} // Disable main click in edit mode unless editing this specific name
+                >
+                     {/* Display Numbering */}
                     <span className="mr-2 font-medium text-muted-foreground min-w-[2em] text-right">{numbering}</span>
 
                     <FileText className="mr-2 h-4 w-4 flex-shrink-0" />
+
                     {/* Name display or Input field */}
                     {isNameEditing ? (
                         <Input
@@ -168,7 +176,7 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
 
                  {/* Edit, Delete, and Add Sub-section Buttons */}
                  {isEditing && !isNameEditing && ( // Only show buttons if global edit mode is on AND not currently editing this item's name
-                     <div className="absolute right-1 top-1/2 transform -translate-y-1/2 flex gap-0.5 opacity-100 group-hover:opacity-100 transition-opacity z-10 bg-card"> {/* Added bg-card for visibility */}
+                     <div className="absolute right-1 top-1/2 transform -translate-y-1/2 flex gap-0.5 opacity-100 group-hover/item:opacity-100 transition-opacity z-10 bg-card"> {/* Use group-hover/item */}
                          <Button
                              variant="ghost"
                              size="icon"
@@ -202,6 +210,7 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
                     </div>
                  )}
             </div>
+
             {/* Render Sub-sections */}
             {hasSubSections && isExpanded && (
                 <div className="ml-0"> {/* No extra margin */}
