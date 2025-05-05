@@ -146,7 +146,7 @@ const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = ({
                 <div className="ml-0"> {/* No extra margin here, padding handled by button style */}
                     {section.subSections.map((subSection) => (
                         <HierarchicalSectionItem
-                            key={subSection.id} // Key directly on the sub-item
+                            key={subSection.id} // Ensure sub-sections also have unique keys
                             section={subSection}
                             level={level + 1}
                             activeSectionId={activeSectionId}
@@ -186,7 +186,7 @@ function ProjectSidebarContent({
 }: {
     project: Project;
     activeSectionId: string | null; // Use string ID
-    setActiveSectionId: (id: string | number) => void; // Accept ID or numeric standard page index
+    setActiveSectionId: (id: string | number) => void; // Accept ID or numeric standard index
     handleGenerateTocClick: () => void;
     isGeneratingOutline: boolean;
     isGenerating: boolean;
@@ -247,6 +247,7 @@ function ProjectSidebarContent({
                  <nav className="flex flex-col gap-1 whitespace-nowrap"> {/* Add whitespace-nowrap here */}
                      {/* Project Details Button */}
                      <Button
+                         key="-1" // Unique key for Project Details button
                          variant={activeSectionId === String(-1) ? "secondary" : "ghost"} // Compare as string
                          size="sm"
                          onClick={() => handleSectionClick(-1)}
@@ -267,7 +268,7 @@ function ProjectSidebarContent({
                         // Ensure key is unique and on the mapped element
                         return (
                             <Button
-                                key={pageId} // Key directly on the button
+                                key={pageId} // Key directly on the button using unique pageId
                                 variant={activeSectionId === pageId ? "secondary" : "ghost"}
                                 size="sm"
                                 onClick={() => handleSectionClick(pageIndex)} // Pass numeric index
