@@ -18,7 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import { generateSectionAction, summarizeSectionAction, generateOutlineAction, suggestImprovementsAction } from '@/app/actions';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet"; // Removed SheetClose - not typically needed for side sheets
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { marked } from 'marked'; // For rendering markdown suggestions
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -983,7 +983,16 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     setIsGeneratingOutline(true);
     try {
         const result = await generateOutlineAction({ projectTitle: project.title, projectContext: project.projectContext || '' });
-        if ('error' in result) throw new Error(result.error);
+        if ('error' in result) {
+             // Check for specific Genkit/API errors
+             if (result.error.includes("Request contains an invalid argument")) {
+                 toast({ variant: "destructive", title: "Section Generation Failed", description: "There might be an issue with the project context provided. Please review and try again." });
+             } else {
+                 throw new Error(result.error);
+             }
+             setIsGeneratingOutline(false);
+             return;
+        }
 
         // Adapt the flat list to the expected hierarchical structure
         // The AI should return a flat list in `suggestedSections`. We convert it.
