@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { BookOpen, Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, List, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles } from 'lucide-react'; // Use MessageSquareQuote
+import { BookOpen, Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, List, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle } from 'lucide-react'; // Use MessageSquareQuote, Added UploadCloud, XCircle
 import Link from 'next/link';
 import type { Project, ProjectSection } from '@/types/project';
 import { COMMON_SECTIONS, TOC_SECTION_NAME } from '@/types/project'; // Ensure TOC_SECTION_NAME is imported
@@ -155,6 +155,117 @@ function ProjectSidebarContent({
      );
 }
 
+// Logo Upload Component
+const LogoUpload = ({
+    label,
+    logoUrl,
+    field,
+    onUpload,
+    onRemove,
+    isUploading, // Optional: to show loading state
+}: {
+    label: string;
+    logoUrl?: string;
+    field: 'universityLogoUrl' | 'collegeLogoUrl';
+    onUpload: (field: 'universityLogoUrl' | 'collegeLogoUrl', file: File | null) => void;
+    onRemove: (field: 'universityLogoUrl' | 'collegeLogoUrl') => void;
+    isUploading?: boolean;
+}) => {
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        onUpload(field, event.target.files ? event.target.files[0] : null);
+        // Optional: Clear the input value to allow re-uploading the same file
+        if (inputRef.current) {
+            inputRef.current.value = '';
+        }
+    };
+
+    const handleDrop = (event: React.DragEvent<HTMLLabelElement>) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const file = event.dataTransfer.files?.[0];
+        if (file) {
+            onUpload(field, file);
+        }
+        event.currentTarget.classList.remove('border-primary', 'bg-primary/10'); // Remove drop highlight
+    };
+
+    const handleDragOver = (event: React.DragEvent<HTMLLabelElement>) => {
+        event.preventDefault();
+        event.stopPropagation();
+        event.currentTarget.classList.add('border-primary', 'bg-primary/10'); // Add drop highlight
+    };
+
+    const handleDragLeave = (event: React.DragEvent<HTMLLabelElement>) => {
+        event.preventDefault();
+        event.stopPropagation();
+        event.currentTarget.classList.remove('border-primary', 'bg-primary/10'); // Remove drop highlight
+    };
+
+    return (
+        <div className="space-y-2">
+            <Label htmlFor={`${field}-input`} className="font-medium">{label}</Label>
+            <Label // Use Label as the dropzone trigger
+                htmlFor={`${field}-input`}
+                className={cn(
+                    "flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-muted/50 hover:bg-muted/80 transition-colors duration-200",
+                    !logoUrl && "p-4 text-center", // Padding only if no preview
+                    logoUrl && "relative overflow-hidden" // Style for preview container
+                )}
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+            >
+                {isUploading ? (
+                     <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                        <Loader2 className="w-8 h-8 mb-3 text-muted-foreground animate-spin" />
+                        <p className="text-sm text-muted-foreground">Uploading...</p>
+                    </div>
+                ) : logoUrl ? (
+                    <>
+                        <img
+                            src={logoUrl}
+                            alt={`${label} Preview`}
+                            className="absolute inset-0 w-full h-full object-contain p-2" // Contain within bounds
+                            data-ai-hint={`${label.toLowerCase().replace(' logo', '')} logo`}
+                        />
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => {
+                                e.preventDefault(); // Prevent label click
+                                onRemove(field);
+                            }}
+                            className="absolute top-1 right-1 z-10 bg-background/50 hover:bg-destructive hover:text-destructive-foreground h-6 w-6 rounded-full"
+                            title={`Remove ${label}`}
+                        >
+                            <XCircle className="h-4 w-4" />
+                        </Button>
+                    </>
+                ) : (
+                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                        <UploadCloud className="w-8 h-8 mb-3 text-muted-foreground" />
+                        <p className="mb-1 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
+                        <p className="text-xs text-muted-foreground">PNG, JPG, GIF, WEBP</p>
+                    </div>
+                )}
+                 {/* Hidden file input */}
+                <Input
+                    id={`${field}-input`}
+                    ref={inputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleFileChange}
+                    disabled={isUploading}
+                />
+            </Label>
+        </div>
+    );
+};
+
 
 export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const [projects, setProjects] = useLocalStorage<Project[]>('projects', []);
@@ -170,6 +281,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const [isMobileSheetOpen, setIsMobileSheetOpen] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
   const [showOutlineContextAlert, setShowOutlineContextAlert] = useState(false);
+  const [isUploadingLogo, setIsUploadingLogo] = useState<Record<'universityLogoUrl' | 'collegeLogoUrl', boolean>>({ universityLogoUrl: false, collegeLogoUrl: false });
   const router = useRouter();
 
   // Undo/Redo state
@@ -314,8 +426,13 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
   const handleProjectDetailChange = (field: keyof Project, value: string) => {
     if (!project) return;
-    if (field === 'storageType') return;
-    updateProject({ [field]: value });
+    // Ensure only valid string fields are updated this way
+    const validStringFields: (keyof Project)[] = ['title', 'projectContext', 'teamDetails', 'instituteName', 'teamId', 'subject', 'semester', 'branch', 'guideName'];
+    if (validStringFields.includes(field)) {
+        updateProject({ [field]: value });
+    } else {
+        console.warn(`Attempted to update non-string field ${field} via handleProjectDetailChange`);
+    }
   };
 
    const handleProjectTypeChange = (value: 'mini-project' | 'internship') => {
@@ -325,17 +442,34 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
   // --- Logo Upload Handler ---
   const handleLogoUpload = (field: 'universityLogoUrl' | 'collegeLogoUrl', file: File | null) => {
-    if (!project || !file) return;
+    if (!project || !file) {
+        // If file is null, it means the input was cleared, do nothing or handle removal logic elsewhere
+        return;
+    };
 
     // Check if the file is an image
     if (!file.type.startsWith('image/')) {
         toast({
             variant: 'destructive',
             title: 'Invalid File Type',
-            description: 'Please upload an image file (e.g., PNG, JPG, GIF).',
+            description: 'Please upload an image file (e.g., PNG, JPG, GIF, WEBP).',
         });
         return;
     }
+
+    // Check file size (e.g., max 2MB)
+    const maxSizeInBytes = 2 * 1024 * 1024; // 2MB
+    if (file.size > maxSizeInBytes) {
+         toast({
+            variant: 'destructive',
+            title: 'File Too Large',
+            description: `Please upload an image smaller than ${maxSizeInBytes / (1024 * 1024)}MB.`,
+        });
+        return;
+    }
+
+
+    setIsUploadingLogo(prev => ({ ...prev, [field]: true })); // Set uploading state
 
     const reader = new FileReader();
     reader.onloadend = () => {
@@ -345,6 +479,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             title: 'Logo Uploaded',
             description: `${field === 'universityLogoUrl' ? 'University' : 'College'} logo updated.`,
         });
+        setIsUploadingLogo(prev => ({ ...prev, [field]: false })); // Clear uploading state
     };
     reader.onerror = (error) => {
         console.error("Error reading file:", error);
@@ -353,9 +488,20 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             title: 'Upload Failed',
             description: 'Could not read the uploaded file.',
         });
+        setIsUploadingLogo(prev => ({ ...prev, [field]: false })); // Clear uploading state
     };
     reader.readAsDataURL(file);
   };
+
+  // --- Logo Removal Handler ---
+  const handleRemoveLogo = (field: 'universityLogoUrl' | 'collegeLogoUrl') => {
+       if (!project) return;
+       updateProject({ [field]: undefined }); // Set the field to undefined to remove the logo
+       toast({
+           title: 'Logo Removed',
+           description: `${field === 'universityLogoUrl' ? 'University' : 'College'} logo has been removed.`,
+       });
+   };
 
 
   // Update sections based on generated ToC
@@ -742,29 +888,23 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                     <p className="text-xs text-muted-foreground mt-1">This context is used by the AI to generate the Table of Contents.</p>
                   </div>
                   {/* Logo Uploads */}
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                     <div>
-                        <Label htmlFor="universityLogoUpload">University Logo</Label>
-                        <Input
-                            id="universityLogoUpload"
-                            type="file"
-                            accept="image/*" // Accept only image files
-                            onChange={(e) => handleLogoUpload('universityLogoUrl', e.target.files ? e.target.files[0] : null)}
-                            className="mt-1 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 focus-visible:glow-primary"
-                        />
-                         {project.universityLogoUrl && <img src={project.universityLogoUrl} alt="University Logo Preview" className="mt-2 max-h-16 border rounded" data-ai-hint="university logo"/>}
-                      </div>
-                      <div>
-                         <Label htmlFor="collegeLogoUpload">College Logo</Label>
-                         <Input
-                            id="collegeLogoUpload"
-                            type="file"
-                            accept="image/*"
-                            onChange={(e) => handleLogoUpload('collegeLogoUrl', e.target.files ? e.target.files[0] : null)}
-                            className="mt-1 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 focus-visible:glow-primary"
-                         />
-                          {project.collegeLogoUrl && <img src={project.collegeLogoUrl} alt="College Logo Preview" className="mt-2 max-h-16 border rounded" data-ai-hint="college logo"/>}
-                       </div>
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <LogoUpload
+                          label="University Logo"
+                          logoUrl={project.universityLogoUrl}
+                          field="universityLogoUrl"
+                          onUpload={handleLogoUpload}
+                          onRemove={handleRemoveLogo}
+                          isUploading={isUploadingLogo.universityLogoUrl}
+                      />
+                      <LogoUpload
+                          label="College Logo"
+                          logoUrl={project.collegeLogoUrl}
+                          field="collegeLogoUrl"
+                          onUpload={handleLogoUpload}
+                          onRemove={handleRemoveLogo}
+                          isUploading={isUploadingLogo.collegeLogoUrl}
+                      />
                    </div>
                   {/* Institute, Branch, Semester, Subject */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
