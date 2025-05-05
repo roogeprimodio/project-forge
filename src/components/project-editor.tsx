@@ -1,3 +1,4 @@
+// src/components/project-editor.tsx
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -8,16 +9,16 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, FileWarning, Eye, Projector } from 'lucide-react'; // Added Projector icon
+import { Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, FileWarning, Eye, Projector, Undo } from 'lucide-react'; // Added Projector, Undo icons
 import Link from 'next/link';
-import type { Project, HierarchicalProjectSection, GeneratedSectionOutline, SectionIdentifier } from '@/types/project';
-import { findSectionById, updateSectionById, deleteSectionById } from '@/types/project';
+import type { Project, HierarchicalProjectSection, GeneratedSectionOutline, SectionIdentifier } from '@/types/project'; // Use hierarchical type
+import { findSectionById, updateSectionById, deleteSectionById, STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES } from '@/types/project'; // Import helpers and standard pages/indices
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { useToast } from '@/hooks/use-toast';
 import { generateSectionAction, summarizeSectionAction, generateOutlineAction, suggestImprovementsAction } from '@/app/actions';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet"; // Import Sheet components
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { marked } from 'marked';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -25,6 +26,7 @@ import { v4 as uuidv4 } from 'uuid';
 import AiDiagramGenerator from './ai-diagram-generator'; // Import the new component
 import MermaidDiagram from './mermaid-diagram'; // Import diagram renderer
 import { ProjectSidebarContent } from './project-sidebar-content'; // Import ProjectSidebarContent
+
 interface ProjectEditorProps {
   projectId: string;
 }
@@ -181,24 +183,30 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const [showOutlineContextAlert, setShowOutlineContextAlert] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState<Record<'universityLogoUrl' | 'collegeLogoUrl', boolean>>({ universityLogoUrl: false, collegeLogoUrl: false });
   const router = useRouter();
-  const [isEditingSections, setIsEditingSections] = useState(false);
-  const [sectionToDelete, setSectionToDelete] = useState<string | null>(null);
-  const [history, setHistory] = useState<Project[]>([]);
-  const [historyIndex, setHistoryIndex] = useState<number>(-1);
-  const isUpdatingHistory = useRef(false);
+  const [isEditingSections, setIsEditingSections] = useState(false); // State for toggling section edit mode
+  const [sectionToDelete, setSectionToDelete] = useState<string | null>(null); // State for delete confirmation
+  const [history, setHistory] = useState<Project[]>([]); // History for undo
+  const [historyIndex, setHistoryIndex] = useState<number>(-1); // Current position in history
+  const isUpdatingHistory = useRef(false); // Flag to prevent history loops
+
+  // Floating Action Button (FAB) state
   const [fabPosition, setFabPosition] = useState({ x: 0, y: 0 });
   const [isDraggingFab, setIsDraggingFab] = useState(false);
   const fabRef = useRef<HTMLButtonElement>(null);
   const dragOffset = useRef({ x: 0, y: 0 });
+
   // State for diagram generator
   const [showDiagramGenerator, setShowDiagramGenerator] = useState(false);
 
+
   useEffect(() => {
     setHasMounted(true);
+    // Set initial FAB position on mount
     const updateInitialFabPosition = () => {
-        const fabWidth = 56;
-        const fabHeight = 56;
-        const margin = 24;
+        if (typeof window === 'undefined') return;
+        const fabWidth = 56; // approx width of FAB
+        const fabHeight = 56; // approx height of FAB
+        const margin = 24; // margin from edge
         const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
         const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
         const initialX = vw - fabWidth - margin;
@@ -210,411 +218,556 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     return () => window.removeEventListener('resize', updateInitialFabPosition);
   }, []);
 
-  const project = useMemo(() => {
-      if (historyIndex >= 0 && historyIndex < history.length) {
-          return history[historyIndex];
-      }
-      const currentProjects = Array.isArray(projects) ? projects : [];
-      return currentProjects.find(p => p.id === projectId);
-  }, [projects, projectId, history, historyIndex]);
+  // Derive current project state from history if available, otherwise from main projects list
+   const project = useMemo(() => {
+     if (historyIndex >= 0 && historyIndex < history.length) {
+       return history[historyIndex];
+     }
+     const currentProjects = Array.isArray(projects) ? projects : [];
+     return currentProjects.find(p => p.id === projectId);
+   }, [projects, projectId, history, historyIndex]);
 
+  // Initialize history with the current project state on mount
   useEffect(() => {
     if (hasMounted && project && history.length === 0 && historyIndex === -1) {
-        setHistory([project]);
-        setHistoryIndex(0);
+      setHistory([project]);
+      setHistoryIndex(0);
     }
   }, [project, hasMounted, history.length, historyIndex]);
 
-  const updateProject = useCallback((updatedData: Partial<Project> | ((prev: Project) => Project), saveToHistory: boolean = true) => {
-      if (!project && !(typeof updatedData === 'function')) return;
-      isUpdatingHistory.current = true;
+
+  // Update project state and optionally save to history
+    const updateProject = useCallback((updatedData: Partial<Project> | ((prev: Project) => Project), saveToHistory: boolean = true) => {
+      if (!project && !(typeof updatedData === 'function')) return; // Exit if project doesn't exist and not using function update
+
+      isUpdatingHistory.current = true; // Prevent feedback loop with history effect
+
+      // Update the main projects list in local storage
       setProjects((prevProjects = []) => {
         const currentProjectsArray = Array.isArray(prevProjects) ? prevProjects : [];
         const currentProjectIndex = currentProjectsArray.findIndex(p => p.id === projectId);
+
+        // Determine the project to update (either from current state or use the one passed if creating)
         let projectToUpdate: Project | undefined;
         if (currentProjectIndex !== -1) {
-            projectToUpdate = currentProjectsArray[currentProjectIndex];
+          projectToUpdate = currentProjectsArray[currentProjectIndex];
         } else if (typeof updatedData === 'function' && project) {
-            projectToUpdate = project;
+          // If using function update and project exists (likely from history)
+          projectToUpdate = project;
         }
+
         if (!projectToUpdate) {
-            console.error("Project not found in setProjects during update");
-            requestAnimationFrame(() => { isUpdatingHistory.current = false; });
-            return currentProjectsArray;
+          console.error("Project not found in setProjects during update");
+          requestAnimationFrame(() => { isUpdatingHistory.current = false; }); // Reset flag
+          return currentProjectsArray; // Return unchanged list
         }
+
+        // Apply the updates
         const updatedProject = typeof updatedData === 'function'
-            ? updatedData(projectToUpdate)
-            : { ...projectToUpdate, ...updatedData, updatedAt: new Date().toISOString() };
+          ? updatedData(projectToUpdate)
+          : { ...projectToUpdate, ...updatedData, updatedAt: new Date().toISOString() };
 
+
+        // --- History Management ---
         if (saveToHistory) {
-            setHistory(prevHistory => {
-                const newHistory = prevHistory.slice(0, historyIndex + 1);
-                if (newHistory.length === 0 || JSON.stringify(newHistory[newHistory.length - 1]) !== JSON.stringify(updatedProject)) {
-                    newHistory.push(updatedProject);
-                }
-                if (newHistory.length > MAX_HISTORY_LENGTH) {
-                    newHistory.shift();
-                }
-                const newIndex = Math.min(newHistory.length - 1, MAX_HISTORY_LENGTH - 1);
-                setHistoryIndex(newIndex);
-                return newHistory;
-            });
+          setHistory(prevHistory => {
+            // Trim history after current index (if user undid changes)
+            const newHistory = prevHistory.slice(0, historyIndex + 1);
+            // Add new state only if it's different from the last one
+             if (newHistory.length === 0 || JSON.stringify(newHistory[newHistory.length - 1]) !== JSON.stringify(updatedProject)) {
+                 newHistory.push(updatedProject);
+             }
+             // Limit history size
+            if (newHistory.length > MAX_HISTORY_LENGTH) {
+              newHistory.shift(); // Remove the oldest entry
+            }
+             const newIndex = Math.min(newHistory.length - 1, MAX_HISTORY_LENGTH - 1);
+            setHistoryIndex(newIndex); // Update index to the latest state
+            return newHistory;
+          });
         } else {
-            setHistory(prevHistory => {
-                const newHistory = [...prevHistory];
-                if (historyIndex >= 0 && historyIndex < newHistory.length) {
-                    if (JSON.stringify(newHistory[historyIndex]) !== JSON.stringify(updatedProject)) {
-                        newHistory[historyIndex] = updatedProject;
-                    }
-                }
-                return newHistory;
-            });
+           // If not saving to history (e.g., during typing), just update the current history state
+           setHistory(prevHistory => {
+              const newHistory = [...prevHistory];
+              if (historyIndex >= 0 && historyIndex < newHistory.length) {
+                 // Update only if different to avoid unnecessary state changes
+                 if (JSON.stringify(newHistory[historyIndex]) !== JSON.stringify(updatedProject)) {
+                    newHistory[historyIndex] = updatedProject;
+                 }
+              }
+              return newHistory;
+           });
         }
-        const updatedProjects = [...currentProjectsArray];
-        if (currentProjectIndex !== -1 && JSON.stringify(updatedProjects[currentProjectIndex]) !== JSON.stringify(updatedProject)) {
-            updatedProjects[currentProjectIndex] = updatedProject;
-            return updatedProjects;
-        } else if (currentProjectIndex === -1) {
-            console.warn("ProjectEditor updateProject: Project index not found, state may not be saved correctly.")
-            return currentProjectsArray;
-        }
-        return currentProjectsArray;
-      });
-      requestAnimationFrame(() => { isUpdatingHistory.current = false; });
-  }, [project, historyIndex, setProjects, projectId]);
 
+
+        // --- Update Main Projects Array (for localStorage) ---
+        const updatedProjects = [...currentProjectsArray];
+        if (currentProjectIndex !== -1) {
+          // Update existing project if found
+           if (JSON.stringify(updatedProjects[currentProjectIndex]) !== JSON.stringify(updatedProject)) {
+               updatedProjects[currentProjectIndex] = updatedProject;
+               return updatedProjects;
+           }
+        } else if (!saveToHistory && project) {
+             // This case might happen if the project was loaded from history but not in the main 'projects' list yet
+             // Avoid adding it back if we're just doing intermediate updates (saveToHistory=false)
+        } else {
+           console.warn("ProjectEditor updateProject: Project index not found, state may not be saved correctly.")
+        }
+        return currentProjectsArray; // Return potentially updated or original array
+      });
+
+      // Reset the flag after the state update cycle
+       requestAnimationFrame(() => { isUpdatingHistory.current = false; });
+    }, [project, historyIndex, setProjects, projectId]); // Dependencies: project, historyIndex, setProjects, projectId
+
+
+
+  // Check if project exists on mount and handle redirects
   useEffect(() => {
-    if (hasMounted && projects === undefined || isUpdatingHistory.current) return;
+    // Prevent running this effect if project state is being updated by history changes
+     if (!hasMounted || projects === undefined || isUpdatingHistory.current) return;
+
     const currentProjects = Array.isArray(projects) ? projects : [];
     const projectExists = currentProjects.some(p => p.id === projectId);
+
     if (projectExists && isProjectFound !== true) {
-        setIsProjectFound(true);
-        if (activeSectionId === null) {
-            setActiveSectionId(String(-1));
-        }
+      setIsProjectFound(true);
+      // Set initial active section (e.g., Project Details) if none is active
+      if (activeSectionId === null) {
+        setActiveSectionId(String(-1)); // -1 for Project Details
+      }
     } else if (!projectExists && isProjectFound !== false) {
-        setIsProjectFound(false);
-        toast({
-            variant: "destructive",
-            title: "Project Not Found",
-            description: `Project with ID ${projectId} seems missing. Returning to dashboard.`,
-        });
-        const timer = setTimeout(() => router.push('/'), 2000);
-        return () => clearTimeout(timer);
+      setIsProjectFound(false);
+      toast({
+        variant: "destructive",
+        title: "Project Not Found",
+        description: `The project with ID ${projectId} could not be found. It might have been deleted or the link is incorrect.`,
+      });
+      const timer = setTimeout(() => router.push('/'), 2000); // Redirect after 2 seconds
+      return () => clearTimeout(timer); // Cleanup timer on unmount
     }
+     // Only run when projectId, projects, activeSectionId, or isProjectFound change
   }, [projectId, projects, activeSectionId, toast, router, isProjectFound, hasMounted]);
 
+
+  // Handle Undo action
   const handleUndo = useCallback(() => {
-      if (historyIndex > 0) {
-          isUpdatingHistory.current = true;
-          const newIndex = historyIndex - 1;
-          setHistoryIndex(newIndex);
-          const undoneProject = history[newIndex];
-          setProjects((prevProjects = []) => {
-              const currentProjectsArray = Array.isArray(prevProjects) ? prevProjects : [];
-              const projectIndex = currentProjectsArray.findIndex(p => p.id === projectId);
-              if (projectIndex !== -1) {
-                  const updatedProjects = [...currentProjectsArray];
-                  updatedProjects[projectIndex] = undoneProject;
-                  return updatedProjects;
-              }
-              return currentProjectsArray;
-          });
-          toast({ title: "Undo successful" });
-          requestAnimationFrame(() => { isUpdatingHistory.current = false; });
-      } else {
-          toast({ variant: "destructive", title: "Nothing to undo" });
-      }
+    if (historyIndex > 0) {
+       isUpdatingHistory.current = true; // Prevent feedback loop
+      const newIndex = historyIndex - 1;
+      setHistoryIndex(newIndex); // Move back in history
+      const undoneProject = history[newIndex]; // Get the previous project state
+
+      // Update the main projects state to reflect the undone state
+      setProjects((prevProjects = []) => {
+         const currentProjectsArray = Array.isArray(prevProjects) ? prevProjects : [];
+         const projectIndex = currentProjectsArray.findIndex(p => p.id === projectId);
+         if (projectIndex !== -1) {
+            const updatedProjects = [...currentProjectsArray];
+            updatedProjects[projectIndex] = undoneProject;
+            return updatedProjects;
+         }
+         return currentProjectsArray; // Should ideally not happen if project exists
+      });
+
+      toast({ title: "Undo successful" });
+       requestAnimationFrame(() => { isUpdatingHistory.current = false; });
+    } else {
+      toast({ variant: "destructive", title: "Nothing to undo" });
+    }
   }, [historyIndex, history, setProjects, projectId, toast]);
 
   const canUndo = historyIndex > 0;
 
-  const handleSetActiveSection = useCallback((idOrIndex: SectionIdentifier) => {
-      const newActiveId = String(idOrIndex);
-      if (activeSectionId !== newActiveId) {
-          setActiveSectionId(newActiveId);
-          setShowDiagramGenerator(false); // Hide diagram generator when changing sections
-      }
-  }, [activeSectionId]);
 
+  // --- Event Handlers for UI interactions ---
+
+  // Set active section in the sidebar
+    const handleSetActiveSection = useCallback((idOrIndex: SectionIdentifier) => {
+      const newActiveId = String(idOrIndex); // Always treat as string ID internally
+       if (activeSectionId !== newActiveId) {
+            setActiveSectionId(newActiveId);
+            setShowDiagramGenerator(false); // Hide diagram generator when changing sections
+        }
+    }, [activeSectionId]); // Depend only on activeSectionId
+
+
+  // Update section content (e.g., from textarea) - no history save on every change
   const handleSectionContentChange = (id: string, content: string) => {
     if (!project) return;
-    updateProject(prev => ({
-        ...prev,
-        sections: updateSectionById(prev.sections, id, { content }),
-    }), false);
+     updateProject(prev => ({
+         ...prev,
+         sections: updateSectionById(prev.sections, id, { content }),
+     }), false); // saveToHistory = false
   };
 
-  const handleSectionContentBlur = () => {
-      if (!project) return;
-      updateProject(prev => ({ ...prev }), true);
-  };
+   // Save content changes to history on blur
+   const handleSectionContentBlur = () => {
+       if (!project) return;
+       updateProject(prev => ({ ...prev }), true); // saveToHistory = true
+   };
 
+  // Update section prompt - no history save on every change
   const handleSectionPromptChange = (id: string, prompt: string) => {
     if (!project) return;
      updateProject(prev => ({
          ...prev,
          sections: updateSectionById(prev.sections, id, { prompt }),
-     }), false);
+     }), false); // saveToHistory = false
   }
 
-  const handleSectionPromptBlur = () => {
-      if (!project) return;
-      updateProject(prev => ({ ...prev }), true);
-  };
+   // Save prompt changes to history on blur
+   const handleSectionPromptBlur = () => {
+       if (!project) return;
+       updateProject(prev => ({ ...prev }), true); // saveToHistory = true
+   };
 
+
+  // Update project details fields - no history save on every change
   const handleProjectDetailChange = (field: keyof Project, value: string) => {
     if (!project) return;
+    // Ensure we only update valid string fields this way
     const validStringFields: (keyof Project)[] = ['title', 'projectContext', 'teamDetails', 'instituteName', 'collegeInfo', 'teamId', 'subject', 'semester', 'branch', 'guideName'];
     if (validStringFields.includes(field)) {
-        updateProject({ [field]: value }, false);
+        updateProject({ [field]: value }, false); // saveToHistory = false
     } else {
         console.warn(`Attempted to update non-string/optional field ${String(field)} via handleProjectDetailChange`);
     }
   };
 
+  // Save project detail changes to history on blur
   const handleProjectDetailBlur = () => {
       if (!project) return;
-      updateProject(prev => ({ ...prev }), true);
+      updateProject(prev => ({ ...prev }), true); // saveToHistory = true
   };
 
+
+  // Update project type - save immediately to history
   const handleProjectTypeChange = (value: 'mini-project' | 'internship') => {
     if (!project) return;
-    updateProject({ projectType: value }, true);
+    updateProject({ projectType: value }, true); // saveToHistory = true
   };
 
+  // Handle logo upload - save immediately to history
   const handleLogoUpload = (field: 'universityLogoUrl' | 'collegeLogoUrl', file: File | null) => {
     if (!project || !file) return;
+
+    // Basic file type validation
     if (!file.type.startsWith('image/')) {
         toast({ variant: 'destructive', title: 'Invalid File Type', description: 'Please upload an image file.' });
         return;
     }
+     // Basic size validation (e.g., 2MB limit)
     const maxSizeInBytes = 2 * 1024 * 1024; // 2MB
     if (file.size > maxSizeInBytes) {
          toast({ variant: 'destructive', title: 'File Too Large', description: `Image must be smaller than ${maxSizeInBytes / (1024 * 1024)}MB.` });
         return;
     }
-    setIsUploadingLogo(prev => ({ ...prev, [field]: true }));
+
+
+    setIsUploadingLogo(prev => ({ ...prev, [field]: true })); // Show loading state
     const reader = new FileReader();
     reader.onloadend = () => {
-        updateProject({ [field]: reader.result as string }, true);
+        updateProject({ [field]: reader.result as string }, true); // saveToHistory = true
         toast({ title: 'Logo Uploaded', description: `${field === 'universityLogoUrl' ? 'University' : 'College'} logo updated.` });
-        setIsUploadingLogo(prev => ({ ...prev, [field]: false }));
+        setIsUploadingLogo(prev => ({ ...prev, [field]: false })); // Hide loading state
     };
     reader.onerror = (error) => {
         console.error("Error reading file:", error);
         toast({ variant: 'destructive', title: 'Upload Failed', description: 'Could not read the file.' });
-        setIsUploadingLogo(prev => ({ ...prev, [field]: false }));
+        setIsUploadingLogo(prev => ({ ...prev, [field]: false })); // Hide loading state
     };
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(file); // Read file as Data URL
   };
 
+  // Handle logo removal - save immediately to history
   const handleRemoveLogo = (field: 'universityLogoUrl' | 'collegeLogoUrl') => {
        if (!project) return;
-       updateProject({ [field]: undefined }, true);
+       updateProject({ [field]: undefined }, true); // saveToHistory = true
        toast({ title: 'Logo Removed', description: `${field === 'universityLogoUrl' ? 'University' : 'College'} logo removed.` });
    };
 
-  const updateSectionsFromToc = useCallback((outline: GeneratedSectionOutline) => {
-    if (!project) return;
-    const processOutline = (
-        outlineSections: GeneratedSectionOutline['sections'],
-        existingSections: HierarchicalProjectSection[] = []
-    ): [HierarchicalProjectSection[], boolean, number, number] => {
-        const updatedSections: HierarchicalProjectSection[] = [];
-        let structureChanged = false;
-        let addedCount = 0;
-        let preservedCount = 0;
-        const existingMap = new Map(existingSections.map(s => [s.name.toLowerCase(), s]));
-        outlineSections.forEach((outlineSection) => {
-            const trimmedName = outlineSection.name.trim();
-            if (!trimmedName) {
-                return;
-            }
-            const existingSection = existingMap.get(trimmedName.toLowerCase());
-            if (existingSection) {
-                const [updatedSubSections, subChanged, subAdded, subPreserved] = processOutline(
-                    outlineSection.subSections || [],
-                    existingSection.subSections || []
-                );
-                updatedSections.push({ ...existingSection, subSections: updatedSubSections });
-                if (subChanged) structureChanged = true;
-                addedCount += subAdded;
-                preservedCount += subPreserved;
-                existingMap.delete(trimmedName.toLowerCase());
-                preservedCount++;
-            } else {
-                const newId = uuidv4();
-                const [newSubSections, subChanged, subAdded, subPreserved] = processOutline(outlineSection.subSections || []);
-                updatedSections.push({
-                    id: newId,
-                    name: trimmedName,
-                    prompt: `Generate the ${trimmedName} section for the project titled "${project.title}". Consider the project context: ${project.projectContext || '[No context provided]'}. [Add specific instructions here.]`,
-                    content: '',
-                    lastGenerated: undefined,
-                    subSections: newSubSections,
-                });
-                structureChanged = true;
-                addedCount += 1 + subAdded;
-                preservedCount += subPreserved;
-            }
-        });
-         for (const [removedName] of existingMap.entries()) {
-                 structureChanged = true;
-                 break;
-         }
-         if (!structureChanged && existingSections.length === updatedSections.length) {
-             for (let i = 0; i < updatedSections.length; i++) {
-                 if (updatedSections[i].id !== existingSections[i].id) {
-                     structureChanged = true;
-                     break;
-                 }
-             }
-         }
-        return [updatedSections, structureChanged, addedCount, preservedCount];
-    };
-    const [finalSections, structureChanged, addedCount, preservedCount] = processOutline(outline.sections, project.sections);
-    if (!structureChanged && addedCount === 0) {
-        toast({ title: "Sections Unchanged", description: "The generated outline matches the current section structure." });
-        return;
-    }
-    updateProject(prev => ({
-        ...prev,
-        sections: finalSections,
-    }), true);
-    let toastDescription = "Report sections updated.";
-    if (addedCount > 0) toastDescription += ` ${addedCount} section(s) added/updated.`;
-    toast({ title: "Sections Updated", description: toastDescription, duration: 7000 });
-    const currentActiveSection = activeSectionId ? findSectionById(project.sections, activeSectionId) : null;
-    if (currentActiveSection && !findSectionById(finalSections, activeSectionId)) {
-        handleSetActiveSection(String(-1));
-    } else if (finalSections.length > 0 && activeSectionId === null) {
-        handleSetActiveSection(finalSections[0].id);
-    }
-    setIsMobileSheetOpen(false);
-  }, [project, updateProject, toast, activeSectionId, handleSetActiveSection]);
 
-  const handleGenerateSection = async (id: string) => {
+  // Function to process the generated outline and update project sections
+    const updateSectionsFromToc = useCallback((outline: GeneratedSectionOutline) => {
+        if (!project) return;
+
+        // Recursive function to process outline and merge with existing sections
+        const processOutline = (
+            outlineSections: GeneratedSectionOutline['sections'],
+            existingSections: HierarchicalProjectSection[] = []
+        ): [HierarchicalProjectSection[], boolean, number, number] => {
+            const updatedSections: HierarchicalProjectSection[] = [];
+            let structureChanged = false;
+            let addedCount = 0;
+            let preservedCount = 0;
+
+            // Create a map of existing sections for efficient lookup (case-insensitive)
+            const existingMap = new Map(existingSections.map(s => [s.name.toLowerCase(), s]));
+
+            outlineSections.forEach((outlineSection) => {
+                const trimmedName = outlineSection.name.trim();
+                if (!trimmedName) return; // Skip empty names
+
+                const existingSection = existingMap.get(trimmedName.toLowerCase());
+
+                if (existingSection) {
+                     // Section exists: process sub-sections recursively
+                     const [updatedSubSections, subChanged, subAdded, subPreserved] = processOutline(
+                        outlineSection.subSections || [],
+                        existingSection.subSections || []
+                     );
+                     // Add the existing section back with potentially updated sub-sections
+                    updatedSections.push({ ...existingSection, subSections: updatedSubSections });
+                    if (subChanged) structureChanged = true;
+                    addedCount += subAdded;
+                    preservedCount += subPreserved;
+                    existingMap.delete(trimmedName.toLowerCase()); // Remove from map as it's processed
+                    preservedCount++; // Count the preserved parent section
+                } else {
+                    // Section is new: create it and process its sub-sections
+                    const newId = uuidv4();
+                     const [newSubSections, subChanged, subAdded, subPreserved] = processOutline(outlineSection.subSections || []);
+                     updatedSections.push({
+                        id: newId,
+                        name: trimmedName,
+                        prompt: `Generate the ${trimmedName} section for the project titled "${project.title}". Consider the project context: ${project.projectContext || '[No context provided]'}. [Add specific instructions here.]`,
+                        content: '',
+                        lastGenerated: undefined,
+                        subSections: newSubSections,
+                    });
+                    structureChanged = true; // Structure changed because a new section was added
+                    addedCount += 1 + subAdded; // Count the new parent and its subs
+                    preservedCount += subPreserved;
+                }
+            });
+
+            // Check if any sections were removed (still present in existingMap)
+             if (existingMap.size > 0) {
+                 structureChanged = true;
+             }
+
+            // Check if the order changed even if no sections were added/removed
+            if (!structureChanged && existingSections.length === updatedSections.length) {
+                for (let i = 0; i < updatedSections.length; i++) {
+                    if (updatedSections[i].id !== existingSections[i].id) {
+                        structureChanged = true;
+                        break;
+                    }
+                }
+            }
+
+            return [updatedSections, structureChanged, addedCount, preservedCount];
+        };
+
+        // Process the outline starting from the root
+        const [finalSections, structureChanged, addedCount, preservedCount] = processOutline(outline.sections, project.sections);
+
+         if (!structureChanged && addedCount === 0) {
+             toast({ title: "Sections Unchanged", description: "The generated outline matches the current section structure." });
+             return; // No update needed
+         }
+
+        // Update the project state with the new sections structure
+        updateProject(prev => ({
+            ...prev,
+            sections: finalSections,
+        }), true); // saveToHistory = true
+
+        let toastDescription = "Report sections updated.";
+        if (addedCount > 0) toastDescription += ` ${addedCount} section(s) added/updated.`;
+        // if (preservedCount > 0) toastDescription += ` ${preservedCount} section(s) preserved.`;
+        toast({ title: "Sections Updated", description: toastDescription, duration: 7000 });
+
+        // Reset active section if it was deleted, or select first if none was active
+        const currentActiveSection = activeSectionId ? findSectionById(project.sections, activeSectionId) : null;
+        if (currentActiveSection && !findSectionById(finalSections, activeSectionId)) {
+            handleSetActiveSection(String(-1)); // Set back to Project Details
+        } else if (finalSections.length > 0 && activeSectionId === null) {
+            handleSetActiveSection(finalSections[0].id); // Select the first section
+        }
+        setIsMobileSheetOpen(false); // Close mobile sheet if open
+
+    }, [project, updateProject, toast, activeSectionId, handleSetActiveSection]); // Dependencies
+
+
+  // Generate content for a specific section
+    const handleGenerateSection = async (id: string) => {
       const section = project ? findSectionById(project.sections, id) : null;
       if (!project || !section || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting) return;
+
       setIsGenerating(true);
       try {
-          const input = {
-              projectTitle: project.title || 'Untitled Project',
-              sectionName: section.name,
-              prompt: section.prompt,
-              teamDetails: project.teamDetails || '',
-              instituteName: project.instituteName || '',
-              teamId: project.teamId,
-              subject: project.subject,
-              semester: project.semester,
-              branch: project.branch,
-              guideName: project.guideName,
-          };
-          const result = await generateSectionAction(input);
-          if ('error' in result) throw new Error(result.error);
-          updateProject(prev => ({
-              ...prev,
-              sections: updateSectionById(prev.sections, id, {
-                  content: result.reportSectionContent,
-                  lastGenerated: new Date().toISOString(),
-              }),
-          }), true);
-          toast({ title: "Section Generated", description: `"${section.name}" content updated.` });
-      } catch (error) {
-          console.error("Generation failed:", error);
-          toast({ variant: "destructive", title: "Generation Failed", description: error instanceof Error ? error.message : "Could not generate content." });
-      } finally {
-          setIsGenerating(false);
-      }
-  };
+        const input = {
+          projectTitle: project.title || 'Untitled Project',
+          sectionName: section.name,
+          prompt: section.prompt,
+          teamDetails: project.teamDetails || '',
+          instituteName: project.instituteName || '',
+          teamId: project.teamId,
+          subject: project.subject,
+          semester: project.semester,
+          branch: project.branch,
+          guideName: project.guideName,
+        };
+        const result = await generateSectionAction(input);
 
-  const handleSummarizeSection = async (id: string) => {
+        if ('error' in result) {
+          throw new Error(result.error);
+        }
+
+        updateProject(prev => ({
+          ...prev,
+          sections: updateSectionById(prev.sections, id, {
+            content: result.reportSectionContent,
+            lastGenerated: new Date().toISOString(),
+          }),
+        }), true); // saveToHistory = true
+        toast({ title: "Section Generated", description: `"${section.name}" content updated.` });
+      } catch (error) {
+        console.error("Generation failed:", error);
+        toast({ variant: "destructive", title: "Generation Failed", description: error instanceof Error ? error.message : "Could not generate content." });
+      } finally {
+        setIsGenerating(false);
+      }
+    };
+
+
+  // Summarize content of a specific section
+    const handleSummarizeSection = async (id: string) => {
       const section = project ? findSectionById(project.sections, id) : null;
       if (!project || !section || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting) return;
+
       if (!section.content?.trim()) {
-          toast({ variant: "destructive", title: "Summarization Failed", description: "Section content is empty." });
-          return;
+        toast({ variant: "destructive", title: "Summarization Failed", description: "Section content is empty." });
+        return;
       }
+
       setIsSummarizing(true);
       try {
-          const result = await summarizeSectionAction({ projectTitle: project.title, sectionText: section.content });
-          if ('error' in result) throw new Error(result.error);
-          toast({
-              title: `Summary for "${section.name}"`,
-              description: ( <ScrollArea className="h-32 w-full"><p className="text-sm">{result.summary}</p></ScrollArea> ),
-              duration: 9000,
-          });
-      } catch (error) {
-          console.error("Summarization failed:", error);
-          toast({ variant: "destructive", title: "Summarization Failed", description: error instanceof Error ? error.message : "Could not summarize." });
-      } finally {
-          setIsSummarizing(false);
-      }
-  };
+        const result = await summarizeSectionAction({
+          projectTitle: project.title,
+          sectionText: section.content,
+        });
 
-  const proceedWithTocGeneration = useCallback(async () => {
-    if (!project || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting) return;
-    setIsGeneratingOutline(true);
-    try {
-        const result = await generateOutlineAction({ projectTitle: project.title, projectContext: project.projectContext || '' });
         if ('error' in result) {
-             if (result.error.includes("Request contains an invalid argument")) {
-                 toast({ variant: "destructive", title: "Section Generation Failed", description: "There might be an issue with the project context provided. Please review and try again." });
-             } else {
-                 throw new Error(result.error);
-             }
-             setIsGeneratingOutline(false);
-             return;
+          throw new Error(result.error);
         }
-        const outlineResult: GeneratedSectionOutline = {
-             sections: (result.suggestedSections || []).map(name => ({ name, subSections: [] }))
-        };
-        if (!outlineResult.sections?.length) {
-             toast({ variant: "destructive", title: "Section Generation Failed", description: "AI did not return suggested sections." });
-             setIsGeneratingOutline(false);
-             return;
-        }
-        updateSectionsFromToc(outlineResult);
-    } catch (error) {
-        console.error("Section generation failed:", error);
-        toast({ variant: "destructive", title: "Section Generation Failed", description: error instanceof Error ? error.message : "Could not generate sections." });
-    } finally {
-        setIsGeneratingOutline(false);
-    }
-  }, [project, isGenerating, isSummarizing, isGeneratingOutline, isSuggesting, updateSectionsFromToc, toast]);
 
-  const handleGenerateTocClick = () => {
-      if (!project || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting) return;
-      const contextLength = project.projectContext?.trim().length || 0;
-      if (contextLength < MIN_CONTEXT_LENGTH) {
-          setShowOutlineContextAlert(true);
-      } else {
-          proceedWithTocGeneration();
+        // Display summary in a toast
+        toast({
+          title: `Summary for "${section.name}"`,
+          description: (
+            <ScrollArea className="h-32 w-full">
+              <p className="text-sm">{result.summary}</p>
+            </ScrollArea>
+          ),
+          duration: 9000, // Longer duration for reading
+        });
+      } catch (error) {
+        console.error("Summarization failed:", error);
+        toast({ variant: "destructive", title: "Summarization Failed", description: error instanceof Error ? error.message : "Could not summarize." });
+      } finally {
+        setIsSummarizing(false);
       }
-  };
+    };
 
-  const handleGetSuggestions = async () => {
+  // Proceed with generating Table of Contents (called after context check)
+    const proceedWithTocGeneration = useCallback(async () => {
+        if (!project || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting) return;
+        setIsGeneratingOutline(true);
+        try {
+            const result = await generateOutlineAction({
+                projectTitle: project.title,
+                projectContext: project.projectContext || ''
+            });
+
+            if ('error' in result) {
+                // Specific handling for invalid argument error (potentially bad context)
+                 if (result.error.includes("Request contains an invalid argument")) {
+                     toast({ variant: "destructive", title: "Section Generation Failed", description: "There might be an issue with the project context provided. Please review and try again." });
+                 } else {
+                     throw new Error(result.error); // Throw other errors
+                 }
+                 setIsGeneratingOutline(false);
+                 return; // Stop execution
+            }
+
+            // Basic validation of the AI response format
+            if (!result || typeof result !== 'object' || !Array.isArray(result.suggestedSections)) {
+                 toast({ variant: "destructive", title: "Section Generation Failed", description: "AI did not return the expected section structure." });
+                 setIsGeneratingOutline(false);
+                 return; // Stop execution
+             }
+
+            // Convert flat list to hierarchical structure expected by updateSectionsFromToc
+            const outlineResult: GeneratedSectionOutline = {
+                 sections: (result.suggestedSections || []).map(name => ({ name, subSections: [] }))
+            };
+
+
+            if (!outlineResult.sections?.length) {
+                toast({ variant: "destructive", title: "Section Generation Failed", description: "AI did not return suggested sections." });
+                 setIsGeneratingOutline(false);
+                return; // Stop execution
+            }
+
+            updateSectionsFromToc(outlineResult); // Update project state
+
+        } catch (error) {
+            console.error("Section generation failed:", error);
+            toast({ variant: "destructive", title: "Section Generation Failed", description: error instanceof Error ? error.message : "Could not generate sections." });
+        } finally {
+            setIsGeneratingOutline(false);
+        }
+    }, [project, isGenerating, isSummarizing, isGeneratingOutline, isSuggesting, updateSectionsFromToc, toast]); // Dependencies
+
+
+   // Handle click on the "Generate TOC" button, includes context check
+    const handleGenerateTocClick = () => {
+        if (!project || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting) return;
+
+        const contextLength = project.projectContext?.trim().length || 0;
+        if (contextLength < MIN_CONTEXT_LENGTH) {
+            setShowOutlineContextAlert(true); // Show warning dialog
+        } else {
+            proceedWithTocGeneration(); // Proceed directly if context is sufficient
+        }
+    };
+
+
+  // Get AI suggestions for improvement
+    const handleGetSuggestions = async () => {
      if (!project || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting) return;
+
      setIsSuggesting(true);
-     setSuggestions(null);
+     setSuggestions(null); // Clear previous suggestions
      try {
+        // Flatten the hierarchical structure into a single string for the AI
         const flattenSections = (sections: HierarchicalProjectSection[], level = 0): string => {
             return sections.map(s =>
                 `${'#'.repeat(level + 2)} ${s.name}\n\n${s.content || '[Empty Section]'}\n\n` +
                 (s.subSections ? flattenSections(s.subSections, level + 1) : '')
             ).join('---\n\n');
         };
+
        const allSectionsContent = flattenSections(project.sections);
+
        const result = await suggestImprovementsAction({
          projectTitle: project.title,
          projectContext: project.projectContext,
          allSectionsContent: allSectionsContent,
-         focusArea: suggestionInput || undefined,
+         focusArea: suggestionInput || undefined, // Pass focus area if provided
        });
-       if ('error' in result) throw new Error(result.error);
-       setSuggestions(result.suggestions);
+
+       if ('error' in result) {
+         throw new Error(result.error);
+       }
+
+       setSuggestions(result.suggestions); // Store suggestions
        toast({ title: "AI Suggestions Ready", description: "Suggestions for improvement generated." });
+
      } catch (error) {
        console.error("Suggestion generation failed:", error);
        toast({ variant: "destructive", title: "Suggestion Failed", description: error instanceof Error ? error.message : "Could not generate suggestions." });
@@ -623,76 +776,93 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
      }
    };
 
-  const handleEditSectionName = (id: string, newName: string) => {
-      if (!project) return;
+   // Handle editing section name (called from HierarchicalSectionItem)
+     const handleEditSectionName = (id: string, newName: string) => {
+         if (!project) return;
+         updateProject(prev => ({
+             ...prev,
+             sections: updateSectionById(prev.sections, id, { name: newName }),
+         }), true); // saveToHistory = true
+         toast({ title: "Section Name Updated", description: `Section "${newName}" renamed.` });
+     };
 
-      updateProject(prev => ({
-          ...prev,
-          sections: updateSectionById(prev.sections, id, { name: newName }),
-      }), true);
-      toast({ title: "Section Name Updated", description: `Section "${newName}" renamed.` });
-  };
-
-  const handleDeleteSection = (id: string) => {
-      setSectionToDelete(id);
-  };
-
-  const confirmDeleteSection = () => {
-      if (!project || !sectionToDelete) return;
-      updateProject(prev => ({
-          ...prev,
-          sections: deleteSectionById(prev.sections, sectionToDelete),
-      }), true);
-      toast({ title: "Section Deleted" });
-      setSectionToDelete(null);
-      if (activeSectionId === sectionToDelete) {
-          handleSetActiveSection(String(-1));
-      }
-  };
-
-  const cancelDeleteSection = () => {
-      setSectionToDelete(null);
-  };
-
-  const handleAddSection = (parentId?: string) => {
-    if (!project) return;
-    const newSection: HierarchicalProjectSection = {
-        id: uuidv4(),
-        name: 'New Section',
-        prompt: `Generate content for New Section...`,
-        content: '',
-        subSections: [],
+  // Initiate section deletion process (opens confirmation dialog)
+    const handleDeleteSection = (id: string) => {
+        setSectionToDelete(id);
     };
-    updateProject(prev => {
-        const addRecursive = (sections: HierarchicalProjectSection[]): HierarchicalProjectSection[] => {
-            if (!parentId) {
-                return [...sections, newSection];
-            }
-            return sections.map(section => {
-                if (section.id === parentId) {
-                    return {
-                        ...section,
-                        subSections: [...(section.subSections || []), newSection]
-                    };
-                }
-                if (section.subSections) {
-                    return { ...section, subSections: addRecursive(section.subSections) };
-                }
-                return section;
-            });
-        };
-        return { ...prev, sections: addRecursive(prev.sections) };
-    }, true);
-    toast({ title: "Section Added" });
-    setIsEditingSections(true);
-  };
 
+  // Confirm deletion after dialog confirmation
+    const confirmDeleteSection = () => {
+        if (!project || !sectionToDelete) return;
+        updateProject(prev => ({
+            ...prev,
+            sections: deleteSectionById(prev.sections, sectionToDelete),
+        }), true); // saveToHistory = true
+        toast({ title: "Section Deleted" });
+        setSectionToDelete(null); // Close dialog
+        // If the active section was deleted, reset to project details
+        if (activeSectionId === sectionToDelete) {
+            handleSetActiveSection(String(-1));
+        }
+    };
+
+   // Cancel deletion from dialog
+    const cancelDeleteSection = () => {
+        setSectionToDelete(null);
+    };
+
+    // Add a new section (top-level or sub-section)
+    const handleAddSection = (parentId?: string) => {
+        if (!project) return;
+
+        const newSection: HierarchicalProjectSection = {
+            id: uuidv4(),
+            name: 'New Section',
+            prompt: `Generate content for New Section...`,
+            content: '',
+            subSections: [],
+        };
+
+        updateProject(prev => {
+            // Recursive function to add the section at the correct level
+            const addRecursive = (sections: HierarchicalProjectSection[]): HierarchicalProjectSection[] => {
+                 if (!parentId) {
+                     // Add to top level
+                     return [...sections, newSection];
+                 }
+                 // Find the parent and add as sub-section
+                 return sections.map(section => {
+                     if (section.id === parentId) {
+                         return {
+                             ...section,
+                             subSections: [...(section.subSections || []), newSection]
+                         };
+                     }
+                     if (section.subSections) {
+                         // Recursively search in sub-sections
+                         return { ...section, subSections: addRecursive(section.subSections) };
+                     }
+                     return section; // Return unchanged if not the parent and no sub-sections
+                 });
+            };
+            return { ...prev, sections: addRecursive(prev.sections) };
+        }, true); // saveToHistory = true
+
+        toast({ title: "Section Added" });
+         setIsEditingSections(true); // Ensure edit mode is active after adding
+    };
+
+
+  // --- Placeholder Actions ---
   const handleSaveOnline = () => {
+     // Placeholder for future cloud save functionality
      if (!project) return;
      toast({ title: "Save Online (Coming Soon)", description: "This will save your project to the cloud." });
+     // Later: Implement API call to save project data
+     // updateProject({ storageType: 'cloud' }, true); // Example state update
   };
 
-  const handleNavigateToExport = () => {
+   const handleNavigateToExport = () => {
      if (project) {
        router.push(`/project/${projectId}/export`);
      } else {
@@ -700,13 +870,16 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
      }
    };
 
-  const handlePreview = () => {
-      toast({ title: "Preview (Coming Soon)", description: "This will show a preview of the generated report." });
-  };
+   const handlePreview = () => {
+       // Placeholder for future preview functionality
+       toast({ title: "Preview (Coming Soon)", description: "This will show a preview of the generated report." });
+   };
+
 
   // --- Diagram Generator Handler ---
   const handleDiagramGenerated = (mermaidCode: string) => {
-    if (!project || !activeSectionId || activeSectionId === String(-1) || isNaN(parseInt(activeSectionId))) return;
+    // Ensure a section is selected and it's not a standard page placeholder
+    if (!project || !activeSectionId || activeSectionId === String(-1) || !isNaN(parseInt(activeSectionId))) return;
 
     const section = findSectionById(project.sections, activeSectionId);
     if (!section) return;
@@ -716,77 +889,111 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
     updateProject(prev => ({
         ...prev,
-        sections: updateSectionById(prev.sections, activeSectionId, { content: newContent }),
-    }), true);
+        sections: updateSectionById(prev.sections, activeSectionId!, { content: newContent }),
+    }), true); // saveToHistory = true
 
     toast({ title: 'Diagram Added', description: 'Mermaid diagram code inserted into the section content.' });
     setShowDiagramGenerator(false); // Hide generator after adding
   };
 
+
+   // --- FAB Drag Handlers ---
   const onFabMouseDown = (e: React.MouseEvent<HTMLButtonElement>) => {
-      if (e.button !== 0) return;
-      const target = fabRef.current;
-      if (!target) return;
-      setIsDraggingFab(true);
-      const rect = target.getBoundingClientRect();
-      dragOffset.current = {
-          x: e.clientX - rect.left,
-          y: e.clientY - rect.top,
-      };
-      target.style.cursor = 'grabbing';
-      e.preventDefault();
+    if (e.button !== 0) return; // Only handle left click
+    const target = fabRef.current;
+    if (!target) return;
+
+    setIsDraggingFab(true);
+    const rect = target.getBoundingClientRect();
+    dragOffset.current = {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    };
+    target.style.cursor = 'grabbing';
+    e.preventDefault(); // Prevent text selection during drag
   };
 
   const onFabMouseMove = useCallback((e: MouseEvent) => {
-      if (!isDraggingFab || !fabRef.current) return;
-      const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
-      const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
-      let newX = e.clientX - dragOffset.current.x;
-      let newY = e.clientY - dragOffset.current.y;
-      const fabWidth = fabRef.current.offsetWidth;
-      const fabHeight = fabRef.current.offsetHeight;
-      const margin = 16;
-      newX = Math.max(margin, Math.min(newX, vw - fabWidth - margin));
-      newY = Math.max(margin, Math.min(newY, vh - fabHeight - margin));
-      setFabPosition({ x: newX, y: newY });
+    if (!isDraggingFab || !fabRef.current) return;
+
+    // Get viewport dimensions
+     const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+     const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
+
+
+    let newX = e.clientX - dragOffset.current.x;
+    let newY = e.clientY - dragOffset.current.y;
+
+     // Constrain FAB within viewport boundaries
+    const fabWidth = fabRef.current.offsetWidth;
+    const fabHeight = fabRef.current.offsetHeight;
+    const margin = 16; // Keep FAB away from edges
+
+    newX = Math.max(margin, Math.min(newX, vw - fabWidth - margin));
+    newY = Math.max(margin, Math.min(newY, vh - fabHeight - margin));
+
+
+    setFabPosition({ x: newX, y: newY });
   }, [isDraggingFab]);
 
   const onFabMouseUp = useCallback(() => {
-      if (isDraggingFab && fabRef.current) {
-          setIsDraggingFab(false);
-          fabRef.current.style.cursor = 'grab';
-      }
+    if (isDraggingFab && fabRef.current) {
+      setIsDraggingFab(false);
+      fabRef.current.style.cursor = 'grab';
+    }
   }, [isDraggingFab]);
 
+  // Add/remove global mouse listeners for FAB dragging
   useEffect(() => {
-      if (isDraggingFab) {
-          window.addEventListener('mousemove', onFabMouseMove);
-          window.addEventListener('mouseup', onFabMouseUp);
-      } else {
-          window.removeEventListener('mousemove', onFabMouseMove);
-          window.removeEventListener('mouseup', onFabMouseUp);
-      }
-      return () => {
-          window.removeEventListener('mousemove', onFabMouseMove);
-          window.removeEventListener('mouseup', onFabMouseUp);
-      };
+    if (isDraggingFab) {
+      window.addEventListener('mousemove', onFabMouseMove);
+      window.addEventListener('mouseup', onFabMouseUp);
+    } else {
+      window.removeEventListener('mousemove', onFabMouseMove);
+      window.removeEventListener('mouseup', onFabMouseUp);
+    }
+    return () => {
+      window.removeEventListener('mousemove', onFabMouseMove);
+      window.removeEventListener('mouseup', onFabMouseUp);
+    };
   }, [isDraggingFab, onFabMouseMove, onFabMouseUp]);
 
+
+  // --- Render Logic ---
+
+  // Loading State
   if (!hasMounted || isProjectFound === null) {
-    return ( <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,60px))] text-center p-4"><Loader2 className="h-16 w-16 animate-spin text-primary mb-4" /><p className="text-lg text-muted-foreground">Loading project...</p></div> );
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,60px))] text-center p-4">
+        <Loader2 className="h-16 w-16 animate-spin text-primary mb-4" />
+        <p className="text-lg text-muted-foreground">Loading project...</p>
+      </div>
+    );
   }
 
+  // Project Not Found State
   if (isProjectFound === false || !project) {
-      return ( <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,60px))] text-center p-4"><CloudOff className="h-16 w-16 text-destructive mb-4" /><h2 className="text-2xl font-semibold text-destructive mb-2">Project Not Found</h2><p className="text-muted-foreground mb-6">The project with ID <code className="bg-muted px-1 rounded">{projectId}</code> could not be found.</p><Button onClick={() => router.push('/')}><Home className="mr-2 h-4 w-4" /> Go to Dashboard</Button></div> );
+      return (
+          <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,60px))] text-center p-4">
+            <CloudOff className="h-16 w-16 text-destructive mb-4" />
+            <h2 className="text-2xl font-semibold text-destructive mb-2">Project Not Found</h2>
+            <p className="text-muted-foreground mb-6">The project with ID <code className="bg-muted px-1 rounded">{projectId}</code> could not be found.</p>
+            <Button onClick={() => router.push('/')}><Home className="mr-2 h-4 w-4" /> Go to Dashboard</Button>
+          </div>
+       );
   }
 
+  // Determine content to display based on activeSectionId
   let activeViewContent: React.ReactNode = null;
   let activeViewName = project.title ?? 'Project';
   let isStandardPage = false;
-  const activeSection = activeSectionId ? findSectionById(project.sections, activeSectionId) : null;
-  const standardPageIndex = parseInt(activeSectionId ?? '', 10);
 
-  if (activeSectionId === String(-1)) {
+  const activeSection = activeSectionId ? findSectionById(project.sections, activeSectionId) : null;
+  const standardPageIndex = !isNaN(parseInt(activeSectionId ?? '', 10)) ? parseInt(activeSectionId!, 10) : NaN;
+
+
+    if (activeSectionId === String(-1)) {
+      // Display Project Details Form
       activeViewName = 'Project Details';
       activeViewContent = (
             <Card className="shadow-md mb-6">
@@ -795,10 +1002,12 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 <CardDescription>Edit general information. Context helps AI generate relevant sections.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+                {/* Project Title */}
                 <div>
                   <Label htmlFor="projectTitleMain">Project Title *</Label>
                   <Input id="projectTitleMain" value={project.title} onChange={(e) => handleProjectDetailChange('title', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="Enter Project Title" className="mt-1 focus-visible:glow-primary" required />
                 </div>
+                 {/* Project Type Toggle */}
                 <div className="space-y-2">
                     <Label>Project Type</Label>
                     <RadioGroup value={project.projectType} onValueChange={(value: 'mini-project' | 'internship') => handleProjectTypeChange(value)} className="flex items-center gap-4">
@@ -806,15 +1015,18 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                       <div className="flex items-center space-x-2"> <RadioGroupItem value="internship" id="type-internship" /> <Label htmlFor="type-internship" className="cursor-pointer">Internship</Label> </div>
                     </RadioGroup>
                 </div>
+                 {/* Project Context */}
                 <div>
                   <Label htmlFor="projectContext">Project Context *</Label>
                   <Textarea id="projectContext" value={project.projectContext} onChange={(e) => handleProjectDetailChange('projectContext', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="Briefly describe your project, goals, scope, technologies..." className="mt-1 min-h-[120px] focus-visible:glow-primary" required />
                   <p className="text-xs text-muted-foreground mt-1">Crucial for AI section generation.</p>
                 </div>
+                 {/* Logo Uploads */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     <LogoUpload label="University Logo" logoUrl={project.universityLogoUrl} field="universityLogoUrl" onUpload={handleLogoUpload} onRemove={handleRemoveLogo} isUploading={isUploadingLogo.universityLogoUrl} />
                     <LogoUpload label="College Logo" logoUrl={project.collegeLogoUrl} field="collegeLogoUrl" onUpload={handleLogoUpload} onRemove={handleRemoveLogo} isUploading={isUploadingLogo.collegeLogoUrl} />
                 </div>
+                 {/* Institute, Branch, Semester, Subject */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div> <Label htmlFor="instituteName">Institute Name</Label> <Input id="instituteName" value={project.instituteName || ''} onChange={(e) => handleProjectDetailChange('instituteName', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="e.g., L. D. College of Engineering" className="mt-1"/> </div>
                   <div> <Label htmlFor="branch">Branch</Label> <Input id="branch" value={project.branch || ''} onChange={(e) => handleProjectDetailChange('branch', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="e.g., Computer Engineering" className="mt-1"/> </div>
@@ -822,16 +1034,19 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                   <div> <Label htmlFor="subject">Subject</Label> <Input id="subject" value={project.subject || ''} onChange={(e) => handleProjectDetailChange('subject', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="e.g., Design Engineering - 1A" className="mt-1"/> </div>
                 </div>
                 <Separator />
+                 {/* Team ID, Guide Name */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div> <Label htmlFor="teamId">Team ID</Label> <Input id="teamId" value={project.teamId || ''} onChange={(e) => handleProjectDetailChange('teamId', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="Enter Team ID" className="mt-1"/> </div>
                   <div> <Label htmlFor="guideName">Faculty Guide Name</Label> <Input id="guideName" value={project.guideName || ''} onChange={(e) => handleProjectDetailChange('guideName', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="Enter Guide's Name" className="mt-1"/> </div>
                 </div>
+                 {/* Team Details */}
                 <div>
                   <Label htmlFor="teamDetails">Team Details (Members & Enrollment)</Label>
                   <Textarea id="teamDetails" value={project.teamDetails} onChange={(e) => handleProjectDetailChange('teamDetails', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="John Doe - 123456789&#10;Jane Smith - 987654321" className="mt-1 min-h-[120px] focus-visible:glow-primary"/>
                   <p className="text-xs text-muted-foreground mt-1">One member per line.</p>
                 </div>
               </CardContent>
+              {/* Footer with Generate/Update Sections Button */}
               <CardFooter className="flex justify-end">
                 <Button variant="default" size="sm" onClick={handleGenerateTocClick} disabled={isGeneratingOutline || isGenerating || isSummarizing || isSuggesting || !project.projectContext?.trim()} className="hover:glow-primary focus-visible:glow-primary">
                   {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
@@ -840,15 +1055,18 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
               </CardFooter>
             </Card>
       );
-  } else if (!isNaN(standardPageIndex) && standardPageIndex < -1) {
-      const standardPageEntry = Object.entries(STANDARD_PAGE_INDICES).find(([, index]) => index === standardPageIndex);
-      activeViewName = standardPageEntry ? standardPageEntry[0] : 'Standard Page';
-      isStandardPage = true;
-      activeViewContent = <StandardPagePlaceholder pageName={activeViewName} />;
-  } else if (activeSection) {
-      activeViewName = activeSection.name;
-      activeViewContent = (
-           <div className="space-y-6">
+    } else if (!isNaN(standardPageIndex) && standardPageIndex < -1) {
+        // Display Standard Page Placeholder
+        const standardPageEntry = Object.entries(STANDARD_PAGE_INDICES).find(([, index]) => index === standardPageIndex);
+        activeViewName = standardPageEntry ? standardPageEntry[0] : 'Standard Page';
+        isStandardPage = true;
+        activeViewContent = <StandardPagePlaceholder pageName={activeViewName} />;
+    } else if (activeSection) {
+        // Display Section Editor
+        activeViewName = activeSection.name;
+        activeViewContent = (
+            <div className="space-y-6">
+                {/* AI Prompt Card */}
                 <Card className="shadow-md">
                   <CardHeader>
                     <CardTitle className="text-primary text-glow-primary">{activeSection.name} - AI Prompt</CardTitle>
@@ -866,6 +1084,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                   </CardContent>
                 </Card>
 
+                {/* Section Content Card */}
               <Card className="shadow-md mb-6">
                 <CardHeader>
                   <CardTitle>{activeSection.name} - Content</CardTitle>
@@ -907,10 +1126,11 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                   </CardFooter>
               </Card>
             </div>
-      );
-  } else {
-      activeViewContent = (
-          <div className="flex items-center justify-center h-full">
+        );
+    } else {
+        // Display Placeholder if no section is selected
+        activeViewContent = (
+            <div className="flex items-center justify-center h-full">
                <Card className="text-center py-8 px-6 max-w-md mx-auto shadow-md">
                   <CardHeader>
                     <CardTitle className="text-xl text-primary text-glow-primary">Select or Generate Sections</CardTitle>
@@ -926,17 +1146,20 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                   </CardContent>
                 </Card>
             </div>
-      );
-  }
+        );
+    }
 
+  // Main Editor Layout
   return (
     <Sheet open={isMobileSheetOpen} onOpenChange={setIsMobileSheetOpen}>
-      <div className="flex h-full relative">
+      <div className="flex h-full relative"> {/* Ensure relative positioning for FAB */}
+
         {/* Mobile: Sidebar inside Sheet */}
         <SheetContent side="left" className="p-0 w-64 bg-card md:hidden">
-          <SheetHeader className="p-4 border-b"> {/* Visible header for mobile sheet */}
+          <SheetHeader className="p-4 border-b">
             <SheetTitle>Project Menu</SheetTitle>
           </SheetHeader>
+          {/* Render Sidebar Content Component */}
           <ProjectSidebarContent
             project={project}
             activeSectionId={activeSectionId}
@@ -960,46 +1183,53 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
         {/* Desktop: Static Sidebar */}
         <div className={cn("hidden md:flex md:flex-col transition-all duration-300 ease-in-out overflow-y-auto overflow-x-hidden", "w-64 border-r")}>
-           <ProjectSidebarContent
-              project={project}
-              activeSectionId={activeSectionId}
-              setActiveSectionId={handleSetActiveSection}
-              handleGenerateTocClick={handleGenerateTocClick}
-              isGeneratingOutline={isGeneratingOutline}
-              isGenerating={isGenerating}
-              isSummarizing={isSummarizing}
-              isSuggesting={isSuggesting}
-              handleSaveOnline={handleSaveOnline}
-              canUndo={canUndo}
-              handleUndo={handleUndo}
-              isEditingSections={isEditingSections}
-              setIsEditingSections={setIsEditingSections}
-              onEditSectionName={handleEditSectionName}
-              onDeleteSection={handleDeleteSection}
-              onAddSection={handleAddSection}
+           {/* Render Sidebar Content Component */}
+            <ProjectSidebarContent
+                project={project}
+                activeSectionId={activeSectionId}
+                setActiveSectionId={handleSetActiveSection}
+                handleGenerateTocClick={handleGenerateTocClick}
+                isGeneratingOutline={isGeneratingOutline}
+                isGenerating={isGenerating}
+                isSummarizing={isSummarizing}
+                isSuggesting={isSuggesting}
+                handleSaveOnline={handleSaveOnline}
+                canUndo={canUndo}
+                handleUndo={handleUndo}
+                isEditingSections={isEditingSections}
+                setIsEditingSections={setIsEditingSections}
+                onEditSectionName={handleEditSectionName}
+                onDeleteSection={handleDeleteSection}
+                onAddSection={handleAddSection}
             />
         </div>
 
         {/* --- Main Content Area --- */}
         <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Header */}
           <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/95 backdrop-blur-sm px-4 lg:px-6 flex-shrink-0">
             <h1 className="flex-1 text-lg font-semibold md:text-xl text-primary truncate text-glow-primary">
                {activeViewName}
             </h1>
+            {/* Storage Type Indicator */}
             <div className="flex items-center gap-1 text-xs text-muted-foreground ml-auto mr-2" title={`Project stored ${project.storageType === 'local' ? 'locally' : 'in the cloud'}`}>
               {project.storageType === 'local' ? <CloudOff className="h-4 w-4" /> : <Cloud className="h-4 w-4 text-green-500" />}
               <span>{project.storageType === 'local' ? 'Local' : 'Cloud'}</span>
             </div>
+             {/* Preview Button */}
              <Button variant="outline" size="sm" onClick={handlePreview} disabled={!project} className="ml-2 focus-visible:glow-accent">
                 <Eye className="mr-2 h-4 w-4" /> Preview
              </Button>
+             {/* Export Button */}
             <Button variant="outline" size="sm" onClick={handleNavigateToExport} className="hover:glow-accent focus-visible:glow-accent ml-2">
               <Download className="mr-2 h-4 w-4" /> Export Report
             </Button>
           </header>
 
+          {/* Scrollable Content Area */}
           <ScrollArea className="flex-1 p-4 md:p-6">
               {activeViewContent}
+              {/* AI Suggestions Card */}
              <Card className="shadow-md mt-6">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-primary text-glow-primary"><Sparkles className="w-5 h-5" /> AI Suggestions</CardTitle>
@@ -1017,6 +1247,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                     {suggestions && (
                         <div className="mt-4 p-4 border rounded-md bg-muted/30">
                             <h4 className="font-semibold mb-2 text-foreground">Suggestions:</h4>
+                            {/* Render suggestions using Markdown */}
                             <div className="prose prose-sm max-w-none dark:prose-invert text-foreground" dangerouslySetInnerHTML={{ __html: marked.parse(suggestions) }} />
                         </div>
                     )}
@@ -1025,20 +1256,28 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
           </ScrollArea>
         </div>
 
-        {/* Floating Action Button for Mobile */}
-        <Button
-            ref={fabRef}
-            variant="default"
-            size="icon"
-            className={cn("fixed z-20 rounded-full shadow-lg w-14 h-14 hover:glow-primary focus-visible:glow-primary cursor-grab active:cursor-grabbing", "md:hidden")}
-            style={{ left: `${fabPosition.x}px`, top: `${fabPosition.y}px`, position: 'fixed' }}
-            onMouseDown={onFabMouseDown}
-            onClick={(e) => { if (!isDraggingFab) setIsMobileSheetOpen(true); }}
-            title="Open project menu"
-            aria-label="Open project menu"
-        >
-            <Menu className="h-6 w-6" />
-        </Button>
+        {/* Floating Action Button (FAB) for Mobile Sidebar */}
+         <Button
+             ref={fabRef}
+             variant="default"
+             size="icon"
+             className={cn(
+                 "fixed z-20 rounded-full shadow-lg w-14 h-14 hover:glow-primary focus-visible:glow-primary cursor-grab active:cursor-grabbing",
+                 "md:hidden" // Hide FAB on medium screens and up
+             )}
+             style={{ left: `${fabPosition.x}px`, top: `${fabPosition.y}px`, position: 'fixed' }} // Ensure position is fixed
+             onMouseDown={onFabMouseDown}
+             onClick={(e) => {
+                 if (!isDraggingFab) { // Only trigger sheet if not dragging
+                    setIsMobileSheetOpen(true);
+                 }
+             }}
+             title="Open project menu"
+             aria-label="Open project menu"
+         >
+             <Menu className="h-6 w-6" />
+         </Button>
+
 
         {/* Context Warning Dialog */}
         <AlertDialog open={showOutlineContextAlert} onOpenChange={setShowOutlineContextAlert}>

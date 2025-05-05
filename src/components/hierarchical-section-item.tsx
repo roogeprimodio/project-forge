@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast'; // Import useToast
 export interface HierarchicalSectionItemProps {
     section: HierarchicalProjectSection;
     level: number;
+    numbering: string; // Added numbering prop (e.g., "1", "1.2", "2.3.1")
     activeSectionId: string | null;
     setActiveSectionId: (id: string | number) => void; // Allow number for standard pages
     onEditSectionName: (id: string, newName: string) => void; // Changed signature
@@ -25,6 +26,7 @@ export interface HierarchicalSectionItemProps {
 export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = ({
     section,
     level,
+    numbering, // Destructure numbering prop
     activeSectionId,
     setActiveSectionId,
     onEditSectionName,
@@ -33,8 +35,6 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
     isEditing,
     onCloseSheet,
 }) => {
-    // IMPORTANT: Ensure section.id is always unique across the entire project structure.
-    // If duplicate IDs exist, React's reconciliation will fail, causing "key" prop warnings.
     const isActive = section.id === activeSectionId;
     const [isExpanded, setIsExpanded] = useState(true);
     const [isNameEditing, setIsNameEditing] = useState(false); // State for inline name editing
@@ -145,6 +145,9 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
                         <span className="w-6 mr-1 flex-shrink-0"></span> // Placeholder for alignment
                     )}
 
+                    {/* Display Numbering */}
+                    <span className="mr-2 font-medium text-muted-foreground min-w-[2em] text-right">{numbering}</span>
+
                     <FileText className="mr-2 h-4 w-4 flex-shrink-0" />
                     {/* Name display or Input field */}
                     {isNameEditing ? (
@@ -202,13 +205,12 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
             {/* Render Sub-sections */}
             {hasSubSections && isExpanded && (
                 <div className="ml-0"> {/* No extra margin */}
-                    {section.subSections.map((subSection) => (
-                        // ** Ensure the key prop is DIRECTLY on the recursively rendered HierarchicalSectionItem **
-                        // Double-check that subSection.id is unique within this parent section's subSections.
+                    {section.subSections.map((subSection, index) => (
                         <HierarchicalSectionItem
                             key={subSection.id} // Key is crucial here!
                             section={subSection}
                             level={level + 1}
+                            numbering={`${numbering}.${index + 1}`} // Calculate sub-section numbering
                             activeSectionId={activeSectionId}
                             setActiveSectionId={setActiveSectionId}
                             onEditSectionName={onEditSectionName}

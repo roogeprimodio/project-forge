@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Settings, Undo, Lightbulb, Cloud, CloudOff, PlusCircle, FileText, Loader2, Edit3, Trash2 } from 'lucide-react'; // Import Loader2, Edit3, Trash2
-import type { Project, SectionIdentifier } from '@/types/project';
+import type { Project, SectionIdentifier, HierarchicalProjectSection } from '@/types/project';
 import { STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES } from '@/types/project';
 import { HierarchicalSectionItem } from './hierarchical-section-item'; // Import the extracted component
 import { useToast } from '@/hooks/use-toast'; // Import useToast for inline editing
@@ -37,7 +37,7 @@ export interface ProjectSidebarContentProps {
  * ProjectSidebarContent Component
  *
  * Displays the sidebar content for the project editor, including project details,
- * standard pages, and editable table of contents. Handles toggling, edits,
+ * standard pages, and editable table of contents with numbering. Handles toggling, edits,
  * and new section creation.
  */
 export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
@@ -119,7 +119,7 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                                 key={pageId} // Key for standard page buttons using the unique index
                                 variant={activeSectionId === pageId ? "secondary" : "ghost"}
                                 size="sm"
-                                onClick={() => handleSectionClick(pageId)}
+                                onClick={() => handleSectionClick(STANDARD_PAGE_INDICES[pageName])} // Pass numeric index here
                                 className="justify-start"
                                 aria-current={activeSectionId === pageId ? "page" : undefined}
                                 title={pageName}
@@ -145,14 +145,16 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                             </Button>
                        </div>
                        {project.sections?.length > 0 ? (
-                          project.sections.map((section) => (
-                            // ** Ensure the key prop is DIRECTLY on HierarchicalSectionItem **
+                          project.sections.map((section, index) => (
+                            // ** Apply the key directly to the HierarchicalSectionItem component **
+                            // Ensure section.id is unique within the project.sections array.
                             <HierarchicalSectionItem
                                 key={section.id} // Apply key here to the component rendered by map
                                 section={section}
                                 level={0}
+                                numbering={`${index + 1}`} // Pass initial numbering
                                 activeSectionId={activeSectionId}
-                                setActiveSectionId={handleSectionClick}
+                                setActiveSectionId={(id) => handleSectionClick(id)} // Pass string ID
                                 onEditSectionName={onEditSectionName}
                                 onDeleteSection={onDeleteSection} // Pass handler
                                 onAddSubSection={handleAddNewSection} // Pass add sub-section handler
