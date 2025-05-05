@@ -121,7 +121,8 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
                 {/* Indentation and Toggle Button - This div provides the indentation */}
                 <div
                     className="flex items-center flex-shrink-0 h-8" // Fixed height for alignment
-                    style={{ paddingLeft: `${1 + level * 1.5}rem` }} // Apply indentation here
+                    // Adjusted paddingLeft: Start with 0rem for level 0, then add 1.5rem per level
+                    style={{ paddingLeft: `${level * 1.5}rem` }}
                 >
                     {hasSubSections ? (
                         <Button
