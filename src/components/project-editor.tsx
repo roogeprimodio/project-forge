@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { BookOpen, Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, List, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, FileWarning, Eye, Trash2, Edit3, PlusCircle } from 'lucide-react'; // Added Trash2, Edit3, PlusCircle
+import { BookOpen, Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, List, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, FileWarning, Eye, Trash2, Edit3, PlusCircle, ChevronDown, ChevronRight } from 'lucide-react'; // Added ChevronDown, ChevronRight
 import Link from 'next/link';
 import type { Project, HierarchicalProjectSection, GeneratedSectionOutline, SectionIdentifier } from '@/types/project'; // Use hierarchical type, import SectionIdentifier
 import { STANDARD_REPORT_PAGES, TOC_SECTION_NAME, STANDARD_PAGE_INDICES, findSectionById, updateSectionById, deleteSectionById } from '@/types/project'; // Import project utils
@@ -41,7 +41,7 @@ interface HierarchicalSectionItemProps {
     activeSectionId: string | null;
     setActiveSectionId: (id: string) => void;
     onEditSectionName: (id: string) => void;
-    onDeleteSection: (id: string) => void; // New prop for delete handler
+    onDeleteSection: (id: string) => void;
     isEditing: boolean;
     onCloseSheet?: () => void;
 }
@@ -52,15 +52,23 @@ const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = ({
     activeSectionId,
     setActiveSectionId,
     onEditSectionName,
-    onDeleteSection, // New prop
+    onDeleteSection,
     isEditing,
     onCloseSheet,
 }) => {
     const isActive = section.id === activeSectionId;
+    const [isExpanded, setIsExpanded] = useState(true); // State for expanding/collapsing sub-sections
+    const hasSubSections = section.subSections && section.subSections.length > 0;
 
     const handleSectionClick = () => {
+        if (isEditing) return; // Don't change selection in edit mode
         setActiveSectionId(section.id);
         onCloseSheet?.(); // Close sheet on selection (mobile)
+    };
+
+    const handleToggleExpand = (e: React.MouseEvent) => {
+         e.stopPropagation(); // Prevent triggering section click
+         setIsExpanded(!isExpanded);
     };
 
     const handleEditClick = (e: React.MouseEvent) => {
@@ -75,20 +83,42 @@ const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = ({
 
     return (
         <div>
-            <Button
-                variant={isActive ? "secondary" : "ghost"}
-                size="sm"
-                onClick={handleSectionClick}
-                className={cn("justify-start truncate w-full group", isEditing && 'pr-16')} // Add padding if editing
-                aria-current={isActive ? "page" : undefined}
-                style={{ paddingLeft: `${1 + level * 1.5}rem` }} // Indentation
-                title={section.name}
-            >
-                <FileText className="mr-2 h-4 w-4 flex-shrink-0" />
-                <span className="truncate flex-1">{section.name}</span>
+            <div className="flex items-center group relative"> {/* Container for button and icons */}
+                <Button
+                    variant={isActive && !isEditing ? "secondary" : "ghost"}
+                    size="sm"
+                    onClick={handleSectionClick}
+                    className={cn(
+                        "justify-start truncate flex-1 group/btn", // Use group/btn for button-specific hover
+                        isEditing ? 'pr-16' : 'pr-2' // Adjust padding based on edit mode
+                    )}
+                    aria-current={isActive && !isEditing ? "page" : undefined}
+                    style={{ paddingLeft: `${1 + level * 1.5}rem` }} // Indentation
+                    title={section.name}
+                    disabled={isEditing} // Disable main click in edit mode
+                >
+                     {/* Expand/Collapse Toggle */}
+                    {hasSubSections ? (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={handleToggleExpand}
+                            className="h-6 w-6 mr-1 text-muted-foreground hover:bg-muted/50 flex-shrink-0"
+                            aria-label={isExpanded ? "Collapse section" : "Expand section"}
+                        >
+                            {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                        </Button>
+                    ) : (
+                        <span className="w-6 mr-1 flex-shrink-0"></span> // Placeholder for alignment
+                    )}
+
+                    <FileText className="mr-2 h-4 w-4 flex-shrink-0" />
+                    <span className="truncate flex-1">{section.name}</span>
+                </Button>
+
                  {/* Edit and Delete Buttons - only show when editing is enabled */}
                  {isEditing && (
-                    <div className="absolute right-1 top-1/2 transform -translate-y-1/2 flex gap-1 opacity-100 group-hover:opacity-100 transition-opacity">
+                     <div className="absolute right-1 top-1/2 transform -translate-y-1/2 flex gap-1 opacity-100 group-hover:opacity-100 transition-opacity z-10">
                          <Button
                              variant="ghost"
                              size="icon"
@@ -109,13 +139,14 @@ const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = ({
                         </Button>
                     </div>
                  )}
-            </Button>
-            {section.subSections && section.subSections.length > 0 && (
+            </div>
+            {/* Render Sub-sections */}
+            {hasSubSections && isExpanded && (
                 <div className="ml-0"> {/* No extra margin here, padding handled by button style */}
                     {section.subSections.map((subSection) => (
-                       <React.Fragment key={subSection.id}> {/* Add key to Fragment */}
+                       <React.Fragment key={subSection.id}> {/* Use Fragment key */}
                             <HierarchicalSectionItem
-                                key={subSection.id}
+                                key={subSection.id} // Key on the component itself
                                 section={subSection}
                                 level={level + 1}
                                 activeSectionId={activeSectionId}
@@ -175,7 +206,8 @@ function ProjectSidebarContent({
      const handleSectionClick = (id: string | number) => {
          // If editing, clicking a section shouldn't change active selection, but might close sheet
          if (isEditingSections) {
-             onCloseSheet?.();
+             // Do nothing or maybe allow selection if needed? For now, prevent selection change.
+             // onCloseSheet?.();
              return;
          }
          setActiveSectionId(id); // Pass string ID or numeric standard index
@@ -184,7 +216,8 @@ function ProjectSidebarContent({
 
      const handleAddNewSection = () => {
           onAddSection(); // Add top-level section
-          onCloseSheet?.(); // Close sheet if open
+          // Optionally close sheet? Depends on desired UX
+          // onCloseSheet?.();
       };
 
      return (
@@ -231,9 +264,9 @@ function ProjectSidebarContent({
                         const pageIndex = STANDARD_PAGE_INDICES[pageName];
                         const pageId = String(pageIndex); // Use string representation
                         return (
-                           <React.Fragment key={pageId}> {/* Add key to Fragment */}
+                           <React.Fragment key={pageId}> {/* Use Fragment key */}
                                 <Button
-                                    key={pageId}
+                                    key={pageId} // Key on the button itself
                                     variant={activeSectionId === pageId ? "secondary" : "ghost"}
                                     size="sm"
                                     onClick={() => handleSectionClick(pageIndex)} // Pass numeric index
@@ -265,9 +298,9 @@ function ProjectSidebarContent({
                        </div>
                        {project.sections?.length > 0 ? (
                           project.sections.map((section) => (
-                            <React.Fragment key={section.id}> {/* Add key to Fragment */}
+                            <React.Fragment key={section.id}> {/* Use Fragment key */}
                                 <HierarchicalSectionItem
-                                    key={section.id} // Use unique section ID
+                                    key={section.id} // Key on the component
                                     section={section}
                                     level={0}
                                     activeSectionId={activeSectionId}
@@ -283,7 +316,7 @@ function ProjectSidebarContent({
                          <p className="px-2 text-xs text-muted-foreground italic">Generate or add sections.</p>
                        )}
                        {/* Add New Section Button (visible in edit mode or if no sections) */}
-                        {(isEditingSections || (project.sections?.length ?? 0) === 0) && (
+                        {isEditingSections && (
                             <Button
                                 variant="outline"
                                 size="sm"
@@ -691,30 +724,48 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     updateProject(prev => ({
         ...prev,
         sections: updateSectionById(prev.sections, id, { content }),
-    }));
+    }), false); // Do not save every character change to history for content
   };
+
+  const handleSectionContentBlur = () => {
+      if (!project) return;
+      // Save the current state explicitly to history when the textarea loses focus
+      updateProject(prev => ({ ...prev }), true);
+  };
+
 
   const handleSectionPromptChange = (id: string, prompt: string) => {
     if (!project) return;
      updateProject(prev => ({
          ...prev,
          sections: updateSectionById(prev.sections, id, { prompt }),
-     }));
+     }), false); // Do not save prompt changes immediately to history
   }
+
+   const handleSectionPromptBlur = () => {
+       if (!project) return;
+       updateProject(prev => ({ ...prev }), true); // Save prompt changes on blur
+   };
 
   const handleProjectDetailChange = (field: keyof Project, value: string) => {
     if (!project) return;
     const validStringFields: (keyof Project)[] = ['title', 'projectContext', 'teamDetails', 'instituteName', 'collegeInfo', 'teamId', 'subject', 'semester', 'branch', 'guideName'];
     if (validStringFields.includes(field)) {
-        updateProject({ [field]: value });
+        updateProject({ [field]: value }, false); // Don't save intermediate changes
     } else {
         console.warn(`Attempted to update non-string/optional field ${String(field)} via handleProjectDetailChange`);
     }
   };
 
+   const handleProjectDetailBlur = () => {
+        if (!project) return;
+        updateProject(prev => ({ ...prev }), true); // Save changes on blur
+    };
+
+
    const handleProjectTypeChange = (value: 'mini-project' | 'internship') => {
     if (!project) return;
-    updateProject({ projectType: value });
+    updateProject({ projectType: value }, true); // Save immediately
   };
 
   const handleLogoUpload = (field: 'universityLogoUrl' | 'collegeLogoUrl', file: File | null) => {
@@ -731,7 +782,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     setIsUploadingLogo(prev => ({ ...prev, [field]: true }));
     const reader = new FileReader();
     reader.onloadend = () => {
-        updateProject({ [field]: reader.result as string });
+        updateProject({ [field]: reader.result as string }, true); // Save logo change
         toast({ title: 'Logo Uploaded', description: `${field === 'universityLogoUrl' ? 'University' : 'College'} logo updated.` });
         setIsUploadingLogo(prev => ({ ...prev, [field]: false }));
     };
@@ -745,7 +796,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
   const handleRemoveLogo = (field: 'universityLogoUrl' | 'collegeLogoUrl') => {
        if (!project) return;
-       updateProject({ [field]: undefined });
+       updateProject({ [field]: undefined }, true); // Save logo removal
        toast({ title: 'Logo Removed', description: `${field === 'universityLogoUrl' ? 'University' : 'College'} logo removed.` });
    };
 
@@ -932,6 +983,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         if ('error' in result) throw new Error(result.error);
 
         // Adapt the flat list to the expected hierarchical structure
+        // The AI should return a flat list in `suggestedSections`. We convert it.
         const outlineResult: GeneratedSectionOutline = {
              sections: (result.suggestedSections || []).map(name => ({ name, subSections: [] })) // Assume flat structure for now
         };
@@ -1201,7 +1253,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     if (activeSectionId === String(-1)) {
         activeViewName = 'Project Details';
         activeViewContent = (
-             // Project Details Form (Existing Code)
+             // Project Details Form
               <Card className="shadow-md mb-6">
                 <CardHeader>
                   <CardTitle className="text-glow-primary">Project Details</CardTitle>
@@ -1214,6 +1266,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                       id="projectTitleMain"
                       value={project.title}
                       onChange={(e) => handleProjectDetailChange('title', e.target.value)}
+                      onBlur={handleProjectDetailBlur} // Save on blur
                       placeholder="Enter Project Title"
                       className="mt-1 focus-visible:glow-primary"
                       required
@@ -1244,6 +1297,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                       id="projectContext"
                       value={project.projectContext}
                       onChange={(e) => handleProjectDetailChange('projectContext', e.target.value)}
+                      onBlur={handleProjectDetailBlur} // Save on blur
                       placeholder="Briefly describe your project, goals, scope, technologies..."
                       className="mt-1 min-h-[120px] focus-visible:glow-primary"
                       required
@@ -1272,35 +1326,35 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="instituteName">Institute Name</Label>
-                      <Input id="instituteName" value={project.instituteName || ''} onChange={(e) => handleProjectDetailChange('instituteName', e.target.value)} placeholder="e.g., L. D. College of Engineering" className="mt-1"/>
+                      <Input id="instituteName" value={project.instituteName || ''} onChange={(e) => handleProjectDetailChange('instituteName', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="e.g., L. D. College of Engineering" className="mt-1"/>
                     </div>
                     <div>
                       <Label htmlFor="branch">Branch</Label>
-                      <Input id="branch" value={project.branch || ''} onChange={(e) => handleProjectDetailChange('branch', e.target.value)} placeholder="e.g., Computer Engineering" className="mt-1"/>
+                      <Input id="branch" value={project.branch || ''} onChange={(e) => handleProjectDetailChange('branch', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="e.g., Computer Engineering" className="mt-1"/>
                     </div>
                     <div>
                       <Label htmlFor="semester">Semester</Label>
-                      <Input id="semester" value={project.semester || ''} onChange={(e) => handleProjectDetailChange('semester', e.target.value)} placeholder="e.g., 5" type="number" className="mt-1"/>
+                      <Input id="semester" value={project.semester || ''} onChange={(e) => handleProjectDetailChange('semester', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="e.g., 5" type="number" className="mt-1"/>
                     </div>
                     <div>
                       <Label htmlFor="subject">Subject</Label>
-                      <Input id="subject" value={project.subject || ''} onChange={(e) => handleProjectDetailChange('subject', e.target.value)} placeholder="e.g., Design Engineering - 1A" className="mt-1"/>
+                      <Input id="subject" value={project.subject || ''} onChange={(e) => handleProjectDetailChange('subject', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="e.g., Design Engineering - 1A" className="mt-1"/>
                     </div>
                   </div>
                   <Separator />
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="teamId">Team ID</Label>
-                      <Input id="teamId" value={project.teamId || ''} onChange={(e) => handleProjectDetailChange('teamId', e.target.value)} placeholder="Enter Team ID" className="mt-1"/>
+                      <Input id="teamId" value={project.teamId || ''} onChange={(e) => handleProjectDetailChange('teamId', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="Enter Team ID" className="mt-1"/>
                     </div>
                     <div>
                       <Label htmlFor="guideName">Faculty Guide Name</Label>
-                      <Input id="guideName" value={project.guideName || ''} onChange={(e) => handleProjectDetailChange('guideName', e.target.value)} placeholder="Enter Guide's Name" className="mt-1"/>
+                      <Input id="guideName" value={project.guideName || ''} onChange={(e) => handleProjectDetailChange('guideName', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="Enter Guide's Name" className="mt-1"/>
                     </div>
                   </div>
                   <div>
                     <Label htmlFor="teamDetails">Team Details (Members & Enrollment)</Label>
-                    <Textarea id="teamDetails" value={project.teamDetails} onChange={(e) => handleProjectDetailChange('teamDetails', e.target.value)} placeholder="John Doe - 123456789&#10;Jane Smith - 987654321" className="mt-1 min-h-[100px]"/>
+                    <Textarea id="teamDetails" value={project.teamDetails} onChange={(e) => handleProjectDetailChange('teamDetails', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="John Doe - 123456789&#10;Jane Smith - 987654321" className="mt-1 min-h-[100px]"/>
                     <p className="text-xs text-muted-foreground mt-1">One member per line.</p>
                   </div>
                 </CardContent>
@@ -1321,7 +1375,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     } else if (activeSection) {
         activeViewName = activeSection.name;
         activeViewContent = (
-            // Section Editor (Existing Code)
+            // Section Editor
              <div className="space-y-6">
                   <Card className="shadow-md">
                     <CardHeader>
@@ -1333,7 +1387,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                     <CardContent className="space-y-4">
                       <div>
                         <Label htmlFor={`section-prompt-${activeSection.id}`}>Generation Prompt</Label>
-                        <Textarea id={`section-prompt-${activeSection.id}`} value={activeSection.prompt} onChange={(e) => handleSectionPromptChange(activeSection.id, e.target.value)} placeholder="Instructions for the AI..." className="mt-1 min-h-[100px] font-mono text-sm focus-visible:glow-primary" />
+                        <Textarea id={`section-prompt-${activeSection.id}`} value={activeSection.prompt} onChange={(e) => handleSectionPromptChange(activeSection.id, e.target.value)} onBlur={handleSectionPromptBlur} placeholder="Instructions for the AI..." className="mt-1 min-h-[100px] font-mono text-sm focus-visible:glow-primary" />
                       </div>
                       <Button onClick={() => handleGenerateSection(activeSection.id)} disabled={isGenerating || isSummarizing || isGeneratingOutline || isSuggesting} className="hover:glow-primary focus-visible:glow-primary">
                         {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
@@ -1348,7 +1402,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                     <CardDescription>Edit the content below.</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <Textarea id={`section-content-${activeSection.id}`} value={activeSection.content} onChange={(e) => handleSectionContentChange(activeSection.id, e.target.value)} placeholder={"Generated content appears here..."} className="min-h-[400px] text-base focus-visible:glow-primary" />
+                    <Textarea id={`section-content-${activeSection.id}`} value={activeSection.content} onChange={(e) => handleSectionContentChange(activeSection.id, e.target.value)} onBlur={handleSectionContentBlur} placeholder={"Generated content appears here..."} className="min-h-[400px] text-base focus-visible:glow-primary" />
                   </CardContent>
                     <CardFooter className="flex justify-end">
                       <Button variant="outline" onClick={() => handleSummarizeSection(activeSection.id)} disabled={isSummarizing || isGenerating || isGeneratingOutline || isSuggesting || !activeSection.content?.trim()} className="hover:glow-accent focus-visible:glow-accent">
@@ -1488,37 +1542,34 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
           <ScrollArea className="flex-1 p-4 md:p-6">
               {activeViewContent}
 
-            {/* AI Suggestions Section - Only show if not editing details/standard page */}
-            {activeSectionId !== String(-1) && !isStandardPage && (
-                <Card className="shadow-md mt-6">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-primary text-glow-primary"><Sparkles className="w-5 h-5" /> AI Suggestions</CardTitle>
-                        <CardDescription>Ask the AI for feedback on your report.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div>
-                            <Label htmlFor="suggestion-input">Focus area (Optional)</Label>
-                            <Input id="suggestion-input" value={suggestionInput} onChange={(e) => setSuggestionInput(e.target.value)} placeholder="e.g., Improve flow, Check clarity..." className="mt-1 focus-visible:glow-primary" />
+            {/* AI Suggestions Section - Now always visible below content */}
+             <Card className="shadow-md mt-6">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-primary text-glow-primary"><Sparkles className="w-5 h-5" /> AI Suggestions</CardTitle>
+                    <CardDescription>Ask the AI for feedback on your report.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div>
+                        <Label htmlFor="suggestion-input">Focus area (Optional)</Label>
+                        <Input id="suggestion-input" value={suggestionInput} onChange={(e) => setSuggestionInput(e.target.value)} placeholder="e.g., Improve flow, Check clarity..." className="mt-1 focus-visible:glow-primary" />
+                    </div>
+                    <Button onClick={handleGetSuggestions} disabled={isSuggesting || isGenerating || isSummarizing || isGeneratingOutline} className="hover:glow-primary focus-visible:glow-primary">
+                        {isSuggesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquareQuote className="mr-2 h-4 w-4" />}
+                        {isSuggesting ? 'Getting Suggestions...' : 'Get Suggestions'}
+                    </Button>
+                    {suggestions && (
+                        <div className="mt-4 p-4 border rounded-md bg-muted/30">
+                            <h4 className="font-semibold mb-2 text-foreground">Suggestions:</h4>
+                            <div className="prose prose-sm max-w-none dark:prose-invert text-foreground" dangerouslySetInnerHTML={{ __html: marked.parse(suggestions) }} />
                         </div>
-                        <Button onClick={handleGetSuggestions} disabled={isSuggesting || isGenerating || isSummarizing || isGeneratingOutline} className="hover:glow-primary focus-visible:glow-primary">
-                            {isSuggesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquareQuote className="mr-2 h-4 w-4" />}
-                            {isSuggesting ? 'Getting Suggestions...' : 'Get Suggestions'}
-                        </Button>
-                        {suggestions && (
-                            <div className="mt-4 p-4 border rounded-md bg-muted/30">
-                                <h4 className="font-semibold mb-2 text-foreground">Suggestions:</h4>
-                                <div className="prose prose-sm max-w-none dark:prose-invert text-foreground" dangerouslySetInnerHTML={{ __html: marked.parse(suggestions) }} />
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-             )}
+                    )}
+                </CardContent>
+             </Card>
 
           </ScrollArea>
         </div>
 
         {/* Floating Action Button (FAB) for Mobile Project Sidebar Toggle */}
-        {/* Placed within the main `relative` container */}
          <SheetTrigger asChild>
              <Button
                 ref={fabRef}
@@ -1538,7 +1589,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                     // Prevent sheet opening if it was a drag
                     if (isDraggingFab) {
                          e.preventDefault();
-                         // Optional: reset drag state here if needed, though mouseUp should handle it
                     }
                      // Otherwise, let the default SheetTrigger behavior open the sheet
                 }}
