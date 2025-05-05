@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger, SheetClose } from "@/components/ui/sheet";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { marked } from 'marked'; // For rendering markdown suggestions
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"; // Import RadioGroup
 
 interface ProjectEditorProps {
   projectId: string;
@@ -317,6 +318,11 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     updateProject({ [field]: value });
   };
 
+   const handleProjectTypeChange = (value: 'mini-project' | 'internship') => {
+    if (!project) return;
+    updateProject({ projectType: value });
+  };
+
   // --- Logo Upload Handler ---
   const handleLogoUpload = (field: 'universityLogoUrl' | 'collegeLogoUrl', file: File | null) => {
     if (!project || !file) return;
@@ -602,10 +608,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
    }
 
    if (isProjectFound === false || !project) {
-      if (isProjectFound === false) {
-         return ( <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,60px))] text-center p-4"><CloudOff className="h-16 w-16 text-destructive mb-4" /><h2 className="text-2xl font-semibold text-destructive mb-2">Project Not Found</h2><p className="text-muted-foreground mb-6">The project with ID <code className="bg-muted px-1 rounded">{projectId}</code> could not be found. It might have been deleted or the link is incorrect.</p><Button onClick={() => router.push('/')}><Home className="mr-2 h-4 w-4" /> Go to Dashboard</Button></div> );
-      }
-       return ( <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,60px))] text-center p-4"><Loader2 className="h-16 w-16 animate-spin text-primary mb-4" /><p className="text-lg text-muted-foreground">Finalizing project data...</p><Button onClick={() => router.push('/')} className="mt-4"><Home className="mr-2 h-4 w-4" /> Go to Dashboard</Button></div> );
+      // No changes needed here as project is loaded from history or direct state
+       return ( <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,60px))] text-center p-4"><CloudOff className="h-16 w-16 text-destructive mb-4" /><h2 className="text-2xl font-semibold text-destructive mb-2">Project Not Found</h2><p className="text-muted-foreground mb-6">The project with ID <code className="bg-muted px-1 rounded">{projectId}</code> could not be found. It might have been deleted or the link is incorrect.</p><Button onClick={() => router.push('/')}><Home className="mr-2 h-4 w-4" /> Go to Dashboard</Button></div> );
    }
 
    const activeSection = activeSectionIndex !== null && activeSectionIndex >= 0 && activeSectionIndex < project.sections.length
@@ -704,6 +708,26 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                       required
                     />
                   </div>
+
+                  {/* Project Type Toggle */}
+                   <div className="space-y-2">
+                      <Label>Project Type</Label>
+                      <RadioGroup
+                        value={project.projectType}
+                        onValueChange={(value: 'mini-project' | 'internship') => handleProjectTypeChange(value)}
+                        className="flex items-center gap-4"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="mini-project" id="type-mini" />
+                          <Label htmlFor="type-mini">Mini Project</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="internship" id="type-internship" />
+                          <Label htmlFor="type-internship">Internship</Label>
+                        </div>
+                      </RadioGroup>
+                    </div>
+
                   {/* Project Context */}
                   <div>
                     <Label htmlFor="projectContext">Project Context *</Label>
@@ -964,18 +988,18 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             </Card>
 
              {/* Floating Action Button (FAB) for Mobile Project Sidebar Toggle */}
-             <div className="fixed bottom-6 right-6 z-20 md:hidden"> {/* Only show on mobile */}
+            <div className="fixed bottom-6 right-6 z-20 md:hidden"> {/* Only show on mobile */}
                  <SheetTrigger asChild>
                      <Button
-                         variant="default"
+                         variant="default" // Use default style for FAB
                          size="icon"
-                         className="rounded-full shadow-lg w-14 h-14 hover:glow-primary focus-visible:glow-primary"
+                         className="rounded-full shadow-lg w-14 h-14 hover:glow-primary focus-visible:glow-primary" // Larger FAB
                          title="Open project menu"
                      >
                          <Menu className="h-6 w-6" />
                      </Button>
                  </SheetTrigger>
-             </div>
+            </div>
 
           </ScrollArea>
         </div>

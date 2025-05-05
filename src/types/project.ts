@@ -8,6 +8,7 @@ export interface ProjectSection {
 export interface Project {
   id: string;
   title: string;
+  projectType: 'mini-project' | 'internship'; // Added project type
   projectContext: string; // Added field to store initial project context
   teamDetails: string; // Simple string for now, represents team members & enrollments. TODO: Refactor to Array<{name: string, enrollment: string}>
   instituteName?: string; // Changed to optional, as it might not always be provided
@@ -39,4 +40,3 @@ export const COMMON_SECTIONS = [
   "References",
   "Appendix",
 ];
-

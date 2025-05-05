@@ -42,9 +42,11 @@ export function CreateProjectDialog({ onCreateProject, children }: CreateProject
     const newProject: Project = {
       id: newProjectId,
       title: title.trim(),
+      projectType: 'mini-project', // Default to 'mini-project'
       projectContext: context.trim(),
       teamDetails: '',
-      collegeInfo: '',
+      collegeInfo: '', // Keep collegeInfo if it was intended, or remove if instituteName covers it
+      instituteName: '', // Initialize instituteName
       sections: [], // Start with no sections, outline will be generated later
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
