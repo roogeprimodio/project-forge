@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input'; // Import Input
 import { Label } from '@/components/ui/label'; // Import Label
 import { useToast } from '@/hooks/use-toast'; // Import useToast
+import { useLocalStorage } from '@/hooks/use-local-storage';
 import { User, Mail, Bell, Palette, ShieldCheck, Activity, Edit3, LogOut, Save, XCircle, Loader2 } from 'lucide-react';
 
 export default function ProfilePage() {
@@ -23,6 +24,10 @@ export default function ProfilePage() {
         avatarUrl: 'https://picsum.photos/id/237/200/200', // Example avatar
         username: 'alex_doe', // Added username
     });
+
+    // State for API keys, using local storage
+    const [geminiApiKey, setGeminiApiKey] = useLocalStorage<string>('geminiApiKey', '');
+    const [openaiApiKey, setOpenaiApiKey] = useLocalStorage<string>('openaiApiKey', '');
 
     // State for profile editing
     const [isEditing, setIsEditing] = useState(false);
@@ -177,6 +182,35 @@ export default function ProfilePage() {
                                 <Button variant="link" className="p-0 h-auto text-primary hover:underline">Change Password</Button>
                              </div>
                          )}
+
+                        <Separator />
+
+                        {/* API Keys Section */}
+                        <h3 className="text-xl font-semibold text-primary flex items-center gap-2"><ShieldCheck className="w-5 h-5" /> API Keys</h3>
+                        <div className="space-y-4">
+                            <div>
+                                <Label htmlFor="gemini-api-key">Gemini API Key</Label>
+                                <Input
+                                    id="gemini-api-key"
+                                    type="password"
+                                    value={geminiApiKey}
+                                    onChange={(e) => setGeminiApiKey(e.target.value)}
+                                    placeholder="Enter your Gemini API key"
+                                    className="mt-1 focus-visible:glow-primary"
+                                />
+                            </div>
+                            <div>
+                                <Label htmlFor="openai-api-key">OpenAI API Key</Label>
+                                <Input
+                                    id="openai-api-key"
+                                    type="password"
+                                    value={openaiApiKey}
+                                    onChange={(e) => setOpenaiApiKey(e.target.value)}
+                                    placeholder="Enter your OpenAI API key"
+                                    className="mt-1 focus-visible:glow-primary"
+                                />
+                            </div>
+                        </div>
 
                         <Separator />
 
