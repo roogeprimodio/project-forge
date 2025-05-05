@@ -11,6 +11,8 @@ export interface Project {
   projectContext: string; // Added field to store initial project context
   teamDetails: string; // Simple string for now, represents team members & enrollments. TODO: Refactor to Array<{name: string, enrollment: string}>
   instituteName: string; // Replaced collegeInfo
+  universityLogoUrl?: string; // Added: Optional URL for University Logo
+  collegeLogoUrl?: string; // Added: Optional URL for College Logo
   teamId?: string; // Optional team ID
   subject?: string; // e.g., Design Engineering - 1A
   semester?: string; // e.g., 5
@@ -22,9 +24,7 @@ export interface Project {
   storageType: 'local' | 'cloud'; // Added to indicate where the project is stored
 }
 
-// Removed TOC_SECTION_NAME constant
-
-// Predefined common sections
+// Predefined common sections (used as suggestions if needed, but primary source is AI outline)
 export const COMMON_SECTIONS = [
   "Introduction",
   "Literature Review",

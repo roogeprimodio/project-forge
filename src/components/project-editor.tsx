@@ -9,13 +9,13 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { BookOpen, Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, List, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles } from 'lucide-react'; // Replaced MessageSquareQuestion with MessageSquareQuote
+import { BookOpen, Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, List, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles } from 'lucide-react'; // Use MessageSquareQuote
 import Link from 'next/link';
 import type { Project, ProjectSection } from '@/types/project';
-import { COMMON_SECTIONS } from '@/types/project'; // Removed TOC_SECTION_NAME import
+import { COMMON_SECTIONS } from '@/types/project';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { useToast } from '@/hooks/use-toast';
-import { generateSectionAction, summarizeSectionAction, generateOutlineAction, suggestImprovementsAction } from '@/app/actions'; // Removed generateTocAction, added generateOutlineAction
+import { generateSectionAction, summarizeSectionAction, generateOutlineAction, suggestImprovementsAction } from '@/app/actions';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger, SheetClose } from "@/components/ui/sheet";
@@ -30,19 +30,16 @@ interface ProjectEditorProps {
 const MIN_CONTEXT_LENGTH = 50;
 const MAX_HISTORY_LENGTH = 10; // Limit undo history
 
-// New component for the local sidebar content (details, sections, add)
+// New component for the local sidebar content (details, ToC, actions)
 function ProjectSidebarContent({
     project,
     activeSectionIndex,
     setActiveSectionIndex,
-    addSection,
-    customSectionName,
-    setCustomSectionName,
     handleGenerateOutlineClick, // Renamed prop
     isGeneratingOutline,
     isGenerating,
     isSummarizing,
-    // Removed isGeneratingToc
+    isSuggesting, // Added
     handleSaveOnline,
     canUndo,
     handleUndo,
@@ -51,14 +48,12 @@ function ProjectSidebarContent({
     project: Project;
     activeSectionIndex: number | null | -1;
     setActiveSectionIndex: (index: number | -1) => void;
-    addSection: (name: string) => void;
-    customSectionName: string;
-    setCustomSectionName: (name: string) => void;
+    // Removed addSection, customSectionName, setCustomSectionName
     handleGenerateOutlineClick: () => void; // Renamed prop type
     isGeneratingOutline: boolean;
     isGenerating: boolean;
     isSummarizing: boolean;
-    // Removed isGeneratingToc prop type
+    isSuggesting: boolean; // Added
     handleSaveOnline: () => void;
     canUndo: boolean;
     handleUndo: () => void;
@@ -106,72 +101,47 @@ function ProjectSidebarContent({
                          Project Details
                      </Button>
                      <Separator className="my-2" />
-                      <p className="px-2 text-xs font-semibold text-muted-foreground mb-1">SECTIONS</p>
-                       {project.sections?.map((section, index) => (
-                         <Button
-                             key={`${section.name}-${index}`}
-                             variant={activeSectionIndex === index ? "secondary" : "ghost"}
-                             size="sm"
-                             onClick={() => handleSectionClick(index)} // Use handler
-                             className="justify-start truncate"
-                             aria-current={activeSectionIndex === index ? "page" : undefined}
-                         >
-                             {/* Removed specific icon for ToC */}
-                             <FileText className="mr-2 h-4 w-4 flex-shrink-0"/>
-                             <span className="truncate">{section.name}</span>
-                         </Button>
-                     ))}
+                      {/* Table of Contents (Sections List) */}
+                      <p className="px-2 text-xs font-semibold text-muted-foreground mb-1">TABLE OF CONTENTS</p>
+                       {project.sections?.length > 0 ? (
+                          project.sections.map((section, index) => (
+                            <Button
+                                key={`${section.name}-${index}`}
+                                variant={activeSectionIndex === index ? "secondary" : "ghost"}
+                                size="sm"
+                                onClick={() => handleSectionClick(index)} // Use handler
+                                className="justify-start truncate"
+                                aria-current={activeSectionIndex === index ? "page" : undefined}
+                            >
+                                <FileText className="mr-2 h-4 w-4 flex-shrink-0"/>
+                                <span className="truncate">{section.name}</span>
+                            </Button>
+                          ))
+                       ) : (
+                         <p className="px-2 text-xs text-muted-foreground italic">Generate an outline to populate the ToC.</p>
+                       )}
 
-                     {/* Add Standard Sections */}
-                     <div className="mt-4 px-2">
-                         <p className="text-xs font-semibold text-muted-foreground mb-2">Add Standard Section</p>
-                         <div className="flex flex-col gap-1">
-                             {COMMON_SECTIONS
-                              // Removed ToC filter
-                              .filter(cs => !project.sections?.some(s => s.name.toLowerCase() === cs.toLowerCase()))
-                              .map(sectionName => (
-                                 <Button key={sectionName} variant="ghost" size="sm" className="justify-start text-muted-foreground hover:text-foreground" onClick={() => addSection(sectionName)}>
-                                     {sectionName}
-                                 </Button>
-                             ))}
-                             {COMMON_SECTIONS.every(cs => project.sections?.some(s => s.name.toLowerCase() === cs.toLowerCase())) && ( // Removed ToC filter
-                                  <p className="text-xs text-muted-foreground">All standard sections added.</p>
-                             )}
-                         </div>
-                      </div>
-
-                      {/* Add Custom Section */}
-                       <div className="mt-4 px-2">
-                         <p className="text-xs font-semibold text-muted-foreground mb-2">Add Custom Section</p>
-                         <div className="flex gap-2">
-                             <Input
-                                 value={customSectionName}
-                                 onChange={(e) => setCustomSectionName(e.target.value)}
-                                 placeholder="Section Name"
-                                 className="h-8"
-                             />
-                             <Button size="sm" onClick={() => addSection(customSectionName)} disabled={!customSectionName.trim()}>Add</Button>
-                         </div>
-                       </div>
+                     {/* Removed Add Standard/Custom Section parts */}
                  </nav>
              </ScrollArea>
              <div className="p-4 border-t space-y-2">
+                 {/* Generate/Update Outline Button */}
                  <Button
                     variant="outline"
                     size="sm"
-                    onClick={handleGenerateOutlineClick} // Use renamed handler
-                    disabled={isGeneratingOutline || isGenerating || isSummarizing /* || isGeneratingToc */ || !project.projectContext?.trim()} // Removed isGeneratingToc
+                    onClick={handleGenerateOutlineClick}
+                    disabled={isGeneratingOutline || isGenerating || isSummarizing || isSuggesting || !project.projectContext?.trim()}
                     className="w-full hover:glow-accent focus-visible:glow-accent"
-                    title={!project.projectContext?.trim() ? "Add project context in Project Details first" : "Generate section outline based on project context"}
+                    title={!project.projectContext?.trim() ? "Add project context in Project Details first" : "Generate Table of Contents based on project context"}
                 >
                     {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
-                    {isGeneratingOutline ? 'Generating Outline...' : 'Generate/Update Outline'} {/* Updated text */}
+                    {isGeneratingOutline ? 'Generating ToC...' : 'Generate/Update ToC'}
                 </Button>
                  <Button
                      variant="outline"
                      size="sm"
                      onClick={handleSaveOnline}
-                     disabled={project.storageType === 'cloud'}
+                     disabled={project.storageType === 'cloud'} // Example disabled state
                      className="w-full mt-2 hover:glow-accent focus-visible:glow-accent"
                      title={project.storageType === 'cloud' ? "Project is saved online" : "Save project to the cloud (requires login - coming soon)"}
                  >
@@ -190,20 +160,18 @@ function ProjectSidebarContent({
 export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const [projects, setProjects] = useLocalStorage<Project[]>('projects', []);
   const { toast } = useToast();
-  const [activeSectionIndex, setActiveSectionIndex] = useState<number | null | -1>(null);
+  const [activeSectionIndex, setActiveSectionIndex] = useState<number | null | -1>(null); // -1 for Project Details
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
-  // Removed isGeneratingToc state
-  const [isGeneratingOutline, setIsGeneratingOutline] = useState(false);
+  const [isGeneratingOutline, setIsGeneratingOutline] = useState(false); // State for ToC generation
   const [isSuggesting, setIsSuggesting] = useState(false); // State for suggestion generation
   const [suggestionInput, setSuggestionInput] = useState(''); // State for suggestion text input
   const [suggestions, setSuggestions] = useState<string | null>(null); // State to store AI suggestions
-  const [customSectionName, setCustomSectionName] = useState('');
-  const [isProjectFound, setIsProjectFound] = useState<boolean | null>(null);
-  const [isLocalSidebarOpen, setIsLocalSidebarOpen] = useState(true); // State for local sidebar visibility (desktop)
+  // Removed customSectionName state
+  const [isProjectFound, setIsProjectFound] = useState<boolean | null>(null); // null: loading, true: found, false: not found
   const [isMobileSheetOpen, setIsMobileSheetOpen] = useState(false); // State for mobile sheet visibility
   const [hasMounted, setHasMounted] = useState(false); // Track hydration
-  const [showOutlineContextAlert, setShowOutlineContextAlert] = useState(false); // Renamed from showTocContextAlert
+  const [showOutlineContextAlert, setShowOutlineContextAlert] = useState(false); // Alert for insufficient context for ToC
   const router = useRouter();
 
   // Undo/Redo state
@@ -222,7 +190,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
       if (historyIndex >= 0 && historyIndex < history.length) {
           return history[historyIndex];
       }
-      // Fallback to projects from localStorage if history is empty/invalid (should ideally not happen after init)
+      // Fallback to projects from localStorage if history is empty/invalid
       return Array.isArray(projects) ? projects.find(p => p.id === projectId) : undefined;
   }, [projects, projectId, history, historyIndex]);
 
@@ -263,7 +231,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 if (newHistory.length > MAX_HISTORY_LENGTH) {
                     newHistory.shift(); // Remove the oldest entry
                 }
-                const newIndex = Math.min(newHistory.length - 1, MAX_HISTORY_LENGTH - 1); // Index should correspond to the limited array
+                const newIndex = Math.min(newHistory.length - 1, MAX_HISTORY_LENGTH - 1);
                 setHistoryIndex(newIndex);
                 return newHistory;
             });
@@ -278,31 +246,32 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
              });
         }
 
-
         // Update localStorage with the latest state
         const updatedProjects = [...prevProjects];
         updatedProjects[currentProjectIndex] = updatedProject;
         return updatedProjects;
       });
 
+      // Use requestAnimationFrame to ensure state updates are flushed before resetting the flag
       requestAnimationFrame(() => {
         isUpdatingHistory.current = false;
       });
 
-  }, [project, historyIndex, setProjects, projectId]); // Added projectId
+  }, [project, historyIndex, setProjects, projectId]);
 
 
    // Effect to check if project exists and set initial state
    useEffect(() => {
-    if (!hasMounted || projects === undefined) return; // Don't run on server or before hydration
+    if (!hasMounted || projects === undefined || isUpdatingHistory.current) return; // Don't run on server, before hydration, or during history updates
 
     const projectExists = Array.isArray(projects) && projects.some(p => p.id === projectId);
-    setIsProjectFound(projectExists);
 
-    if (projectExists && activeSectionIndex === null) {
+    if (projectExists && isProjectFound !== true) {
+      setIsProjectFound(true);
+      if (activeSectionIndex === null) {
         setActiveSectionIndex(-1); // Default to project details if project exists
+      }
     } else if (!projectExists && isProjectFound !== false) {
-        // Only show toast and redirect if we newly detect the project is missing
         setIsProjectFound(false); // Set definitively to false
         toast({
             variant: "destructive",
@@ -312,7 +281,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         const timer = setTimeout(() => router.push('/'), 2000);
         return () => clearTimeout(timer);
     }
-   }, [projectId, projects, activeSectionIndex, toast, router, isProjectFound, hasMounted]); // Add hasMounted
+   }, [projectId, projects, activeSectionIndex, toast, router, isProjectFound, hasMounted]);
 
     // --- Undo/Redo Handlers ---
     const handleUndo = useCallback(() => {
@@ -362,35 +331,10 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     updateProject({ [field]: value });
   };
 
-  const addSection = (name: string) => {
-    if (!project || !name.trim()) return;
-    if (project.sections.some(s => s.name.toLowerCase() === name.trim().toLowerCase())) {
-        toast({
-            variant: "destructive",
-            title: "Section Exists",
-            description: `A section named "${name.trim()}" already exists.`,
-        });
-        return;
-    }
+  // Removed addSection function
 
-    const newSection: ProjectSection = {
-      name: name.trim(),
-      prompt: `Generate the ${name.trim()} section for the project titled "${project.title}". Consider the project context: ${project.projectContext || '[No context provided]'}. [Add more specific instructions here if needed]`,
-      content: '',
-      lastGenerated: undefined,
-    };
-     updateProject(prev => ({ ...prev, sections: [...prev.sections, newSection] }));
-    setActiveSectionIndex(project.sections.length); // Set index for the newly added section
-    setCustomSectionName('');
-    toast({
-      title: "Section Added",
-      description: `"${name.trim()}" section has been added.`,
-    });
-     setIsMobileSheetOpen(false); // Close mobile sheet after adding
-  };
-
-  // Renamed: addMultipleSections to setSectionsFromOutline
-  const setSectionsFromOutline = useCallback((newSectionNames: string[]) => {
+  // Renamed: setSectionsFromOutline to updateSectionsFromToc
+  const updateSectionsFromToc = useCallback((newSectionNames: string[]) => {
     if (!project) return;
 
     const existingSectionsMap = new Map(project.sections.map(s => [s.name.toLowerCase(), s]));
@@ -398,8 +342,12 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     let addedCount = 0;
     let preservedCount = 0;
     let sectionOrderChanged = false;
+    let sectionsRemoved = false;
 
-    newSectionNames.forEach((name, index) => {
+    // Track original indices for order change detection
+    const originalIndices = new Map(project.sections.map((s, i) => [s.name.toLowerCase(), i]));
+
+    newSectionNames.forEach((name, newIndex) => {
         const trimmedName = name.trim();
         if (!trimmedName) return; // Skip empty names
 
@@ -408,10 +356,10 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         if (existingSection) {
             // Preserve existing section, update its order
             updatedSections.push(existingSection);
-            existingSectionsMap.delete(trimmedName.toLowerCase()); // Mark as used
-            if (project.sections[index]?.name.toLowerCase() !== trimmedName.toLowerCase()) {
-                sectionOrderChanged = true; // Check if order changed
+            if (originalIndices.get(trimmedName.toLowerCase()) !== newIndex) {
+                sectionOrderChanged = true; // Order changed
             }
+            existingSectionsMap.delete(trimmedName.toLowerCase()); // Mark as used
             preservedCount++;
         } else {
             // Add new section
@@ -422,45 +370,51 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 lastGenerated: undefined,
             });
             addedCount++;
-            sectionOrderChanged = true; // Adding is a change in order/content
+            sectionOrderChanged = true; // Adding is a change
         }
     });
 
-     // Check if any sections were removed (not present in new outline but existed before)
-     const sectionsRemoved = existingSectionsMap.size > 0;
+     // Check if any sections were removed (exist in map means they weren't in newSectionNames)
+     if (existingSectionsMap.size > 0) {
+         sectionsRemoved = true;
+         sectionOrderChanged = true; // Removal is a change
+     }
 
+    // Only update and show toast if there's a meaningful change
     if (addedCount === 0 && !sectionOrderChanged && !sectionsRemoved) {
         toast({
-            title: "Outline Unchanged",
-            description: "The generated outline matches the current section structure.",
+            title: "Table of Contents Unchanged",
+            description: "The generated ToC matches the current section structure.",
         });
         return;
     }
 
+    // Update project with history management
     updateProject(prev => ({
         ...prev,
         sections: updatedSections, // Replace sections entirely with the new ordered list
-    }));
+    }), true); // Explicitly save this structural change to history
 
-    let toastDescription = "Project sections have been updated based on the generated outline.";
+    let toastDescription = "Table of Contents updated.";
     if (addedCount > 0) toastDescription += ` ${addedCount} new section(s) added.`;
     if (preservedCount > 0) toastDescription += ` ${preservedCount} existing section(s) preserved.`;
-    if (sectionsRemoved) toastDescription += ` Some sections were removed.`;
-    if (sectionOrderChanged && addedCount === 0 && !sectionsRemoved) toastDescription = "Section order has been updated based on the generated outline.";
+    if (sectionsRemoved) toastDescription += ` Some sections removed.`;
+    if (sectionOrderChanged && addedCount === 0 && !sectionsRemoved) toastDescription = "Section order updated.";
 
     toast({
-        title: "Project Outline Updated",
+        title: "Table of Contents Updated",
         description: toastDescription,
         duration: 7000, // Longer duration for more info
     });
+
     setActiveSectionIndex(0); // Go to the first section after update
-    setIsMobileSheetOpen(false); // Close mobile sheet after adding/updating
+    setIsMobileSheetOpen(false); // Close mobile sheet after updating
 
 }, [project, updateProject, toast, setActiveSectionIndex]);
 
 
   const handleGenerateSection = async (index: number) => {
-    if (!project || index < 0 || index >= project.sections.length || isGenerating || isSummarizing /*|| isGeneratingToc */|| isGeneratingOutline || isSuggesting) return; // Removed isGeneratingToc
+    if (!project || index < 0 || index >= project.sections.length || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting) return;
 
     const section = project.sections[index];
     setIsGenerating(true);
@@ -468,12 +422,12 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     try {
       // Ensure required fields for the AI action are present
       const input = {
-        projectTitle: project.title || 'Untitled Project', // Provide fallback
+        projectTitle: project.title || 'Untitled Project',
         sectionName: section.name,
         prompt: section.prompt,
-        teamDetails: project.teamDetails || '', // Provide fallback
-        instituteName: project.instituteName || '', // Use instituteName, provide fallback
-        // Add optional fields if they exist in the project, otherwise they remain undefined
+        teamDetails: project.teamDetails || '',
+        instituteName: project.instituteName || '',
+        // Include optional fields if they exist
         teamId: project.teamId,
         subject: project.subject,
         semester: project.semester,
@@ -481,11 +435,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         guideName: project.guideName,
       };
 
-      // Type check (optional but good practice)
-      // const validatedInput: GenerateReportSectionInput = GenerateReportSectionInputSchema.parse(input);
-
       const result = await generateSectionAction(input);
-
 
       if ('error' in result) throw new Error(result.error);
 
@@ -519,7 +469,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   };
 
   const handleSummarizeSection = async (index: number) => {
-      if (!project || index < 0 || index >= project.sections.length || isGenerating || isSummarizing /* || isGeneratingToc */|| isGeneratingOutline || isSuggesting) return; // Removed isGeneratingToc
+      if (!project || index < 0 || index >= project.sections.length || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting) return;
 
       const section = project.sections[index];
       if (!section.content?.trim()) {
@@ -543,51 +493,50 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
       }
   };
 
-  // Removed function extractSectionsFromToc
+  // Renamed: proceedWithOutlineGeneration to proceedWithTocGeneration
+  const proceedWithTocGeneration = useCallback(async () => {
+    if (!project || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting) return;
 
-  // Renamed: proceedWithTocGeneration to proceedWithOutlineGeneration
-  const proceedWithOutlineGeneration = useCallback(async () => {
-    if (!project || isGenerating || isSummarizing /* || isGeneratingToc */ || isGeneratingOutline || isSuggesting) return; // Removed isGeneratingToc
-
-    setIsGeneratingOutline(true);
+    setIsGeneratingOutline(true); // Use the same state, maybe rename state later if needed
     try {
+        // Use generateOutlineAction which is already defined for generating sections
         const result = await generateOutlineAction({ projectTitle: project.title, projectContext: project.projectContext || '' });
         if ('error' in result) throw new Error(result.error);
 
         if (!result.suggestedSections?.length) {
-             toast({ variant: "destructive", title: "Outline Generation Failed", description: "AI did not return any suggested sections." });
+             toast({ variant: "destructive", title: "ToC Generation Failed", description: "AI did not return any suggested sections." });
              setIsGeneratingOutline(false);
              return;
         }
 
-        // Use the new handler to update sections based on the outline
-        setSectionsFromOutline(result.suggestedSections);
+        // Use the renamed handler to update sections based on the generated outline (ToC)
+        updateSectionsFromToc(result.suggestedSections);
 
     } catch (error) {
-        console.error("Outline generation failed:", error);
-        toast({ variant: "destructive", title: "Outline Generation Failed", description: error instanceof Error ? error.message : "Could not generate project outline." });
+        console.error("ToC generation failed:", error);
+        toast({ variant: "destructive", title: "ToC Generation Failed", description: error instanceof Error ? error.message : "Could not generate Table of Contents." });
     } finally {
         setIsGeneratingOutline(false);
     }
-}, [project, isGenerating, isSummarizing, /* isGeneratingToc, */ isGeneratingOutline, isSuggesting, updateProject, toast, setActiveSectionIndex, setSectionsFromOutline]); // Added dependencies
+}, [project, isGenerating, isSummarizing, isGeneratingOutline, isSuggesting, updateSectionsFromToc, toast]);
 
 
-    // Renamed: handleGenerateTocClick to handleGenerateOutlineClick
-    const handleGenerateOutlineClick = () => {
-        if (!project || isGenerating || isSummarizing /* || isGeneratingToc */ || isGeneratingOutline || isSuggesting) return; // Removed isGeneratingToc
+    // Renamed: handleGenerateOutlineClick to handleGenerateTocClick
+    const handleGenerateTocClick = () => {
+        if (!project || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting) return;
 
         const contextLength = project.projectContext?.trim().length || 0;
 
         if (contextLength < MIN_CONTEXT_LENGTH) {
             setShowOutlineContextAlert(true); // Open the confirmation dialog
         } else {
-            proceedWithOutlineGeneration(); // Context is sufficient, proceed directly
+            proceedWithTocGeneration(); // Context is sufficient, proceed directly
         }
     };
 
   // --- AI Suggestions ---
    const handleGetSuggestions = async () => {
-     if (!project || isGenerating || isSummarizing /* || isGeneratingToc */ || isGeneratingOutline || isSuggesting) return; // Removed isGeneratingToc
+     if (!project || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting) return;
 
      setIsSuggesting(true);
      setSuggestions(null); // Clear previous suggestions
@@ -646,12 +595,10 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
      return ( <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,60px))] text-center p-4"><Loader2 className="h-16 w-16 animate-spin text-primary mb-4" /><p className="text-lg text-muted-foreground">Loading project...</p></div> );
    }
 
-   if (isProjectFound === false || !project) { // Combine checks for safety
-     // Show the "Not Found" message only if isProjectFound is definitively false
+   if (isProjectFound === false || !project) {
       if (isProjectFound === false) {
          return ( <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,60px))] text-center p-4"><CloudOff className="h-16 w-16 text-destructive mb-4" /><h2 className="text-2xl font-semibold text-destructive mb-2">Project Not Found</h2><p className="text-muted-foreground mb-6">The project with ID <code className="bg-muted px-1 rounded">{projectId}</code> could not be found. It might have been deleted or the link is incorrect.</p><Button onClick={() => router.push('/')}><Home className="mr-2 h-4 w-4" /> Go to Dashboard</Button></div> );
       }
-       // If isProjectFound is null or true but project is missing, show loading
        return ( <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,60px))] text-center p-4"><Loader2 className="h-16 w-16 animate-spin text-primary mb-4" /><p className="text-lg text-muted-foreground">Finalizing project data...</p><Button onClick={() => router.push('/')} className="mt-4"><Home className="mr-2 h-4 w-4" /> Go to Dashboard</Button></div> );
    }
 
@@ -666,67 +613,58 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
       <div className="flex h-full relative"> {/* Use full height and relative positioning for floating button */}
 
         {/* --- Local Project Sidebar (Drawer on Mobile - Content only) --- */}
-        {/* The SheetTrigger is now the floating button */}
         <SheetContent side="left" className="p-0 w-64 bg-card md:hidden"> {/* Hide on desktop */}
           <SheetHeader className="sr-only">
             <SheetTitle>Project Menu</SheetTitle>
             <SheetDescription>Navigate project sections and details</SheetDescription>
           </SheetHeader>
+          {/* Pass the renamed handler */}
           <ProjectSidebarContent
             project={project}
             activeSectionIndex={activeSectionIndex}
             setActiveSectionIndex={setActiveSectionIndex}
-            addSection={addSection}
-            customSectionName={customSectionName}
-            setCustomSectionName={setCustomSectionName}
-            handleGenerateOutlineClick={handleGenerateOutlineClick} // Use renamed prop
+            handleGenerateOutlineClick={handleGenerateTocClick} // Pass renamed handler
             isGeneratingOutline={isGeneratingOutline}
             isGenerating={isGenerating}
             isSummarizing={isSummarizing}
-            // Removed isGeneratingToc
+            isSuggesting={isSuggesting}
             handleSaveOnline={handleSaveOnline}
-            canUndo={canUndo} // Pass undo state
-            handleUndo={handleUndo} // Pass undo handler
-            onCloseSheet={() => setIsMobileSheetOpen(false)} // Pass close handler
+            canUndo={canUndo}
+            handleUndo={handleUndo}
+            onCloseSheet={() => setIsMobileSheetOpen(false)}
           />
         </SheetContent>
 
-        {/* Desktop Static Sidebar */}
+        {/* Desktop Static Sidebar (Always rendered, width controlled by CSS) */}
         <div
           className={cn(
-            "hidden md:block transition-all duration-300 ease-in-out overflow-y-auto overflow-x-hidden", // Hide on mobile
-            isLocalSidebarOpen ? "w-64 border-r" : "w-0 border-r-0" // Adjust width and border based on state
+            "hidden md:flex md:flex-col transition-all duration-300 ease-in-out overflow-y-auto overflow-x-hidden", // Flex column layout
+            "w-64 border-r" // Static width for desktop
           )}
-          aria-hidden={!isLocalSidebarOpen}
+          aria-hidden={false} // Always accessible on desktop, though content might be visually hidden if needed
         >
-          {/* Only render content if open to prevent visual glitches when collapsed */}
-          {isLocalSidebarOpen && (
-            <ProjectSidebarContent
+          {/* Pass the renamed handler */}
+           <ProjectSidebarContent
               project={project}
               activeSectionIndex={activeSectionIndex}
               setActiveSectionIndex={setActiveSectionIndex}
-              addSection={addSection}
-              customSectionName={customSectionName}
-              setCustomSectionName={setCustomSectionName}
-              handleGenerateOutlineClick={handleGenerateOutlineClick} // Use renamed prop
+              handleGenerateOutlineClick={handleGenerateTocClick} // Pass renamed handler
               isGeneratingOutline={isGeneratingOutline}
               isGenerating={isGenerating}
               isSummarizing={isSummarizing}
-              // Removed isGeneratingToc
+              isSuggesting={isSuggesting}
               handleSaveOnline={handleSaveOnline}
-              canUndo={canUndo} // Pass undo state
-              handleUndo={handleUndo} // Pass undo handler
+              canUndo={canUndo}
+              handleUndo={handleUndo}
               // No onCloseSheet needed for desktop
             />
-          )}
         </div>
 
         {/* --- Main Content Area --- */}
         <div className="flex-1 flex flex-col overflow-hidden"> {/* Allow main content to scroll */}
           {/* Sticky Header for Main Content */}
           <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/95 backdrop-blur-sm px-4 lg:px-6 flex-shrink-0">
-            {/* Global Sidebar Trigger (only if needed, usually handled by MainLayout) */}
-            {/* Mobile Sheet Trigger (moved to FAB) */}
+            {/* Mobile Sheet Trigger (Now FAB) */}
 
             <h1 className="flex-1 text-lg font-semibold md:text-xl text-primary truncate text-glow-primary">
               {activeSectionIndex === -1 ? 'Project Details' : activeSection?.name ?? project.title ?? 'Project'}
@@ -735,7 +673,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
               {project.storageType === 'local' ? <CloudOff className="h-4 w-4" /> : <Cloud className="h-4 w-4 text-green-500" />}
               <span>{project.storageType === 'local' ? 'Local' : 'Cloud'}</span>
             </div>
-            {/* Removed Generate ToC Button */}
             <Button
               variant="outline"
               size="sm"
@@ -753,9 +690,10 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
               <Card className="shadow-md mb-6">
                 <CardHeader>
                   <CardTitle className="text-glow-primary">Project Details</CardTitle>
-                  <CardDescription>Edit general information about your project. Providing context helps the AI generate a relevant outline and content.</CardDescription>
+                  <CardDescription>Edit general information about your project. Providing context helps the AI generate a relevant Table of Contents (ToC) and section content.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
+                  {/* Project Title */}
                   <div>
                     <Label htmlFor="projectTitleMain">Project Title *</Label>
                     <Input
@@ -767,17 +705,47 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                       required
                     />
                   </div>
+                  {/* Project Context */}
                   <div>
-                    <Label htmlFor="projectContext">Project Context</Label>
+                    <Label htmlFor="projectContext">Project Context *</Label>
                     <Textarea
                       id="projectContext"
                       value={project.projectContext}
                       onChange={(e) => handleProjectDetailChange('projectContext', e.target.value)}
-                      placeholder="Briefly describe your project, its goals, scope, and key features or technologies involved. This helps the AI generate a relevant outline and content."
+                      placeholder="Briefly describe your project, its goals, scope, and key features or technologies involved. This context is CRUCIAL for generating an accurate Table of Contents."
                       className="mt-1 min-h-[120px] focus-visible:glow-primary"
+                      required // Make context required for ToC generation
                     />
-                    <p className="text-xs text-muted-foreground mt-1">This context is used by the AI to generate the project outline.</p> {/* Updated description */}
+                    <p className="text-xs text-muted-foreground mt-1">This context is used by the AI to generate the Table of Contents.</p>
                   </div>
+                  {/* Logo URLs */}
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     <div>
+                        <Label htmlFor="universityLogoUrl">University Logo URL</Label>
+                        <Input
+                            id="universityLogoUrl"
+                            value={project.universityLogoUrl || ''}
+                            onChange={(e) => handleProjectDetailChange('universityLogoUrl', e.target.value)}
+                            placeholder="https://example.com/uni_logo.png"
+                            className="mt-1 focus-visible:glow-primary"
+                        />
+                         {/* Optional: Preview Image */}
+                         {project.universityLogoUrl && <img src={project.universityLogoUrl} alt="University Logo Preview" className="mt-2 max-h-16 border rounded" data-ai-hint="university logo"/>}
+                      </div>
+                      <div>
+                         <Label htmlFor="collegeLogoUrl">College Logo URL</Label>
+                         <Input
+                            id="collegeLogoUrl"
+                            value={project.collegeLogoUrl || ''}
+                            onChange={(e) => handleProjectDetailChange('collegeLogoUrl', e.target.value)}
+                            placeholder="https://example.com/college_logo.png"
+                            className="mt-1 focus-visible:glow-primary"
+                         />
+                          {/* Optional: Preview Image */}
+                         {project.collegeLogoUrl && <img src={project.collegeLogoUrl} alt="College Logo Preview" className="mt-2 max-h-16 border rounded" data-ai-hint="college logo"/>}
+                       </div>
+                   </div>
+                  {/* Institute, Branch, Semester, Subject */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="instituteName">Institute Name</Label>
@@ -806,7 +774,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                         value={project.semester || ''}
                         onChange={(e) => handleProjectDetailChange('semester', e.target.value)}
                         placeholder="e.g., 5"
-                        type="number" // Use number type for semester if appropriate
+                        type="number"
                         className="mt-1 focus-visible:glow-primary"
                       />
                     </div>
@@ -822,6 +790,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                     </div>
                   </div>
                   <Separator />
+                  {/* Team ID, Guide Name */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="teamId">Team ID</Label>
@@ -844,6 +813,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                       />
                     </div>
                   </div>
+                  {/* Team Details */}
                   <div>
                     <Label htmlFor="teamDetails">Team Details (Members & Enrollment)</Label>
                     <Textarea
@@ -857,23 +827,23 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                   </div>
                 </CardContent>
                 <CardFooter className="flex justify-end">
+                   {/* Generate/Update ToC Button in Footer */}
                   <Button
                     variant="default"
                     size="sm"
-                    onClick={handleGenerateOutlineClick} // Use renamed handler
-                    disabled={isGeneratingOutline || isGenerating || isSummarizing /*|| isGeneratingToc*/ || isSuggesting || !project.projectContext?.trim()} // Removed isGeneratingToc
+                    onClick={handleGenerateTocClick} // Use renamed handler
+                    disabled={isGeneratingOutline || isGenerating || isSummarizing || isSuggesting || !project.projectContext?.trim()}
                     className="hover:glow-primary focus-visible:glow-primary"
-                    title={!project.projectContext?.trim() ? "Add project context above first" : "Generate section outline based on project context"}
+                    title={!project.projectContext?.trim() ? "Add project context above first" : "Generate Table of Contents based on project context"}
                   >
                     {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
-                    {isGeneratingOutline ? 'Generating Outline...' : 'Generate/Update Outline'} {/* Updated text */}
+                    {isGeneratingOutline ? 'Generating ToC...' : 'Generate/Update ToC'}
                   </Button>
                 </CardFooter>
               </Card>
             ) : activeSection ? (
               // Section Editor
               <div className="space-y-6">
-                {/* Removed conditional check for TOC_SECTION_NAME */}
                   <Card className="shadow-md">
                     <CardHeader>
                       <CardTitle className="text-primary text-glow-primary">{activeSection.name} - AI Prompt</CardTitle>
@@ -892,19 +862,17 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                           className="mt-1 min-h-[100px] font-mono text-sm focus-visible:glow-primary"
                         />
                       </div>
-                      <Button onClick={() => handleGenerateSection(activeSectionIndex)} disabled={isGenerating || isSummarizing /* || isGeneratingToc */ || isGeneratingOutline || isSuggesting} className="hover:glow-primary focus-visible:glow-primary"> {/* Removed isGeneratingToc */}
+                      <Button onClick={() => handleGenerateSection(activeSectionIndex)} disabled={isGenerating || isSummarizing || isGeneratingOutline || isSuggesting} className="hover:glow-primary focus-visible:glow-primary">
                         {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
                         {isGenerating ? 'Generating...' : 'Generate Content'}
                       </Button>
                     </CardContent>
                   </Card>
 
-
                 <Card className="shadow-md mb-6"> {/* Added margin-bottom */}
                   <CardHeader>
                     <CardTitle>{activeSection.name} - Content</CardTitle>
                     <CardDescription>
-                      {/* Removed TOC-specific description */}
                       Edit the generated or existing content below.
                     </CardDescription>
                   </CardHeader>
@@ -913,55 +881,49 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                       id={`section-content-${activeSectionIndex}`}
                       value={activeSection.content}
                       onChange={(e) => handleSectionContentChange(activeSectionIndex, e.target.value)}
-                      placeholder={"Generated content will appear here. You can also write manually."} // Simplified placeholder
+                      placeholder={"Generated content will appear here. You can also write manually."}
                       className="min-h-[400px] text-base focus-visible:glow-primary"
                     />
                   </CardContent>
-                  {/* Removed conditional check for TOC_SECTION_NAME */}
                     <CardFooter className="flex justify-end">
                       <Button
                         variant="outline"
                         onClick={() => handleSummarizeSection(activeSectionIndex)}
-                        disabled={isSummarizing || isGenerating /* || isGeneratingToc */ || isGeneratingOutline || isSuggesting || !activeSection.content?.trim()} // Removed isGeneratingToc
+                        disabled={isSummarizing || isGenerating || isGeneratingOutline || isSuggesting || !activeSection.content?.trim()}
                         className="hover:glow-accent focus-visible:glow-accent"
                       >
                         {isSummarizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ScrollText className="mr-2 h-4 w-4" />}
                         {isSummarizing ? 'Summarizing...' : 'Summarize'}
                       </Button>
                     </CardFooter>
-
                 </Card>
               </div>
             ) : (
               // Initial State - No Section Selected or Empty Project
               <div className="flex items-center justify-center h-full">
-                {project.sections && project.sections.length > 0 ? (
-                  <p className="text-muted-foreground text-lg">Select a section from the sidebar or add a new one.</p>
-                ) : (
-                  <Card className="text-center py-8 px-6 max-w-md mx-auto shadow-md">
+                 <Card className="text-center py-8 px-6 max-w-md mx-auto shadow-md">
                     <CardHeader>
-                      <CardTitle className="text-xl text-primary text-glow-primary">Project Outline Needed</CardTitle>
+                      <CardTitle className="text-xl text-primary text-glow-primary">Table of Contents Needed</CardTitle>
                       <CardDescription className="mt-2">
-                        Your project doesn't have any sections yet.
+                        Your project report sections are managed via the Table of Contents (ToC).
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="mt-4 space-y-4">
-                      <p>Go to <Button variant="link" className="p-0 h-auto text-base" onClick={() => setActiveSectionIndex(-1)}>Project Details</Button> and provide some context, then click "Generate/Update Outline" below or in the details section.</p> {/* Updated text */}
+                      <p>Go to <Button variant="link" className="p-0 h-auto text-base" onClick={() => setActiveSectionIndex(-1)}>Project Details</Button>, provide a title and context, then click "Generate/Update ToC" below or in the details section.</p>
                       <Button
                         variant="default"
                         size="sm"
-                        onClick={handleGenerateOutlineClick} // Use renamed handler
-                        disabled={isGeneratingOutline || isGenerating || isSummarizing /* || isGeneratingToc */ || isSuggesting || !project.projectContext?.trim()} // Removed isGeneratingToc
+                        onClick={handleGenerateTocClick} // Use renamed handler
+                        disabled={isGeneratingOutline || isGenerating || isSummarizing || isSuggesting || !project.projectContext?.trim()}
                         className="hover:glow-primary focus-visible:glow-primary"
-                        title={!project.projectContext?.trim() ? "Add project context in Project Details first" : "Generate section outline based on project context"}
+                        title={!project.projectContext?.trim() ? "Add project context in Project Details first" : "Generate Table of Contents based on project context"}
                       >
                         {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
-                        {isGeneratingOutline ? 'Generating Outline...' : 'Generate/Update Outline'} {/* Updated text */}
+                        {isGeneratingOutline ? 'Generating ToC...' : 'Generate/Update ToC'}
                       </Button>
-                      <p className="text-xs text-muted-foreground mt-3">Alternatively, you can add standard or custom sections manually using the sidebar.</p>
+                      <p className="text-xs text-muted-foreground mt-3">The AI will create the necessary sections based on your project context.</p>
                     </CardContent>
                   </Card>
-                )}
               </div>
             )}
 
@@ -986,10 +948,10 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                     </div>
                     <Button
                         onClick={handleGetSuggestions}
-                        disabled={isSuggesting || isGenerating || isSummarizing /* || isGeneratingToc */ || isGeneratingOutline} // Removed isGeneratingToc
+                        disabled={isSuggesting || isGenerating || isSummarizing || isGeneratingOutline}
                         className="hover:glow-primary focus-visible:glow-primary"
                     >
-                        {isSuggesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquareQuote className="mr-2 h-4 w-4" />} {/* Use MessageSquareQuote */}
+                        {isSuggesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquareQuote className="mr-2 h-4 w-4" />}
                         {isSuggesting ? 'Getting Suggestions...' : 'Get Suggestions'}
                     </Button>
 
@@ -1007,48 +969,36 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             </Card>
 
 
-            {/* Floating Action Button (FAB) for Sidebar Toggle */}
-            <div className="fixed bottom-6 right-6 z-20 md:bottom-8 md:right-8"> {/* Use fixed positioning */}
-              {/* Mobile: Sheet Trigger */}
+            {/* Floating Action Button (FAB) for Mobile Sidebar Toggle */}
+            <div className="fixed bottom-6 right-6 z-20 md:hidden"> {/* Only show on mobile */}
               <SheetTrigger asChild>
                 <Button
                   variant="default" // Use default style for FAB
                   size="icon"
-                  className="rounded-full w-14 h-14 shadow-lg md:hidden hover:glow-primary focus-visible:glow-primary"
+                  className="rounded-full w-14 h-14 shadow-lg hover:glow-primary focus-visible:glow-primary"
                   aria-label="Open project menu"
                 >
                   <Menu className="h-6 w-6" />
                 </Button>
               </SheetTrigger>
-
-              {/* Desktop: Static Sidebar Toggle */}
-              <Button
-                variant="default" // Use default style for FAB
-                size="icon"
-                onClick={() => setIsLocalSidebarOpen(!isLocalSidebarOpen)}
-                className="hidden md:flex rounded-full w-14 h-14 shadow-lg hover:glow-primary focus-visible:glow-primary"
-                aria-label={isLocalSidebarOpen ? "Collapse project menu" : "Expand project menu"}
-              >
-                <Menu className="h-6 w-6" />
-              </Button>
             </div>
           </ScrollArea>
         </div> {/* End Main Content Area */}
 
-        {/* Context Warning Dialog for Outline Generation */}
+        {/* Context Warning Dialog for ToC Generation */}
         <AlertDialog open={showOutlineContextAlert} onOpenChange={setShowOutlineContextAlert}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Project Context May Be Limited</AlertDialogTitle>
               <AlertDialogDescription>
-                The project context provided is quite short. Generating an outline might be less accurate.
+                The project context provided is quite short. Generating an accurate Table of Contents might be difficult.
                 Consider adding more details to the "Project Context" field in Project Details for better results.
-                Do you want to proceed with outline generation anyway?
+                Do you want to proceed with ToC generation anyway?
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={proceedWithOutlineGeneration}>Generate Anyway</AlertDialogAction> {/* Use renamed handler */}
+              <AlertDialogAction onClick={proceedWithTocGeneration}>Generate Anyway</AlertDialogAction> {/* Use renamed handler */}
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
