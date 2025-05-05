@@ -1,22 +1,22 @@
 export type SectionIdentifier = string | number; // ID (string) or standard page index (number)
 
-// Update ProjectSection to be hierarchical and include an ID
+// Interface for the structure expected from the AI outline generation (Hierarchical)
+export interface OutlineSection {
+  name: string;
+  subSections?: OutlineSection[]; // Recursive definition, AI might omit if none
+}
+export interface GeneratedSectionOutline {
+  sections: OutlineSection[];
+}
+
+// Updated Hierarchical Project Section
 export interface HierarchicalProjectSection {
   id: string; // Unique identifier for the section
   name: string;
   prompt: string;
-  content: string;
+  content: string; // For text sections or to store Mermaid code/image ref
   lastGenerated?: Date | string;
-  subSections: HierarchicalProjectSection[]; // Ensure subSections is always an array
-}
-
-// Interface for the structure expected from the AI outline generation (Hierarchical)
-export interface OutlineSection {
-  name: string;
-  subSections?: OutlineSection[]; // Recursive definition (optional from AI)
-}
-export interface GeneratedSectionOutline {
-  sections: OutlineSection[];
+  subSections: HierarchicalProjectSection[]; // Subsections should always be an array
 }
 
 
@@ -40,3 +40,24 @@ export interface Project {
   updatedAt: Date | string;
   storageType: 'local' | 'cloud';
 }
+
+// Constants for standard pages and their indices
+export const TOC_SECTION_NAME = "Table of Contents";
+
+export const STANDARD_REPORT_PAGES = [
+  "Cover Page",
+  "Certificate",
+  "Declaration",
+  "Abstract",
+  "Acknowledgement",
+  "List of Figures",
+  "List of Tables",
+  "Abbreviations",
+  // TOC_SECTION_NAME // TOC is implicitly handled, but constant is useful
+];
+
+export const STANDARD_PAGE_INDICES: { [key: string]: number } = {};
+STANDARD_REPORT_PAGES.forEach((page, index) => {
+  STANDARD_PAGE_INDICES[page] = -(index + 2); // Start from -2 (-1 is Project Details)
+});
+STANDARD_PAGE_INDICES[TOC_SECTION_NAME] = -100; // Assign a distinct index for TOC

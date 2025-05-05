@@ -11,12 +11,12 @@
 import { ai } from '@/ai/ai-instance';
 import { z } from 'genkit';
 
-// Recursive schema for sections and sub-sections
-const OutlineSectionSchema: z.ZodType<any> = z.lazy(() => // Use z.lazy for recursion
+// Recursive schema for sections and sub-sections allowing deeper nesting
+const OutlineSectionSchema: z.ZodType<any> = z.lazy(() =>
     z.object({
-        name: z.string().describe('The full name of the section or sub-section (e.g., "1.1 Background and Motivation"). Should be descriptive and appropriate for a report heading.'),
-        // Ensure subSections is ALWAYS an array, even if empty, when present in the AI output for consistency.
-        subSections: z.array(OutlineSectionSchema).optional().describe('An optional array of sub-sections nested under this section. Each sub-section must follow the same structure. Only include sub-sections where logical subdivision is appropriate. If present, it must be an array.'),
+        name: z.string().describe('The full name of the section or sub-section (e.g., "1.1 Background", "1.1.1 System Architecture Diagram"). Should be descriptive. Use "Figure X:" or "Diagram:" prefix for visuals.'),
+        // Ensure subSections is ALWAYS an array, even if empty, when present.
+        subSections: z.array(OutlineSectionSchema).optional().describe('An optional array of sub-sections nested under this section. Allows for multiple levels (e.g., section -> sub-section -> diagram).'),
     }).describe('A single section or sub-section in the report outline. Sections should be logically ordered.')
 );
 
@@ -27,8 +27,8 @@ const GenerateProjectOutlineInputSchema = z.object({
 export type GenerateProjectOutlineInput = z.infer<typeof GenerateProjectOutlineInputSchema>;
 
 const GenerateProjectOutlineOutputSchema = z.object({
-  // The output schema expects an array of the recursive section schema.
-  sections: z.array(OutlineSectionSchema).describe('An ordered, hierarchical list of suggested sections and sub-sections for the report. The structure must strictly follow the schema, with sections containing optional subSections arrays.'),
+  // Expect an array of the recursive section schema.
+  sections: z.array(OutlineSectionSchema).describe('An ordered, hierarchical list of suggested sections and sub-sections for the report. May include sections for diagrams/figures (e.g., "Figure 1: Flowchart").'),
 });
 export type GenerateProjectOutlineOutput = z.infer<typeof GenerateProjectOutlineOutputSchema>;
 
@@ -40,13 +40,11 @@ const validateOutlineStructure = (sections: any[] | undefined): sections is Outl
             console.warn("Validation failed: Section missing name or is not an object:", section);
             return false;
         }
-        // If subSections exists, it MUST be an array (can be empty). Recursively validate.
         if (section.hasOwnProperty('subSections')) {
             if (!Array.isArray(section.subSections)) {
                 console.warn("Validation failed: subSections exists but is not an array:", section);
                 return false;
             }
-            // Recursively validate sub-sections
             if (!validateOutlineStructure(section.subSections)) return false;
         }
         return true;
@@ -55,11 +53,8 @@ const validateOutlineStructure = (sections: any[] | undefined): sections is Outl
 
 
 export async function generateProjectOutline(input: GenerateProjectOutlineInput): Promise<GenerateProjectOutlineOutput> {
-  // Add a basic check for minimal context length before calling the flow
-  if (!input.projectContext || input.projectContext.trim().length < 30) { // Increased minimum length slightly
+  if (!input.projectContext || input.projectContext.trim().length < 30) {
       console.warn("Project context is very short, AI outline generation might be suboptimal.");
-      // Optionally, you could return a specific error or default structure here
-      // return { error: "Project context is too short for effective outline generation." };
   }
   return generateProjectOutlineFlow(input);
 }
@@ -70,12 +65,12 @@ const prompt = ai.definePrompt({
     schema: GenerateProjectOutlineInputSchema,
   },
   output: {
-    schema: GenerateProjectOutlineOutputSchema, // Use the hierarchical schema
+    schema: GenerateProjectOutlineOutputSchema,
   },
-  // **Enhanced Prompt**
+  // **Enhanced Prompt for Diagrams**
   prompt: `You are an AI expert specializing in structuring academic and technical project reports.
 
-  **Task:** Generate a comprehensive and logically ordered HIERARCHICAL list of section names suitable for a project report, based on the provided title and context.
+  **Task:** Generate a comprehensive and logically ordered HIERARCHICAL list of section names suitable for a project report, based on the provided title and context. Include standard sections and suggest relevant sub-sections. **Where appropriate, also include placeholders for diagrams or figures as specific sub-sections (e.g., "1.1.1 Diagram: System Flowchart", "Figure 3: Results Graph").**
 
   **Project Title:** {{{projectTitle}}}
   **Project Context:** {{{projectContext}}}
@@ -86,60 +81,32 @@ const prompt = ai.definePrompt({
   {
     "sections": [
       {
-        "name": "Section 1 Name (e.g., 1. Introduction)",
-        "subSections": [ // Optional: Include ONLY if logical sub-sections exist. MUST be an array if present.
+        "name": "1. Introduction",
+        "subSections": [
+          { "name": "1.1 Background" },
           {
-            "name": "Sub-section 1.1 Name",
-            "subSections": [] // Can be nested further if needed, MUST be an array.
-          },
-          { "name": "Sub-section 1.2 Name" }
+            "name": "1.2 System Overview",
+            "subSections": [ // Example of diagram placeholder
+              { "name": "1.2.1 Diagram: High-Level Architecture" }
+            ]
+          }
         ]
       },
-      {
-        "name": "Section 2 Name"
-        // "subSections" key is omitted if there are no sub-sections.
-      },
-      // ... more sections
+      { "name": "2. Methodology" },
+      // ... more sections, potentially with nested sub-sections and diagrams
     ]
   }
   \`\`\`
 
   **Critical Instructions:**
-  1.  **JSON ONLY:** Output ONLY the JSON object. Do NOT include any introductory text, explanations, apologies, markdown formatting (like \`\`\`json ... \`\`\`), or any characters before the opening \`{\` or after the closing \`}\`.
-  2.  **Hierarchical Structure:** Adhere strictly to the JSON schema. Use the "subSections" array for nesting (1-2 levels deep is typical). If a section has no sub-sections, OMIT the "subSections" key entirely for that section. If the "subSections" key IS present, its value MUST be an array (it can be empty: \`[]\`).
-  3.  **Standard Sections:** Include essential academic/technical sections (e.g., Introduction, Literature Review, Methodology/Design, Implementation, Results/Evaluation, Discussion, Conclusion, References, Appendix). Adapt these based on the project context.
-  4.  **Context is Key:** Tailor sections and sub-sections *specifically* to the details in the project context. Reflect mentioned technologies, features, evaluation methods, etc.
-  5.  **Logical Flow:** Ensure sections follow a clear progression (problem -> solution -> evaluation -> conclusion).
-  6.  **Naming:** Use clear, descriptive, concise names appropriate for report headings. Include numbering (e.g., "1.", "1.1") if appropriate for the context.
-  7.  **Completeness:** Aim for a reasonably complete outline covering typical report components relevant to the context.
-
-  **Example Valid JSON Output (for a different project):**
-  \`\`\`json
-  {
-    "sections": [
-      {
-        "name": "1. Introduction",
-        "subSections": [
-          { "name": "1.1 Background and Motivation" },
-          { "name": "1.2 Problem Statement" },
-          { "name": "1.3 Objectives" },
-          { "name": "1.4 Scope and Limitations" }
-        ]
-      },
-      { "name": "2. Literature Review" },
-      {
-        "name": "3. System Design",
-        "subSections": [
-          { "name": "3.1 Architecture Overview" },
-          { "name": "3.2 Database Schema" }
-        ]
-      },
-      { "name": "4. Implementation" },
-      { "name": "5. Testing and Evaluation" },
-      { "name": "6. Conclusion" }
-    ]
-  }
-  \`\`\`
+  1.  **JSON ONLY:** Output ONLY the JSON object. No extra text or markdown formatting.
+  2.  **Hierarchical Structure:** Adhere strictly to the schema. Use "subSections" for nesting (allow 2-3 levels). If a section has no sub-sections, OMIT the "subSections" key. If present, "subSections" MUST be an array (can be empty: \`[]\`).
+  3.  **Diagram Placeholders:** Intelligently insert diagram/figure placeholders as sub-sections where visuals would enhance understanding (e.g., for architecture, flowcharts, results). Use naming conventions like "Diagram: [Description]" or "Figure X: [Description]".
+  4.  **Standard Sections:** Include essential academic/technical sections.
+  5.  **Context is Key:** Tailor sections and sub-sections *specifically* to the project context.
+  6.  **Logical Flow:** Ensure sections follow a clear progression.
+  7.  **Naming:** Use clear, descriptive names. Include numbering (e.g., "1.", "1.1", "1.1.1") where appropriate.
+  8.  **Completeness:** Aim for a reasonably complete outline.
 
   Now, generate the JSON output for the given Project Title and Context.
   `,
@@ -155,9 +122,8 @@ const generateProjectOutlineFlow = ai.defineFlow<
 },
 async input => {
     let output: GenerateProjectOutlineOutput | undefined;
-    // **Improved Fallback Outline** (Hierarchical)
     const fallbackOutline: GenerateProjectOutlineOutput = { sections: [
-        { name: "1. Introduction", subSections: [] }, // Use empty arrays for consistency
+        { name: "1. Introduction", subSections: [] },
         { name: "2. Methodology", subSections: [] },
         { name: "3. Implementation", subSections: [] },
         { name: "4. Results", subSections: [] },
@@ -169,22 +135,20 @@ async input => {
         const result = await prompt(input);
         output = result.output;
 
-        // **Enhanced Validation**
         if (!output || typeof output !== 'object' || !validateOutlineStructure(output.sections)) {
-            console.warn("AI did not return a valid hierarchical section structure according to validation. Output received:", JSON.stringify(output));
-            // Attempt to parse schema defensively (might catch simple errors)
+            console.warn("AI did not return a valid hierarchical structure. Output:", JSON.stringify(output));
              try {
                 const parsed = GenerateProjectOutlineOutputSchema.parse(output);
                 console.log("Defensive parsing successful, using parsed output:", parsed);
-                return parsed; // Use the Zod-parsed output if possible
+                return parsed;
              } catch (parseError) {
                  console.error("Defensive parsing also failed:", parseError);
-                 return fallbackOutline; // Fallback if even parsing fails
+                 return fallbackOutline;
              }
         }
 
         console.log("AI outline generation successful and validated.");
-        return output; // Return validated output
+        return output;
 
     } catch (error) {
         console.error("Error calling AI for project outline generation:", error);
@@ -192,7 +156,6 @@ async input => {
              console.warn("AI generation failed possibly due to invalid context. Returning fallback.");
              return fallbackOutline;
          }
-         // General fallback on other errors
          return fallbackOutline;
     }
 });

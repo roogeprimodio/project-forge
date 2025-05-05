@@ -3,10 +3,9 @@
 
 import React, { useEffect, useState } from 'react';
 import { marked } from 'marked';
-import mermaid from 'mermaid';
 import { cn } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
-import MermaidDiagram from './mermaid-diagram'; // Assuming MermaidDiagram component exists
+import MermaidDiagram from './mermaid-diagram'; // Import the MermaidDiagram component
 
 interface MarkdownPreviewProps {
   content: string;
@@ -14,6 +13,7 @@ interface MarkdownPreviewProps {
 
 const MarkdownPreview: React.FC<MarkdownPreviewProps> = React.memo(({ content }) => {
   const [renderedHtml, setRenderedHtml] = useState('');
+  const [diagrams, setDiagrams] = useState<{ code: string; id: string }[]>([]);
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
@@ -22,59 +22,85 @@ const MarkdownPreview: React.FC<MarkdownPreviewProps> = React.memo(({ content })
 
   useEffect(() => {
     if (isClient && content) {
-      // Ensure marked runs only on the client after mount
       try {
-          // Basic sanitization for security (consider a more robust library if needed)
-          const sanitizedContent = content
-              .replace(/<script.*?>.*?<\/script>/gi, '') // Remove script tags
-              .replace(/javascript:/gi, ''); // Remove javascript: links
+        // Basic sanitization
+        const sanitizedContent = content
+            .replace(/<script.*?>.*?<\/script>/gi, '')
+            .replace(/javascript:/gi, '');
 
-          setRenderedHtml(marked.parse(sanitizedContent));
+        // Extract Mermaid blocks and replace them with placeholders
+        const tempDiagrams: { code: string; id: string }[] = [];
+        const placeholderPrefix = 'mermaid-placeholder-';
+        let index = 0;
+        const contentWithoutDiagrams = sanitizedContent.replace(
+          /```mermaid\n([\s\S]*?)\n```/g,
+          (match, code) => {
+            const id = `${placeholderPrefix}${index++}`;
+            tempDiagrams.push({ code: code.trim(), id });
+            return `<div id="${id}" class="mermaid-render-placeholder my-4"></div>`; // Placeholder div
+          }
+        );
 
-          // Re-initialize Mermaid for diagrams within the preview
-          mermaid.initialize({ startOnLoad: false }); // Don't auto-render globally
-          setTimeout(() => { // Allow DOM to update
-            try {
-              mermaid.run({ nodes: document.querySelectorAll(`.markdown-preview-container .mermaid`) });
-            } catch (mermaidError) {
-              console.error("Mermaid rendering error in preview:", mermaidError);
-            }
-          }, 100); // Adjust delay if needed
+        setRenderedHtml(marked.parse(contentWithoutDiagrams));
+        setDiagrams(tempDiagrams);
+
       } catch (error) {
           console.error("Error parsing Markdown:", error);
           setRenderedHtml("<p class='text-destructive'>Error rendering preview.</p>");
+          setDiagrams([]);
       }
     } else {
       setRenderedHtml(''); // Clear if no content or on server
+      setDiagrams([]);
     }
-  }, [content, isClient]); // Re-render when content changes on the client
+  }, [content, isClient]);
+
+  // Effect to render diagrams into placeholders after HTML is rendered
+  useEffect(() => {
+    if (isClient && diagrams.length > 0) {
+        // Give the DOM a moment to update with the placeholders
+        const timeoutId = setTimeout(() => {
+            diagrams.forEach(diagram => {
+                const placeholder = document.getElementById(diagram.id);
+                // While we use the MermaidDiagram component below,
+                // this logic shows how you *could* render directly if needed.
+                // For this implementation, we rely on the component rendering below.
+                // if (placeholder) {
+                //    // Logic to render using mermaid.render could go here
+                // }
+            });
+        }, 100); // Adjust delay if necessary
+         return () => clearTimeout(timeoutId);
+    }
+  }, [diagrams, isClient, renderedHtml]); // Rerun when diagrams or renderedHtml changes
+
 
   if (!isClient) {
-    // Render nothing or a placeholder on the server/during hydration
+    // Server/hydration placeholder
     return <div className="prose prose-sm dark:prose-invert max-w-none p-4 border rounded min-h-[400px] bg-muted/20 flex items-center justify-center"><Loader2 className="animate-spin h-6 w-6 text-muted-foreground"/></div>;
   }
 
   return (
-    <div className="markdown-preview-container"> {/* Add a container class */}
+    <div className="markdown-preview-container space-y-4"> {/* Add space between elements */}
+      {/* Render the HTML part (without diagrams initially) */}
       <div
-        className="prose prose-sm dark:prose-invert max-w-none p-4 border rounded min-h-[400px] bg-muted/20" // Added background for contrast
+        className="prose prose-sm dark:prose-invert max-w-none p-4 border rounded bg-muted/20"
         dangerouslySetInnerHTML={{ __html: renderedHtml || '<p class="italic text-muted-foreground">Nothing to preview yet.</p>' }}
       />
-      {/* Explicitly render Mermaid diagrams *outside* dangerouslySetInnerHTML for better control */}
-       {/* This part might be redundant if mermaid.run() works reliably inside the effect */}
-       {/* Consider keeping it as a fallback or if mermaid.run has issues */}
-      {/*
-      <div className="space-y-4 mt-4 p-4 border rounded bg-muted/20">
-        {content?.match(/```mermaid\n([\s\S]*?)\n```/g)?.map((block, index) => {
-          const code = block.replace(/```mermaid\n/, '').replace(/\n```/, '');
-          return (
-            <div key={`diagram-preview-explicit-${index}`} className="my-4">
-              <MermaidDiagram chart={code} />
-            </div>
-          );
-        })}
-      </div>
-      */}
+
+      {/* Explicitly render Mermaid diagrams using the component */}
+      {diagrams.map((diagram) => (
+        <div key={diagram.id} className="mermaid-diagram-wrapper p-4 border rounded bg-muted/30">
+           <h4 className="text-xs font-semibold text-muted-foreground mb-2">Diagram Preview:</h4>
+           <MermaidDiagram chart={diagram.code} id={`preview-${diagram.id}`} />
+           <details className="mt-2 text-xs">
+               <summary className="cursor-pointer text-muted-foreground hover:text-foreground">Show Code</summary>
+               <pre className="mt-1 p-2 bg-muted rounded-md text-muted-foreground overflow-x-auto max-h-32">
+                 <code>{diagram.code}</code>
+               </pre>
+           </details>
+        </div>
+      ))}
     </div>
   );
 });
