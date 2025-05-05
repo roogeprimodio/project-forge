@@ -1,7 +1,6 @@
-// src/components/project-editor.tsx
 "use client";
 
-import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -9,10 +8,10 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, FileWarning, Eye, Projector } from 'lucide-react'; // Added Projector icon
+import { Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, FileWarning, Eye, Projector } from 'lucide-react'; // Added Projector icon
 import Link from 'next/link';
 import type { Project, HierarchicalProjectSection, GeneratedSectionOutline, SectionIdentifier } from '@/types/project';
-import { STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, findSectionById, updateSectionById, deleteSectionById } from '@/types/project';
+import { findSectionById, updateSectionById, deleteSectionById } from '@/types/project';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { useToast } from '@/hooks/use-toast';
 import { generateSectionAction, summarizeSectionAction, generateOutlineAction, suggestImprovementsAction } from '@/app/actions';
@@ -23,19 +22,15 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { marked } from 'marked';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { v4 as uuidv4 } from 'uuid';
-import { ProjectSidebarContent } from './project-sidebar-content';
-import { HierarchicalSectionItem } from './hierarchical-section-item';
 import AiDiagramGenerator from './ai-diagram-generator'; // Import the new component
 import MermaidDiagram from './mermaid-diagram'; // Import diagram renderer
-
-
+import { ProjectSidebarContent } from './project-sidebar-content'; // Import ProjectSidebarContent
 interface ProjectEditorProps {
   projectId: string;
 }
 
 const MIN_CONTEXT_LENGTH = 50;
 const MAX_HISTORY_LENGTH = 10;
-
 
 // Logo Upload Component
 const LogoUpload = ({
@@ -289,7 +284,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   }, [project, historyIndex, setProjects, projectId]);
 
   useEffect(() => {
-    if (!hasMounted || projects === undefined || isUpdatingHistory.current) return;
+    if (hasMounted && projects === undefined || isUpdatingHistory.current) return;
     const currentProjects = Array.isArray(projects) ? projects : [];
     const projectExists = currentProjects.some(p => p.id === projectId);
     if (projectExists && isProjectFound !== true) {
@@ -433,7 +428,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         const existingMap = new Map(existingSections.map(s => [s.name.toLowerCase(), s]));
         outlineSections.forEach((outlineSection) => {
             const trimmedName = outlineSection.name.trim();
-            if (!trimmedName || STANDARD_REPORT_PAGES.map(p => p.toLowerCase()).includes(trimmedName.toLowerCase())) {
+            if (!trimmedName) {
                 return;
             }
             const existingSection = existingMap.get(trimmedName.toLowerCase());
@@ -465,10 +460,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             }
         });
          for (const [removedName] of existingMap.entries()) {
-            if (!STANDARD_REPORT_PAGES.map(p => p.toLowerCase()).includes(removedName)) {
                  structureChanged = true;
                  break;
-            }
          }
          if (!structureChanged && existingSections.length === updatedSections.length) {
              for (let i = 0; i < updatedSections.length; i++) {
@@ -630,13 +623,14 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
      }
    };
 
-  const handleEditSectionName = (id: string) => {
-    const section = project ? findSectionById(project.sections, id) : null;
-    if (section) {
-        // Not implemented: inline name editing state management
-        toast({ title: "Edit Section Name (WIP)", description: `Inline editing for "${section.name}" not yet fully implemented.` });
-        console.log("Attempted to edit name for section ID:", id);
-    }
+  const handleEditSectionName = (id: string, newName: string) => {
+      if (!project) return;
+
+      updateProject(prev => ({
+          ...prev,
+          sections: updateSectionById(prev.sections, id, { name: newName }),
+      }), true);
+      toast({ title: "Section Name Updated", description: `Section "${newName}" renamed.` });
   };
 
   const handleDeleteSection = (id: string) => {
@@ -691,8 +685,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     }, true);
     toast({ title: "Section Added" });
     setIsEditingSections(true);
-    // Inline editing on add not fully implemented, might need timeout/ref
-    // handleEditSectionName(newSection.id);
   };
 
   const handleSaveOnline = () => {
@@ -836,7 +828,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 </div>
                 <div>
                   <Label htmlFor="teamDetails">Team Details (Members & Enrollment)</Label>
-                  <Textarea id="teamDetails" value={project.teamDetails} onChange={(e) => handleProjectDetailChange('teamDetails', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="John Doe - 123456789&#10;Jane Smith - 987654321" className="mt-1 min-h-[100px]"/>
+                  <Textarea id="teamDetails" value={project.teamDetails} onChange={(e) => handleProjectDetailChange('teamDetails', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="John Doe - 123456789&#10;Jane Smith - 987654321" className="mt-1 min-h-[120px] focus-visible:glow-primary"/>
                   <p className="text-xs text-muted-foreground mt-1">One member per line.</p>
                 </div>
               </CardContent>
@@ -944,7 +936,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         <SheetContent side="left" className="p-0 w-64 bg-card md:hidden">
           <SheetHeader className="p-4 border-b"> {/* Visible header for mobile sheet */}
             <SheetTitle>Project Menu</SheetTitle>
-            {/* <SheetDescription>Navigate sections</SheetDescription> */}
           </SheetHeader>
           <ProjectSidebarContent
             project={project}

@@ -1,4 +1,3 @@
-// src/components/project-sidebar-content.tsx
 "use client";
 
 import React from 'react';
@@ -8,7 +7,7 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Settings, Undo, Lightbulb, Cloud, CloudOff, PlusCircle, FileText } from 'lucide-react';
 import type { Project } from '@/types/project';
-import { STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES } from '@/types/project';
+import { STANDARD_REPORT_PAGES} from '@/types/project';
 import { HierarchicalSectionItem } from './hierarchical-section-item'; // Import the extracted component
 
 // Props interface for ProjectSidebarContent
@@ -27,11 +26,18 @@ export interface ProjectSidebarContentProps {
     onCloseSheet?: () => void;
     isEditingSections: boolean;
     setIsEditingSections: (editing: boolean) => void;
-    onEditSectionName: (id: string) => void;
+    onEditSectionName: (id: string, newName: string) => void;
     onDeleteSection: (id: string) => void; // Define delete handler prop
     onAddSection: (parentId?: string) => void; // Define add handler prop
 }
 
+/**
+ * ProjectSidebarContent Component
+ *
+ * Displays the sidebar content for the project editor, including project details,
+ * standard pages, and editable table of contents.  Handles toggling, edits,
+ * and new section creation.
+ */
 export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
     project,
     activeSectionId,
@@ -59,8 +65,8 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
          onCloseSheet?.();
      };
 
-     const handleAddNewSection = () => {
-          onAddSection();
+     const handleAddNewSection = (parentId?: string) => {
+          onAddSection(parentId);
       };
 
      return (
@@ -104,15 +110,14 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
 
                      {/* Standard Report Pages */}
                      <p className="px-2 text-xs font-semibold text-muted-foreground mb-1">STANDARD PAGES</p>
-                     {STANDARD_REPORT_PAGES.map((pageName) => {
-                        const pageIndex = STANDARD_PAGE_INDICES[pageName];
-                        const pageId = String(pageIndex);
+                     {STANDARD_REPORT_PAGES.map((pageName, index) => {
+                        const pageId = String(-(index + 2)); // Standard pages have negative IDs
                         return (
                             <Button
                                 key={pageId} // Key for standard page buttons
                                 variant={activeSectionId === pageId ? "secondary" : "ghost"}
                                 size="sm"
-                                onClick={() => handleSectionClick(pageIndex)}
+                                onClick={() => handleSectionClick(pageId)}
                                 className="justify-start"
                                 aria-current={activeSectionId === pageId ? "page" : undefined}
                                 title={pageName}
@@ -149,6 +154,7 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                                 setActiveSectionId={(id) => handleSectionClick(id)} // Pass string ID
                                 onEditSectionName={onEditSectionName}
                                 onDeleteSection={onDeleteSection} // Pass handler
+                                onAddSubSection={onAddSection}
                                 isEditing={isEditingSections}
                                 onCloseSheet={onCloseSheet}
                             />
