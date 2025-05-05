@@ -113,6 +113,7 @@ const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = ({
                     )}
 
                     <FileText className="mr-2 h-4 w-4 flex-shrink-0" />
+                    {/* Ensure text span handles potential overflow */}
                     <span className="truncate flex-1">{section.name}</span>
                 </Button>
 
@@ -299,7 +300,7 @@ function ProjectSidebarContent({
                           project.sections.map((section) => (
                             // Key directly on the HierarchicalSectionItem component
                             <HierarchicalSectionItem
-                                key={section.id}
+                                key={section.id} // Key directly on the list item component
                                 section={section}
                                 level={0}
                                 activeSectionId={activeSectionId}
@@ -1520,9 +1521,13 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 variant="outline"
                 size="sm"
                 onClick={handlePreview}
-                // disabled={true} // Re-enable when preview is implemented
+                disabled={!project || activeSectionId === null || activeSectionId === String(-1) || isStandardPage} // Disable for Project Details or standard pages
                 className="ml-2"
-                title="Preview Report (PDF Only)"
+                title={
+                    (!project || activeSectionId === null || activeSectionId === String(-1) || isStandardPage)
+                    ? "Preview not available for Project Details or standard pages"
+                    : "Preview Report (PDF Only)"
+                }
               >
                 <Eye className="mr-2 h-4 w-4" />
                 Preview
@@ -1636,3 +1641,4 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     </Sheet>
   );
 }
+
