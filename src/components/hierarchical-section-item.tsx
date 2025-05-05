@@ -124,49 +124,45 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
 
     return (
         <div className="group w-full"> {/* Ensure group takes full width */}
-             {/* Main row containing toggle, content button, and edit buttons */}
-            <div className="flex group/item relative w-full"> {/* Use w-full */}
+             {/* Main row containing content button and edit buttons */}
+            <div className="flex group/item relative w-full items-center"> {/* Use w-full and items-center */}
 
-                 {/* Indentation Spacer and Toggle */}
-                 <div
-                    className="flex flex-shrink-0 h-8" // Fixed height for alignment, removed items-center
-                    style={{ paddingLeft: `${level * 1.5}rem` }} // Indentation based on level
-                >
-                    {/* Toggle Button Logic */}
-                    {hasSubSections ? (
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={handleToggleExpand}
-                            className="h-6 w-6 mr-1 text-muted-foreground hover:bg-muted/50 flex-shrink-0"
-                            aria-label={isExpanded ? "Collapse section" : "Expand section"}
-                            tabIndex={-1} // Make it non-focusable directly, accessible via parent
-                        >
-                            {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                        </Button>
-                    ) : (
-                        <span className="w-6 mr-1 flex-shrink-0"></span> // Placeholder for alignment
-                    )}
-                 </div>
-
-
-                {/* Section Content Button */}
+                {/* Section Content Button - Apply paddingLeft here for indentation */}
                 <Button
                     variant={(isActive || isNameEditing) && !isEditing ? "secondary" : "ghost"}
                     size="sm"
                     onClick={handleSectionClick}
                     className={cn(
-                        "justify-start text-left flex-1 group/btn h-8 min-w-0 flex items-center", // Use items-center here for vertical alignment
-                        "pl-0 pr-1", // Removed left padding, kept right padding
+                        "justify-start text-left flex-1 group/btn h-8 min-w-0 flex items-center", // items-center for vertical alignment
+                        "pr-1", // Keep right padding for potential actions
                         isEditing ? 'pr-[70px]' : 'pr-1' // Adjust right padding based on edit mode
                     )}
+                    style={{ paddingLeft: `${0.5 + (level * 1.5)}rem` }} // Base padding (0.5rem matches title's pl-2) + level indentation
                     aria-current={isActive && !isEditing && !isNameEditing ? "page" : undefined}
                     title={section.name} // Tooltip
                     disabled={isEditing && !isNameEditing}
                 >
-                    {/* Numbering - Removed mr-1.5 */}
-                    <span className="font-medium text-muted-foreground min-w-[2em] flex-shrink-0">{numbering}</span>
-                    <FileText className="mr-1.5 h-4 w-4 flex-shrink-0" />
+                    {/* Toggle Button or Spacer (Positioned absolutely or with negative margin if needed, or keep inline) */}
+                     {hasSubSections ? (
+                         <Button
+                             variant="ghost"
+                             size="icon"
+                             onClick={handleToggleExpand}
+                             className="h-6 w-6 mr-1 text-muted-foreground hover:bg-muted/50 flex-shrink-0" // Kept mr-1 for spacing
+                             aria-label={isExpanded ? "Collapse section" : "Expand section"}
+                             tabIndex={-1} // Make it non-focusable directly, accessible via parent
+                         >
+                             {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                         </Button>
+                     ) : (
+                         <span className="w-6 mr-1 flex-shrink-0"></span> // Placeholder for alignment
+                     )}
+
+                    {/* Numbering - Remove extra spacing */}
+                    <span className="font-medium text-muted-foreground flex-shrink-0">{numbering}</span>
+                    {/* Icon - Reduce margin */}
+                    <FileText className="ml-1 h-4 w-4 flex-shrink-0" />
+                    {/* Name or Input */}
                     {isNameEditing ? (
                         <Input
                             ref={inputRef}
@@ -174,12 +170,12 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
                             onChange={handleNameChange}
                             onKeyDown={handleNameKeyDown}
                             onBlur={handleNameBlur}
-                            className="h-6 px-1 text-sm flex-1 bg-transparent border-b border-primary focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-primary text-left" // text-left
+                            className="h-6 px-1 text-sm flex-1 bg-transparent border-b border-primary focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-primary text-left ml-1" // Added ml-1
                             onClick={(e) => e.stopPropagation()}
                             onMouseDown={(e) => e.stopPropagation()}
                         />
                     ) : (
-                        <span className="flex-1 truncate text-left">{section.name}</span> // text-left
+                        <span className="flex-1 truncate text-left ml-1">{section.name}</span> // Added ml-1
                     )}
                 </Button>
 
@@ -209,3 +205,4 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
         </div>
     );
 }
+
