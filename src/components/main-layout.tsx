@@ -81,7 +81,8 @@ export function MainLayout({ children }: MainLayoutProps) {
                     Project Forge
                   </a>
                 </Link>
-                <SidebarTrigger className="hidden group-data-[state=collapsed]:flex text-sidebar-foreground" />
+                {/* Sidebar Trigger for Icon Collapse - visible when expanded */}
+                <SidebarTrigger className="hidden group-data-[state=expanded]:flex text-sidebar-foreground" />
             </div>
           </SidebarHeader>
 
@@ -115,7 +116,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                  <Link href="/canva" passHref legacyBehavior>
                     <SidebarMenuButton
                         isActive={pathname === '/canva'}
-                        tooltip="Canva (Placeholder)"
+                        tooltip="Canvas"
                         className="text-sidebar-foreground hover:bg-sidebar-accent data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground"
                     >
                         {/* Using ImageIcon as a placeholder for Canva */}
@@ -152,7 +153,10 @@ export function MainLayout({ children }: MainLayoutProps) {
         <SidebarInset className="flex-1 flex flex-col bg-background">
              {/* Header inside the main content area */}
            <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/95 backdrop-blur-sm px-4 lg:h-[60px] lg:px-6">
-               <SidebarTrigger className="md:hidden text-foreground" /> {/* Trigger for mobile */}
+                {/* Sidebar Trigger for Desktop View */}
+               <SidebarTrigger className="hidden md:flex text-foreground" />
+               {/* Mobile trigger remains if needed, or remove if FAB is sufficient */}
+               {/* <SidebarTrigger className="md:hidden text-foreground" /> */}
                {/* Maybe add breadcrumbs or page title here */}
            </header>
            {/* Page content renders here */}
