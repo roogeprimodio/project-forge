@@ -146,7 +146,7 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
                     size="sm"
                     onClick={handleSectionClick}
                     className={cn(
-                        "justify-start flex-1 group/btn h-8 min-w-0 px-1", // Use px-1 instead of default padding
+                        "justify-start text-left flex-1 group/btn h-8 min-w-0 px-1", // Use px-1, ensure justify-start and text-left
                         isEditing ? 'pr-[70px]' : 'pr-2' // Adjust right padding when edit buttons are visible
                     )}
                     aria-current={isActive && !isEditing && !isNameEditing ? "page" : undefined}
@@ -163,12 +163,12 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
                             onChange={handleNameChange}
                             onKeyDown={handleNameKeyDown}
                             onBlur={handleNameBlur}
-                            className="h-6 px-1 text-sm flex-1 bg-transparent border-b border-primary focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-primary"
+                            className="h-6 px-1 text-sm flex-1 bg-transparent border-b border-primary focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-primary text-left" // Ensure text-left
                             onClick={(e) => e.stopPropagation()} // Prevent button click when editing name
                             onMouseDown={(e) => e.stopPropagation()} // Prevent drag/select issues
                         />
                     ) : (
-                        <span className="flex-1 truncate">{section.name}</span> // This now starts right after the icon
+                        <span className="flex-1 truncate text-left">{section.name}</span> // This now starts right after the icon, ensure text-left
                     )}
                 </Button>
 

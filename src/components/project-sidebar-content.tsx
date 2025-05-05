@@ -13,6 +13,7 @@ import { STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, findSectionById, updatePr
 import { HierarchicalSectionItem } from './hierarchical-section-item'; // Import the hierarchical item
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid'; // Import uuid for generating unique IDs
+import { cn } from '@/lib/utils'; // Import cn for conditional classes
 
 
 // Props interface for ProjectSidebarContent
@@ -126,7 +127,7 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                  // The HierarchicalSectionItem should handle the edit state based on isEditing prop
              }
           }, 0);
-     };
+     }; // <-- This closing brace might have been missing or misplaced
 
 
      // Recursive function to render sections and sub-sections
@@ -136,7 +137,7 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
             const currentNumbering = parentNumbering ? `${parentNumbering}.${index + 1}` : `${index + 1}`;
             return (
                 <HierarchicalSectionItem
-                    key={section.id} // ** Ensure key is unique and stable **
+                    key={section.id} // ** Key is crucial here **
                     section={section}
                     level={level}
                     numbering={currentNumbering} // Pass numbering
@@ -154,15 +155,15 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
     };
 
 
-     return (
+     return ( // Ensure the return statement is correctly placed after all function definitions
         <div className="flex flex-col h-full border-r bg-card">
-            {/* Header */}
+            {/* Header - Uses project.title which updates when parent re-renders */}
             <div className="p-4 border-b flex justify-between items-center flex-shrink-0">
                  <Input
                         id="projectTitleSidebar"
                         value={project.title}
                         readOnly
-                        className="h-8 text-base font-semibold bg-transparent border-0 shadow-none focus-visible:ring-0 p-0 truncate flex-1 mr-2"
+                        className="h-8 text-base font-semibold bg-transparent border-0 shadow-none focus-visible:ring-0 p-0 truncate flex-1 mr-2 text-left" // Explicitly add text-left
                         placeholder="Project Title"
                         aria-label="Project Title (Readonly)"
                     />
@@ -178,14 +179,14 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                 </Button>
             </div>
 
-            {/* Project Details Button */}
+            {/* Project Details Button - `justify-start` aligns content left */}
             <div className="px-2 py-2 flex-shrink-0">
                 <Button
                     key="-1"
                     variant={activeSectionId === String(-1) ? "secondary" : "ghost"}
                     size="sm"
                     onClick={() => handleSectionClick(-1)}
-                    className="justify-start w-full"
+                    className="justify-start w-full text-left" // Ensure justify-start and text-left
                     aria-current={activeSectionId === String(-1) ? "page" : undefined}
                 >
                     <Settings className="mr-2 h-4 w-4" />
@@ -196,7 +197,7 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
 
             {/* Standard Report Pages Section */}
             <div className="px-2 py-2 flex-shrink-0">
-                <p className="px-2 text-xs font-semibold text-muted-foreground mb-1">STANDARD PAGES</p>
+                <p className="px-2 text-xs font-semibold text-muted-foreground mb-1 text-left">STANDARD PAGES</p> {/* Ensure text-left */}
                 <ScrollArea className="w-full"> {/* No explicit horizontal scroll needed here usually */}
                     <nav className="flex flex-col gap-1">
                         {STANDARD_REPORT_PAGES.map((pageName) => {
@@ -207,12 +208,12 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                                     variant={activeSectionId === pageId ? "secondary" : "ghost"}
                                     size="sm"
                                     onClick={() => handleSectionClick(STANDARD_PAGE_INDICES[pageName])}
-                                    className="justify-start"
+                                    className="justify-start text-left" // Ensure justify-start and text-left
                                     aria-current={activeSectionId === pageId ? "page" : undefined}
                                     title={pageName}
                                 >
                                     <FileText className="mr-2 h-4 w-4 flex-shrink-0" />
-                                    <span>{pageName}</span>
+                                    <span className="truncate">{pageName}</span> {/* Added truncate */}
                                 </Button>
                             );
                         })}
@@ -224,7 +225,7 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
             {/* Report Sections Section */}
             <div className="flex-1 flex flex-col min-h-0"> {/* Allow this section to grow and enable internal scroll */}
                  <div className="flex justify-between items-center px-4 py-2 flex-shrink-0">
-                    <p className="text-xs font-semibold text-muted-foreground">REPORT SECTIONS</p>
+                    <p className="text-xs font-semibold text-muted-foreground text-left">REPORT SECTIONS</p> {/* Ensure text-left */}
                     <Button
                         variant="ghost"
                         size="sm"
@@ -234,13 +235,13 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                         {isEditingSections ? 'Done' : 'Edit'}
                     </Button>
                  </div>
-                 <ScrollArea className="flex-1 px-2 py-2 overflow-x-auto"> {/* Take remaining space and allow horizontal scroll */}
+                 <ScrollArea className="flex-1 px-2 py-2 overflow-x-auto"> {/* Takes remaining space and allows horizontal scroll */}
                      <nav className="flex flex-col gap-1 whitespace-nowrap"> {/* Add whitespace-nowrap */}
                        {project.sections?.length > 0 ? (
                           // Call the recursive rendering function starting at level 0
                           renderSectionsRecursive(project.sections, 0)
                        ) : (
-                         <p className="px-2 text-xs text-muted-foreground italic">Generate or add sections.</p>
+                         <p className="px-2 text-xs text-muted-foreground italic text-left">Generate or add sections.</p> // Ensure text-left
                        )}
                        {/* Add New Section Button (visible in edit mode) */}
                         {isEditingSections && (
@@ -249,7 +250,7 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleAddSectionLocal()} // Add top-level section
-                                className="justify-start mt-2 text-muted-foreground hover:text-primary"
+                                className="justify-start mt-2 text-muted-foreground hover:text-primary text-left" // Ensure text-left
                                 title="Add new top-level section"
                             >
                                 <PlusCircle className="mr-2 h-4 w-4" />
@@ -291,4 +292,4 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
              </div>
         </div>
      );
-}
+};
