@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'; // Import ScrollBar
 import { Separator } from '@/components/ui/separator';
-import { Settings, Undo, Lightbulb, Cloud, CloudOff, PlusCircle, FileText, Loader2, ChevronRight, ChevronDown, Edit3, Trash2 } from 'lucide-react'; // Import necessary icons
+import { Settings, Undo, Lightbulb, Cloud, CloudOff, PlusCircle, FileText, Loader2 } from 'lucide-react'; // Import necessary icons
 import type { Project, SectionIdentifier, HierarchicalProjectSection } from '@/types/project';
 import { STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, findSectionById } from '@/lib/project-utils'; // Import from lib
 import { HierarchicalSectionItem } from './hierarchical-section-item'; // Import the hierarchical item
@@ -160,7 +160,7 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                         })}
                     </nav>
                      <ScrollBar orientation="horizontal" />
-                     <ScrollBar orientation="vertical" /> {/* Explicitly add vertical scrollbar if needed */}
+                     <ScrollBar orientation="vertical" /> {/* Explicitly add vertical scrollbar */}
                 </ScrollArea>
             </div>
             <Separator className="my-0 flex-shrink-0" />
