@@ -60,8 +60,9 @@ export default function ProfilePage() {
 
     const handleSave = () => {
         setIsSaving(true);
-        // Simulate saving data
+        // Simulate saving data (includes profile info AND API keys if changed)
         console.log('Saving profile:', editForm);
+        console.log('Saving API keys (local storage):', { geminiApiKey: '...', openaiApiKey: '...' }); // Log placeholders
         setTimeout(() => {
             setUser(prevUser => ({
                 ...prevUser,
@@ -69,11 +70,12 @@ export default function ProfilePage() {
                 email: editForm.email,
                 username: editForm.username,
             }));
+            // API keys are saved automatically by useLocalStorage hook
             setIsSaving(false);
             setIsEditing(false);
             toast({
                 title: 'Profile Updated',
-                description: 'Your profile information has been saved.',
+                description: 'Your profile information and API keys have been saved locally.',
             });
         }, 1500);
     };
@@ -186,37 +188,43 @@ export default function ProfilePage() {
                         <Separator />
 
                         {/* API Keys Section */}
-                        <h3 className="text-xl font-semibold text-primary flex items-center gap-2"><ShieldCheck className="w-5 h-5" /> API Keys</h3>
+                        <h3 className="text-xl font-semibold text-primary flex items-center gap-2"><ShieldCheck className="w-5 h-5" /> API Keys (Stored Locally)</h3>
                         <div className="space-y-4">
                             <div>
-                                <Label htmlFor="gemini-api-key">Gemini API Key</Label>
+                                <Label htmlFor="gemini-api-key">Google Gemini API Key</Label>
                                 <Input
                                     id="gemini-api-key"
-                                    type="password"
+                                    type="password" // Mask the key
                                     value={geminiApiKey}
                                     onChange={(e) => setGeminiApiKey(e.target.value)}
                                     placeholder="Enter your Gemini API key"
                                     className="mt-1 focus-visible:glow-primary"
+                                    autoComplete="off" // Discourage browser saving
                                 />
+                                <p className="text-xs text-muted-foreground mt-1">Optional. If provided, this key will be used for Gemini features.</p>
                             </div>
                             <div>
                                 <Label htmlFor="openai-api-key">OpenAI API Key</Label>
                                 <Input
                                     id="openai-api-key"
-                                    type="password"
+                                    type="password" // Mask the key
                                     value={openaiApiKey}
                                     onChange={(e) => setOpenaiApiKey(e.target.value)}
-                                    placeholder="Enter your OpenAI API key"
+                                    placeholder="Enter your OpenAI API key (sk-...)"
                                     className="mt-1 focus-visible:glow-primary"
+                                    autoComplete="off" // Discourage browser saving
                                 />
+                                <p className="text-xs text-muted-foreground mt-1">Optional. Used for features leveraging OpenAI models (if implemented).</p>
                             </div>
+                            {/* Add more inputs for other providers as needed */}
+                             <p className="text-xs text-destructive">Note: Keys are stored in your browser's local storage. Do not use this on shared computers.</p>
                         </div>
 
                         <Separator />
 
                         <h3 className="text-xl font-semibold text-primary flex items-center gap-2"><Palette className="w-5 h-5" /> Preferences</h3>
                         <div className="space-y-3 text-sm">
-                            <p><strong className="text-foreground">Theme:</strong> Light (Option to switch)</p>
+                            <p><strong className="text-foreground">Theme:</strong> (Theme toggle in sidebar)</p>
                             <p><strong className="text-foreground">Language:</strong> English (US)</p>
                         </div>
 
