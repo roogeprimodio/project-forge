@@ -78,6 +78,7 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
         onDeleteSection(section.id);
     };
 
+    // ** UPDATED: Handler for adding a sub-section **
     const handleAddSubSectionClick = (e: React.MouseEvent) => {
         e.stopPropagation(); // Prevent parent button click
         onAddSubSection(section.id); // Call the passed handler with the current section's ID as parent
@@ -122,41 +123,47 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
     };
 
 
-    return (
+    // Make sure the return statement is correctly placed within the component function
+    return ( // This is the start of the return statement
         <div className="group w-full"> {/* Ensure group takes full width */}
              {/* Main row containing content button and edit buttons */}
             <div className="flex group/item relative w-full items-center"> {/* Use w-full and items-center */}
 
-                {/* Section Content Button - Use a div for structure */}
-                <div
-                    role="button" // Make it behave like a button for accessibility
-                    tabIndex={isEditing ? -1 : 0} // Only focusable when not editing sections
+                {/* Section Content Button */}
+                <Button
+                    variant="ghost" // Use ghost variant for clickable area
                     onClick={handleSectionClick}
-                    onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && handleSectionClick()} // Keyboard activation
                     className={cn(
-                        "flex items-center justify-start text-left flex-1 group/btn h-8 min-w-0", // Added min-w-0
-                        (isActive || isNameEditing) && !isEditing ? "bg-secondary" : "hover:bg-ghost", // Apply background on hover/active
-                        isEditing ? 'pr-[70px]' : 'pr-1 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md', // Adjust padding and add focus/cursor when not editing
+                        "flex items-center justify-start text-left flex-1 group/btn h-8 min-w-0 pl-0", // Use pl-0 here, indentation handled by inner div
+                        (isActive || isNameEditing) && !isEditing ? "bg-secondary" : "hover:bg-ghost",
+                        isEditing ? 'pr-[70px]' : 'pr-1 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md',
                     )}
-                    style={{ paddingLeft: `${level * 1.5}rem` }} // Apply indentation here
+                    disabled={isEditing || isNameEditing} // Disable button interaction during edits
                     aria-current={isActive && !isEditing && !isNameEditing ? "page" : undefined}
                     title={section.name} // Tooltip
+                    tabIndex={isEditing ? -1 : 0} // Focusable only when not editing
                 >
-                    {/* Toggle Button or Spacer (Positioned first) */}
-                    {hasSubSections ? (
-                         <Button
-                             variant="ghost"
-                             size="icon"
-                             onClick={handleToggleExpand}
-                             className="h-6 w-6 mr-1 text-muted-foreground hover:bg-muted/50 flex-shrink-0"
-                             aria-label={isExpanded ? "Collapse section" : "Expand section"}
-                             tabIndex={0} // Make it focusable
-                         >
-                             {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                         </Button>
-                     ) : (
-                         <span className="w-6 mr-1 flex-shrink-0"></span> // Placeholder for alignment
-                     )}
+                    {/* Indentation and Toggle */}
+                    <div
+                        className="flex items-center flex-shrink-0 h-full" // Use h-full for vertical alignment
+                        style={{ paddingLeft: `${level * 1.5}rem` }} // Apply indentation here
+                        onClick={(e) => e.stopPropagation()} // Prevent clicks on this div from triggering parent button during edit
+                    >
+                        {hasSubSections ? (
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={handleToggleExpand} // Separate toggle handler
+                                className="h-6 w-6 mr-1 text-muted-foreground hover:bg-muted/50 flex-shrink-0"
+                                aria-label={isExpanded ? "Collapse section" : "Expand section"}
+                                tabIndex={0} // Make toggle focusable independently
+                            >
+                                {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                            </Button>
+                        ) : (
+                            <span className="w-6 mr-1 flex-shrink-0"></span> // Placeholder for alignment
+                        )}
+                    </div>
 
                     {/* Numbering */}
                     <span className="font-medium text-muted-foreground flex-shrink-0 mr-1">{numbering}</span>
@@ -171,13 +178,14 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
                             onKeyDown={handleNameKeyDown}
                             onBlur={handleNameBlur}
                             className="h-6 px-1 text-sm flex-1 bg-transparent border-b border-primary focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-primary text-left"
-                            onClick={(e) => e.stopPropagation()}
-                            onMouseDown={(e) => e.stopPropagation()}
+                            onClick={(e) => e.stopPropagation()} // Prevent clicks propagating to parent button
+                            onMouseDown={(e) => e.stopPropagation()} // Prevent drag initiation on input
+                            aria-label={`Editing section name ${section.name}`}
                         />
                     ) : (
                         <span className="flex-1 truncate text-left">{section.name}</span>
                     )}
-                </div>
+                </Button>
 
 
                  {/* Edit, Delete, and Add Sub-section Buttons (visible only in edit mode) */}
@@ -186,6 +194,7 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
                          <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={handleEditClick} aria-label={`Edit section name ${section.name}`} title="Edit name">
                              <Edit3 className="h-4 w-4" />
                          </Button>
+                          {/* ** UPDATED: "+" button now calls handleAddSubSectionClick ** */}
                           <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={handleAddSubSectionClick} aria-label={`Add sub-section to ${section.name}`} title="Add sub-section">
                               <PlusCircle className="h-4 w-4" />
                           </Button>

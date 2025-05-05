@@ -95,9 +95,10 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
     };
 
 
-     return (
+     // Make sure the return statement is correctly placed within the component function
+     return ( // This is the start of the return statement
         <div className="flex flex-col h-full border-r bg-card">
-            {/* Header */}
+            {/* Header - Uses project.title which updates when parent re-renders */}
             <div className="p-4 border-b flex justify-between items-center flex-shrink-0">
                  <Input
                         id="projectTitleSidebar"
@@ -183,13 +184,15 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                      <div className="px-2 py-2">
                         <nav className="flex flex-col gap-1 min-w-max text-left whitespace-nowrap"> {/* min-w-max and whitespace-nowrap */}
                            {project.sections?.length > 0 ? (
-                                renderSectionsRecursive(project.sections, 0)
+                               // ** Pass onAddSubSection down to the recursive renderer **
+                               renderSectionsRecursive(project.sections, 0)
                            ) : (
                              <p className="text-xs text-muted-foreground italic text-left">Generate or add sections.</p>
                            )}
+                           {/* Add New Top-Level Section Button */}
                            {isEditingSections && (
                                <Button
-                                   key="add-new-section-button"
+                                   key="add-new-top-level-section-button"
                                    variant="outline"
                                    size="sm"
                                    onClick={handleAddNewSection}

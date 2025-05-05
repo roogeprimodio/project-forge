@@ -1,6 +1,7 @@
 // src/lib/project-utils.ts
 import type { Project, HierarchicalProjectSection } from '@/types/project';
 import type React from 'react';
+import { v4 as uuidv4 } from 'uuid'; // Import uuid
 
 // Recursive function to find a section by ID
 export function findSectionById(sections: HierarchicalProjectSection[], id: string): HierarchicalProjectSection | null {
@@ -30,6 +31,7 @@ export function updateSectionById(
         }
         if (section.subSections) {
             const updatedSubSections = updateSectionById(section.subSections, id, updates);
+            // Check if subSections array reference changed to avoid unnecessary re-renders
             if (updatedSubSections !== section.subSections) {
                 return { ...section, subSections: updatedSubSections };
             }
@@ -37,6 +39,39 @@ export function updateSectionById(
         return section;
     });
 }
+
+// ** NEW: Recursive function to add a subsection under a specific parent ID **
+export function addSubSectionById(
+    sections: HierarchicalProjectSection[],
+    parentId: string,
+    newSubSection: Omit<HierarchicalProjectSection, 'subSections'> // New subsection data (ID is generated)
+): HierarchicalProjectSection[] {
+    return sections.map(section => {
+        if (section.id === parentId) {
+            // Found the parent, add the new subsection
+            const subSectionToAdd: HierarchicalProjectSection = {
+                ...newSubSection,
+                id: newSubSection.id || uuidv4(), // Ensure ID exists or generate one
+                subSections: [], // Initialize empty subSections array for the new item
+            };
+            return {
+                ...section,
+                subSections: [...(section.subSections || []), subSectionToAdd], // Add to existing or new array
+            };
+        }
+        if (section.subSections) {
+            // Recursively search in subsections
+            const updatedSubSections = addSubSectionById(section.subSections, parentId, newSubSection);
+            if (updatedSubSections !== section.subSections) {
+                // If subsections were updated, return the section with the updated list
+                return { ...section, subSections: updatedSubSections };
+            }
+        }
+        // If not the parent and no changes in subsections, return the original section
+        return section;
+    });
+}
+
 
 // Recursive function to delete a section by ID
 export function deleteSectionById(sections: HierarchicalProjectSection[], id: string): HierarchicalProjectSection[] {
@@ -126,28 +161,36 @@ export const updateProject = (
         if (saveToHistory) {
             setHistory(prevHistory => {
                 const newHistory = prevHistory.slice(0, historyIndex + 1);
+                // Only add to history if the state actually changed
                 if (newHistory.length === 0 || JSON.stringify(newHistory[newHistory.length - 1]) !== JSON.stringify(updatedProject)) {
                     newHistory.push(updatedProject);
+                    // Trim history if it exceeds the maximum length
+                    if (newHistory.length > maxHistoryLength) {
+                         newHistory.shift(); // Remove the oldest entry
+                    }
+                    // Update the history index to point to the latest state
+                    setHistoryIndex(newHistory.length - 1);
+                } else {
+                    // If state hasn't changed, don't add duplicates, just ensure index is correct
+                    setHistoryIndex(newHistory.length - 1);
                 }
-                if (newHistory.length > maxHistoryLength) {
-                    newHistory.shift();
-                }
-                const newIndex = Math.min(newHistory.length - 1, maxHistoryLength - 1);
-                setHistoryIndex(newIndex);
+
                 return newHistory;
             });
         } else {
             // If not saving to history (e.g., during typing), update the current history state directly
+            // Only update if the state actually changed to prevent unnecessary state updates
             setHistory(prevHistory => {
                 const newHistory = [...prevHistory];
                 if (historyIndex >= 0 && historyIndex < newHistory.length) {
-                     if (JSON.stringify(newHistory[historyIndex]) !== JSON.stringify(updatedProject)) {
+                    if (JSON.stringify(newHistory[historyIndex]) !== JSON.stringify(updatedProject)) {
                         newHistory[historyIndex] = updatedProject;
-                     }
+                    }
                 }
                 return newHistory;
             });
         }
+
 
         // --- Update Main Projects Array (for localStorage) ---
         const updatedProjects = [...currentProjectsArray];
