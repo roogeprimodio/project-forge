@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, FileWarning, Eye, Projector, Undo } from 'lucide-react'; // Added Projector, Undo icons
+import { Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, FileWarning, Eye, Projector } from 'lucide-react';
 import Link from 'next/link';
 import type { Project, HierarchicalProjectSection, GeneratedSectionOutline, SectionIdentifier, OutlineSection } from '@/types/project'; // Use hierarchical type, Import OutlineSection
 import { findSectionById, updateSectionById, deleteSectionById, STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, TOC_SECTION_NAME } from '@/lib/project-utils'; // Import helpers from lib
@@ -34,7 +34,8 @@ interface ProjectEditorProps {
   projectId: string;
 }
 
-const MIN_CONTEXT_LENGTH = 50;
+const MIN_CONTEXT_LENGTH = 50; // Minimum character length for context
+const MIN_CONTEXT_WORDS = 10; // Minimum word count for context
 const MAX_HISTORY_LENGTH = 10;
 
 // Logo Upload Component
@@ -300,7 +301,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
       setIsProjectFound(true);
       // Set initial active section (e.g., Project Details) if none is active
       if (activeSectionId === null) {
-        setActiveSectionId(String(-1)); // -1 for Project Details
+        handleSetActiveSection(String(-1)); // -1 for Project Details
       }
     } else if (!projectExists && isProjectFound !== false) {
       setIsProjectFound(false);
@@ -313,7 +314,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
       return () => clearTimeout(timer); // Cleanup timer on unmount
     }
      // Only run when projectId, projects, activeSectionId, or isProjectFound change
-  }, [projectId, projects, activeSectionId, toast, router, isProjectFound, hasMounted]);
+  }, [projectId, projects, activeSectionId, toast, router, isProjectFound, hasMounted, handleSetActiveSection]); // Added handleSetActiveSection dependency
 
 
   // Handle Undo action
@@ -633,7 +634,9 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         if (!project || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting) return;
 
         const contextLength = project.projectContext?.trim().length || 0;
-        if (contextLength < MIN_CONTEXT_LENGTH) {
+        const contextWords = project.projectContext?.trim().split(/\s+/).filter(Boolean).length || 0; // Count words
+
+        if (contextLength < MIN_CONTEXT_LENGTH || contextWords < MIN_CONTEXT_WORDS) {
             setShowOutlineContextAlert(true); // Show warning dialog
         } else {
             proceedWithTocGeneration(); // Proceed directly if context is sufficient
@@ -879,7 +882,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 <div>
                   <Label htmlFor="projectContext">Project Context *</Label>
                   <Textarea id="projectContext" value={project.projectContext} onChange={(e) => handleProjectDetailChange('projectContext', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="Briefly describe your project, goals, scope, technologies..." className="mt-1 min-h-[120px] focus-visible:glow-primary" required />
-                  <p className="text-xs text-muted-foreground mt-1">Crucial for AI section generation.</p>
+                  <p className="text-xs text-muted-foreground mt-1">Crucial for AI section generation (at least {MIN_CONTEXT_WORDS} words and {MIN_CONTEXT_LENGTH} characters recommended).</p>
                 </div>
                  {/* Logo Uploads */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -1155,7 +1158,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         {/* Context Warning Dialog */}
         <AlertDialog open={showOutlineContextAlert} onOpenChange={setShowOutlineContextAlert}>
           <AlertDialogContent>
-            <AlertDialogHeader> <AlertDialogTitle>Project Context May Be Limited</AlertDialogTitle> <AlertDialogDescription> The project context is short. Generating accurate sections might be difficult. Consider adding more details in "Project Context" for better results. Proceed anyway? </AlertDialogDescription> </AlertDialogHeader>
+            <AlertDialogHeader> <AlertDialogTitle>Project Context May Be Limited</AlertDialogTitle> <AlertDialogDescription> The project context is short ({project?.projectContext?.trim().split(/\s+/).filter(Boolean).length || 0} words, minimum {MIN_CONTEXT_WORDS} recommended). Generating accurate sections might be difficult. Consider adding more details in "Project Context" for better results. Proceed anyway? </AlertDialogDescription> </AlertDialogHeader>
             <AlertDialogFooter> <AlertDialogCancel>Cancel</AlertDialogCancel> <AlertDialogAction onClick={proceedWithTocGeneration}>Generate Anyway</AlertDialogAction> </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
