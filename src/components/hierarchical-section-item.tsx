@@ -1,13 +1,13 @@
 // src/components/hierarchical-section-item.tsx
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input'; // Import Input for editing
-import { FileText, Trash2, Edit3, ChevronDown, ChevronRight, PlusCircle } from 'lucide-react'; // Added PlusCircle, ChevronDown, ChevronRight
+import { Input } from '@/components/ui/input';
+import { FileText, Trash2, Edit3, ChevronDown, ChevronRight, PlusCircle } from 'lucide-react';
 import type { HierarchicalProjectSection, SectionIdentifier } from '@/types/project';
 import { cn } from '@/lib/utils';
-import { useToast } from '@/hooks/use-toast'; // Import useToast
+import { useToast } from '@/hooks/use-toast';
 
 // Props interface for HierarchicalSectionItem
 export interface HierarchicalSectionItemProps {
@@ -44,7 +44,15 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
     const [tempName, setTempName] = useState(section.name);
     const { toast } = useToast();
     const hasSubSections = section.subSections && section.subSections.length > 0;
-    const inputRef = React.useRef<HTMLInputElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    // Update tempName if the external section name changes while not editing
+    useEffect(() => {
+        if (!isNameEditing) {
+            setTempName(section.name);
+        }
+    }, [section.name, isNameEditing]);
+
 
     const handleSectionClick = () => {
         if (isEditing || isNameEditing) return; // Prevent click if editing name or structure
@@ -117,12 +125,11 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
     return (
         <div className="group">
              {/* Main row containing toggle, content button, and edit buttons */}
-            <div className="flex items-center group/item relative pr-1"> {/* Ensure space for edit buttons */}
+            <div className="flex group/item relative pr-1"> {/* Ensure space for edit buttons, removed items-center */}
                 {/* Indentation and Toggle Button - This div provides the indentation */}
                 <div
-                    className="flex items-center flex-shrink-0 h-8" // Fixed height for alignment
-                    // Adjusted paddingLeft: Start with 0rem for level 0, then add 1.5rem per level
-                    style={{ paddingLeft: `${level * 1.5}rem` }}
+                    className="flex flex-shrink-0 h-8" // Fixed height for alignment, removed items-center
+                    style={{ paddingLeft: `${level * 1.5}rem` }} // Apply indentation here
                 >
                     {hasSubSections ? (
                         <Button
@@ -147,7 +154,7 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
                     size="sm"
                     onClick={handleSectionClick}
                     className={cn(
-                        "justify-start text-left flex-1 group/btn h-8 min-w-0 px-1", // Use px-1, ensure justify-start and text-left
+                        "justify-start text-left flex-1 group/btn h-8 min-w-0 px-1 items-center", // Use px-1, ensure justify-start and text-left, ADDED items-center here
                         isEditing ? 'pr-[70px]' : 'pr-2' // Adjust right padding when edit buttons are visible
                     )}
                     aria-current={isActive && !isEditing && !isNameEditing ? "page" : undefined}
