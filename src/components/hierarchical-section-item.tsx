@@ -125,11 +125,11 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
     return (
         <div className="group w-full"> {/* Ensure group takes full width */}
              {/* Main row containing toggle, content button, and edit buttons */}
-            <div className="flex group/item relative w-full"> {/* Use w-full, REMOVED items-center */}
+            <div className="flex group/item relative w-full"> {/* Use w-full */}
 
                  {/* Indentation Spacer and Toggle */}
                  <div
-                    className="flex flex-shrink-0 h-8" // Fixed height for alignment, REMOVED items-center
+                    className="flex flex-shrink-0 h-8" // Fixed height for alignment, removed items-center
                     style={{ paddingLeft: `${level * 1.5}rem` }} // Indentation based on level
                 >
                     {/* Toggle Button Logic */}
@@ -157,15 +157,15 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
                     onClick={handleSectionClick}
                     className={cn(
                         "justify-start text-left flex-1 group/btn h-8 min-w-0 flex items-center", // Use items-center here for vertical alignment
-                        "pl-0 pr-1", // REMOVED left padding (px-1 -> pl-0 pr-1), kept right padding
+                        "pl-0 pr-1", // Removed left padding, kept right padding
                         isEditing ? 'pr-[70px]' : 'pr-1' // Adjust right padding based on edit mode
                     )}
                     aria-current={isActive && !isEditing && !isNameEditing ? "page" : undefined}
                     title={section.name} // Tooltip
                     disabled={isEditing && !isNameEditing}
                 >
-                    {/* Numbering */}
-                    <span className="mr-1.5 font-medium text-muted-foreground min-w-[2em] flex-shrink-0">{numbering}</span>
+                    {/* Numbering - Removed mr-1.5 */}
+                    <span className="font-medium text-muted-foreground min-w-[2em] flex-shrink-0">{numbering}</span>
                     <FileText className="mr-1.5 h-4 w-4 flex-shrink-0" />
                     {isNameEditing ? (
                         <Input
@@ -209,4 +209,3 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
         </div>
     );
 }
-    
