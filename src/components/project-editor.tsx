@@ -111,9 +111,8 @@ function ProjectSidebarContent({
                      <p className="px-2 text-xs font-semibold text-muted-foreground mb-1">STANDARD PAGES</p>
                      {STANDARD_REPORT_PAGES.map((pageName) => {
                         const pageIndex = STANDARD_PAGE_INDICES[pageName];
-                        const isToc = pageName === TOC_SECTION_NAME; // TOC is handled differently later
                         // Skip rendering TOC button here if it's managed by the sections list below
-                        if (isToc && project.sections.some(s => s.name === TOC_SECTION_NAME)) {
+                        if (pageName === TOC_SECTION_NAME && project.sections.some(s => s.name === TOC_SECTION_NAME)) {
                             return null;
                         }
                         return (
@@ -355,10 +354,19 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   useEffect(() => {
     setHasMounted(true);
      // Initialize FAB position (bottom right corner)
-     // We need container dimensions for accurate positioning, using viewport for now
-     const initialX = window.innerWidth - 80; // Approx width + margin
-     const initialY = window.innerHeight - 80; // Approx height + margin
-     setFabPosition({ x: initialX, y: initialY });
+     if (fabRef.current?.parentElement) {
+         const parentRect = fabRef.current.parentElement.getBoundingClientRect();
+         const fabWidth = fabRef.current.offsetWidth || 56; // Default width if not rendered yet
+         const fabHeight = fabRef.current.offsetHeight || 56; // Default height
+         const initialX = parentRect.width - fabWidth - 24; // 24px margin
+         const initialY = parentRect.height - fabHeight - 24; // 24px margin
+         setFabPosition({ x: initialX, y: initialY });
+     } else {
+         // Fallback if parent isn't available immediately
+         const initialX = window.innerWidth - 80;
+         const initialY = window.innerHeight - 80;
+         setFabPosition({ x: initialX, y: initialY });
+     }
   }, []);
 
   // Derived state: current project
@@ -381,7 +389,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
   // Update project and history
   const updateProject = useCallback((updatedData: Partial<Project> | ((prev: Project) => Project), saveToHistory: boolean = true) => {
-      if (!project) return;
+      if (!project && !(typeof updatedData === 'function')) return; // Need existing project or function updater
 
       isUpdatingHistory.current = true;
 
@@ -389,38 +397,47 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         const currentProjectsArray = Array.isArray(prevProjects) ? prevProjects : [];
         const currentProjectIndex = currentProjectsArray.findIndex(p => p.id === projectId);
 
-        if (currentProjectIndex === -1) {
-            console.error("Project not found in setProjects during update");
-            requestAnimationFrame(() => { isUpdatingHistory.current = false; });
-            return currentProjectsArray;
-        }
+        // Determine the project to update (current one or the one from the functional update)
+         let projectToUpdate: Project | undefined;
+         if (currentProjectIndex !== -1) {
+             projectToUpdate = currentProjectsArray[currentProjectIndex];
+         } else if (typeof updatedData === 'function' && project) {
+             // This case might be problematic if project is null, handle carefully
+              projectToUpdate = project; // Use the project from useMemo if index not found but project exists
+         }
 
-        const currentProject = currentProjectsArray[currentProjectIndex];
+         if (!projectToUpdate) {
+             console.error("Project not found in setProjects during update");
+             requestAnimationFrame(() => { isUpdatingHistory.current = false; });
+             return currentProjectsArray;
+         }
+
+
         const updatedProject = typeof updatedData === 'function'
-            ? updatedData(currentProject)
-            : { ...currentProject, ...updatedData, updatedAt: new Date().toISOString() };
+            ? updatedData(projectToUpdate)
+            : { ...projectToUpdate, ...updatedData, updatedAt: new Date().toISOString() };
 
         if (saveToHistory) {
             setHistory(prevHistory => {
                 const newHistory = prevHistory.slice(0, historyIndex + 1);
-                newHistory.push(updatedProject);
+                // Avoid adding duplicate states
+                 if (newHistory.length === 0 || JSON.stringify(newHistory[newHistory.length - 1]) !== JSON.stringify(updatedProject)) {
+                    newHistory.push(updatedProject);
+                 }
                 if (newHistory.length > MAX_HISTORY_LENGTH) {
                     newHistory.shift();
                 }
+                 // Update index to the latest state
                 const newIndex = Math.min(newHistory.length - 1, MAX_HISTORY_LENGTH - 1);
-                // Check for actual change before updating index to prevent infinite loops
-                if (newIndex >= 0 && newIndex < newHistory.length && JSON.stringify(newHistory[newIndex]) !== JSON.stringify(prevHistory[historyIndex])) {
-                    setHistoryIndex(newIndex);
-                } else if (newIndex !== historyIndex) {
-                    // If index changes but content doesn't (e.g., truncating history), update index
-                     setHistoryIndex(newIndex);
-                }
+                 setHistoryIndex(newIndex); // Always set to the new latest index
                 return newHistory;
             });
         } else {
+             // Only update the current state in history without adding a new entry
              setHistory(prevHistory => {
                  const newHistory = [...prevHistory];
                  if (historyIndex >= 0 && historyIndex < newHistory.length) {
+                     // Only update if the data is actually different
                     if(JSON.stringify(newHistory[historyIndex]) !== JSON.stringify(updatedProject)) {
                          newHistory[historyIndex] = updatedProject;
                      }
@@ -431,9 +448,14 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
         const updatedProjects = [...currentProjectsArray];
         // Ensure we don't mutate the state if the project hasn't actually changed
-        if (JSON.stringify(updatedProjects[currentProjectIndex]) !== JSON.stringify(updatedProject)) {
+        if (currentProjectIndex !== -1 && JSON.stringify(updatedProjects[currentProjectIndex]) !== JSON.stringify(updatedProject)) {
             updatedProjects[currentProjectIndex] = updatedProject;
              return updatedProjects;
+        } else if (currentProjectIndex === -1) {
+             // If project wasn't found initially (edge case), maybe add it?
+             // Or handle error appropriately. For now, let's just return the original array.
+             console.warn("ProjectEditor updateProject: Project index not found, state may not be saved correctly.")
+             return currentProjectsArray;
         }
         return currentProjectsArray; // Return original array if no change
 
@@ -476,13 +498,19 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             const newIndex = historyIndex - 1;
             setHistoryIndex(newIndex);
              const undoneProject = history[newIndex];
-             // Update the main projects array in localStorage
-             setProjects((prevProjects = []) =>
-                 (Array.isArray(prevProjects) ? prevProjects : []).map(p =>
-                     p.id === projectId ? undoneProject : p
-                 )
-             );
+             // Update the main projects array in localStorage WITHOUT adding to history again
+             setProjects((prevProjects = []) => {
+                  const currentProjectsArray = Array.isArray(prevProjects) ? prevProjects : [];
+                  const projectIndex = currentProjectsArray.findIndex(p => p.id === projectId);
+                  if (projectIndex !== -1) {
+                      const updatedProjects = [...currentProjectsArray];
+                      updatedProjects[projectIndex] = undoneProject;
+                      return updatedProjects;
+                  }
+                  return currentProjectsArray;
+              });
              toast({ title: "Undo successful" });
+             // Use requestAnimationFrame to ensure state updates propagate before allowing next history change
              requestAnimationFrame(() => { isUpdatingHistory.current = false; });
         } else {
              toast({ variant: "destructive", title: "Nothing to undo" });
@@ -573,7 +601,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     newSectionNames.forEach((name, newIndex) => {
         const trimmedName = name.trim();
         // Exclude standard pages and empty names from being added as regular sections
-        if (!trimmedName || STANDARD_REPORT_PAGES.map(p => p.toLowerCase()).includes(trimmedName.toLowerCase())) return;
+         // Keep TOC if it's explicitly generated
+        if (!trimmedName || (STANDARD_REPORT_PAGES.map(p => p.toLowerCase()).includes(trimmedName.toLowerCase()) && trimmedName.toLowerCase() !== TOC_SECTION_NAME.toLowerCase())) return;
 
 
         const existingSection = existingSectionsMap.get(trimmedName.toLowerCase());
@@ -614,7 +643,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     updateProject(prev => ({
         ...prev,
         sections: updatedSections,
-    }), true);
+    }), true); // Save this change to history
 
     let toastDescription = "Report sections updated.";
     if (addedCount > 0) toastDescription += ` ${addedCount} new section(s) added.`;
@@ -625,7 +654,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     toast({ title: "Sections Updated", description: toastDescription, duration: 7000 });
 
     // If the currently active section was removed, switch to Project Details
-     const currentActiveSectionName = activeSectionIndex !== null && activeSectionIndex >= 0 ? project.sections[activeSectionIndex]?.name : null;
+     const currentActiveSectionName = activeSectionIndex !== null && activeSectionIndex >= 0 && activeSectionIndex < project.sections.length ? project.sections[activeSectionIndex]?.name : null;
      if (currentActiveSectionName && sectionsRemoved && !updatedSections.some(s => s.name === currentActiveSectionName)) {
          setActiveSectionIndex(-1);
      } else if (updatedSections.length > 0 && activeSectionIndex === null) {
@@ -670,7 +699,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                lastGenerated: new Date().toISOString(),
            };
            return { ...prev, sections: updatedSections };
-       }, true);
+       }, true); // Save change to history
 
 
       toast({ title: "Section Generated", description: `"${section.name}" content updated.` });
@@ -779,6 +808,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const handleSaveOnline = () => {
      if (!project) return;
      toast({ title: "Save Online (Coming Soon)", description: "This will save your project to the cloud." });
+     // Placeholder: Update storageType optimistically or after successful save
+     // updateProject({ storageType: 'cloud' });
   };
 
    const handleNavigateToExport = () => {
@@ -810,14 +841,17 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         const parentRect = fabRef.current.parentElement?.getBoundingClientRect();
         if (!parentRect) return;
 
-        let newX = e.clientX - dragOffset.current.x - parentRect.left;
-        let newY = e.clientY - dragOffset.current.y - parentRect.top;
+        let newX = e.clientX - dragOffset.current.x; // Use clientX/Y directly
+        let newY = e.clientY - dragOffset.current.y;
 
-        // Constrain within parent bounds (considering FAB size)
+        // Constrain within viewport bounds (considering FAB size)
         const fabWidth = fabRef.current.offsetWidth;
         const fabHeight = fabRef.current.offsetHeight;
-        newX = Math.max(0, Math.min(newX, parentRect.width - fabWidth));
-        newY = Math.max(0, Math.min(newY, parentRect.height - fabHeight));
+         const margin = 16; // Keep FAB away from edges
+
+        newX = Math.max(margin, Math.min(newX, window.innerWidth - fabWidth - margin));
+        newY = Math.max(margin, Math.min(newY, window.innerHeight - fabHeight - margin));
+
 
         setFabPosition({ x: newX, y: newY });
     }, [isDraggingFab]);
@@ -851,6 +885,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
    }
 
    if (isProjectFound === false || !project) {
+       // This part should ideally not be reached due to the effect that redirects
        return ( <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,60px))] text-center p-4"><CloudOff className="h-16 w-16 text-destructive mb-4" /><h2 className="text-2xl font-semibold text-destructive mb-2">Project Not Found</h2><p className="text-muted-foreground mb-6">The project with ID <code className="bg-muted px-1 rounded">{projectId}</code> could not be found.</p><Button onClick={() => router.push('/')}><Home className="mr-2 h-4 w-4" /> Go to Dashboard</Button></div> );
    }
 
@@ -872,7 +907,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
   return (
     <Sheet open={isMobileSheetOpen} onOpenChange={setIsMobileSheetOpen}>
-      <div className="flex h-full relative">
+      <div className="flex h-full relative"> {/* Added relative for FAB positioning context */}
 
         {/* Mobile: Sidebar inside Sheet */}
         <SheetContent side="left" className="p-0 w-64 bg-card md:hidden">
@@ -919,7 +954,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         </div>
 
         {/* --- Main Content Area --- */}
-        <div className="flex-1 flex flex-col overflow-hidden relative"> {/* Added relative positioning for FAB */}
+        <div className="flex-1 flex flex-col overflow-hidden">
           <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/95 backdrop-blur-sm px-4 lg:px-6 flex-shrink-0">
             <h1 className="flex-1 text-lg font-semibold md:text-xl text-primary truncate text-glow-primary">
               {activeViewName} {/* Use dynamic view name */}
@@ -939,7 +974,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             </Button>
           </header>
 
-          <ScrollArea className="flex-1 p-4 md:p-6"> {/* Remove relative positioning here */}
+          <ScrollArea className="flex-1 p-4 md:p-6">
             {activeSectionIndex === -1 ? (
               // Project Details Form
               <Card className="shadow-md mb-6">
@@ -969,11 +1004,11 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                       >
                         <div className="flex items-center space-x-2">
                           <RadioGroupItem value="mini-project" id="type-mini" />
-                          <Label htmlFor="type-mini">Mini Project</Label>
+                          <Label htmlFor="type-mini" className="cursor-pointer">Mini Project</Label>
                         </div>
                         <div className="flex items-center space-x-2">
                           <RadioGroupItem value="internship" id="type-internship" />
-                          <Label htmlFor="type-internship">Internship</Label>
+                          <Label htmlFor="type-internship" className="cursor-pointer">Internship</Label>
                         </div>
                       </RadioGroup>
                     </div>
@@ -1137,35 +1172,39 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             </Card>
 
           </ScrollArea>
-
-            {/* Floating Action Button (FAB) for Mobile/Draggable Sidebar Toggle */}
-            <SheetTrigger asChild>
-                <Button
-                    ref={fabRef}
-                    variant="default"
-                    size="icon"
-                    className={cn(
-                        "fixed z-20 rounded-full shadow-lg w-14 h-14 hover:glow-primary focus-visible:glow-primary cursor-grab active:cursor-grabbing",
-                        "md:hidden" // Hide on medium and larger screens where static sidebar is shown
-                    )}
-                    style={{
-                        left: `${fabPosition.x}px`,
-                        top: `${fabPosition.y}px`,
-                    }}
-                    onMouseDown={onFabMouseDown}
-                    onClick={(e) => {
-                        // Prevent sheet opening if it was a drag
-                        if (isDraggingFab) {
-                             e.preventDefault();
-                        }
-                    }}
-                    title="Open project menu"
-                    aria-label="Open project menu"
-                 >
-                    <Menu className="h-6 w-6" />
-                 </Button>
-            </SheetTrigger>
         </div>
+
+        {/* Floating Action Button (FAB) for Mobile/Draggable Sidebar Toggle */}
+        {/* This button now triggers the Sheet */}
+         <SheetTrigger asChild>
+             <Button
+                ref={fabRef}
+                variant="default" // Use default style for FAB
+                size="icon"
+                className={cn(
+                    "fixed z-20 rounded-full shadow-lg w-14 h-14 hover:glow-primary focus-visible:glow-primary cursor-grab active:cursor-grabbing",
+                    "md:hidden" // Hide on medium and larger screens
+                )}
+                 style={{
+                    left: `${fabPosition.x}px`,
+                    top: `${fabPosition.y}px`,
+                    position: 'fixed', // Ensure it uses fixed positioning relative to viewport
+                 }}
+                onMouseDown={onFabMouseDown}
+                onClick={(e) => {
+                    // Prevent sheet opening if it was a drag
+                    if (isDraggingFab) {
+                         e.preventDefault();
+                         // Optional: reset drag state here if needed, though mouseUp should handle it
+                    }
+                     // Otherwise, let the default SheetTrigger behavior open the sheet
+                }}
+                title="Open project menu"
+                aria-label="Open project menu"
+             >
+                <Menu className="h-6 w-6" />
+             </Button>
+         </SheetTrigger>
 
         {/* Context Warning Dialog */}
         <AlertDialog open={showOutlineContextAlert} onOpenChange={setShowOutlineContextAlert}>
@@ -1188,3 +1227,5 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     </Sheet>
   );
 }
+
+    
