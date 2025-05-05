@@ -1,21 +1,22 @@
 // src/components/project-sidebar-content.tsx
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Settings, Undo, Lightbulb, Cloud, CloudOff, PlusCircle, FileText, Loader2 } from 'lucide-react'; // Import Loader2
-import type { Project } from '@/types/project';
+import { Settings, Undo, Lightbulb, Cloud, CloudOff, PlusCircle, FileText, Loader2, Edit3, Trash2 } from 'lucide-react'; // Import Loader2, Edit3, Trash2
+import type { Project, SectionIdentifier } from '@/types/project';
 import { STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES } from '@/types/project';
 import { HierarchicalSectionItem } from './hierarchical-section-item'; // Import the extracted component
+import { useToast } from '@/hooks/use-toast'; // Import useToast for inline editing
 
 // Props interface for ProjectSidebarContent
 export interface ProjectSidebarContentProps {
     project: Project;
     activeSectionId: string | null; // Use string ID
-    setActiveSectionId: (id: string | number) => void; // Accept ID or numeric standard index
+    setActiveSectionId: (id: SectionIdentifier) => void; // Accept ID or numeric standard index
     handleGenerateTocClick: () => void;
     isGeneratingOutline: boolean;
     isGenerating: boolean;
@@ -58,8 +59,10 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
     onDeleteSection,
     onAddSection,
 }) => {
-     const handleSectionClick = (id: string | number) => {
-         // No need to check isEditingSections anymore, allow selection
+     const { toast } = useToast(); // Get toast function for inline editing
+
+     const handleSectionClick = (id: SectionIdentifier) => {
+         // Allow selection even in edit mode
          setActiveSectionId(id);
          onCloseSheet?.();
      };
@@ -143,17 +146,16 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                        </div>
                        {project.sections?.length > 0 ? (
                           project.sections.map((section) => (
-                            // ** Apply the key directly to the HierarchicalSectionItem component **
-                            // Ensure section.id is unique within the project.sections array.
+                            // ** Ensure the key prop is DIRECTLY on HierarchicalSectionItem **
                             <HierarchicalSectionItem
                                 key={section.id} // Apply key here to the component rendered by map
                                 section={section}
                                 level={0}
                                 activeSectionId={activeSectionId}
-                                setActiveSectionId={setActiveSectionId} // Pass setActiveSectionId down
+                                setActiveSectionId={handleSectionClick}
                                 onEditSectionName={onEditSectionName}
                                 onDeleteSection={onDeleteSection} // Pass handler
-                                onAddSubSection={onAddSection} // Pass add sub-section handler
+                                onAddSubSection={handleAddNewSection} // Pass add sub-section handler
                                 isEditing={isEditingSections}
                                 onCloseSheet={onCloseSheet}
                             />
@@ -170,7 +172,7 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                                 onClick={() => handleAddNewSection()} // Call without parentId for top-level
                                 className="justify-start mt-2 text-muted-foreground hover:text-primary"
                                 title="Add new top-level section"
-                                >
+                            >
                                 <PlusCircle className="mr-2 h-4 w-4" />
                                 Add Section
                             </Button>
@@ -186,7 +188,7 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                     onClick={handleGenerateTocClick}
                     disabled={isGeneratingOutline || isGenerating || isSummarizing || isSuggesting || !project.projectContext?.trim()}
                     className="w-full hover:glow-accent focus-visible:glow-accent"
-                    title={!project.projectContext?.trim() ? "Add project context in Project Details first" : "Generate/Update Sections based on project context"}
+                    title={!project.projectContext?.trim() ? "Add project context in Project Details first" : "Generate Table of Contents based on project context"}
                 >
                     {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
                     {isGeneratingOutline ? 'Generating Sections...' : 'Generate/Update Sections'}
