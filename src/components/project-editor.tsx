@@ -9,10 +9,10 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { BookOpen, Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, List, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle } from 'lucide-react'; // Use MessageSquareQuote, Added UploadCloud, XCircle
+import { BookOpen, Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, List, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, FileWarning } from 'lucide-react'; // Added icons
 import Link from 'next/link';
 import type { Project, ProjectSection } from '@/types/project';
-import { COMMON_SECTIONS, TOC_SECTION_NAME } from '@/types/project'; // Ensure TOC_SECTION_NAME is imported
+import { STANDARD_REPORT_PAGES, TOC_SECTION_NAME } from '@/types/project'; // Import standard pages
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { useToast } from '@/hooks/use-toast';
 import { generateSectionAction, summarizeSectionAction, generateOutlineAction, suggestImprovementsAction } from '@/app/actions';
@@ -21,7 +21,7 @@ import { cn } from '@/lib/utils';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger, SheetClose } from "@/components/ui/sheet";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { marked } from 'marked'; // For rendering markdown suggestions
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"; // Import RadioGroup
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 interface ProjectEditorProps {
   projectId: string;
@@ -31,7 +31,13 @@ interface ProjectEditorProps {
 const MIN_CONTEXT_LENGTH = 50;
 const MAX_HISTORY_LENGTH = 10; // Limit undo history
 
-// New component for the local sidebar content (details, ToC, actions)
+// Assign negative indices to standard pages for sidebar identification
+const STANDARD_PAGE_INDICES: { [key: string]: number } = {};
+STANDARD_REPORT_PAGES.forEach((page, index) => {
+  STANDARD_PAGE_INDICES[page] = -(index + 2); // Start from -2 (-1 is Project Details)
+});
+
+// New component for the local sidebar content (details, Standard Pages, ToC, actions)
 function ProjectSidebarContent({
     project,
     activeSectionIndex,
@@ -47,8 +53,8 @@ function ProjectSidebarContent({
     onCloseSheet
 }: {
     project: Project;
-    activeSectionIndex: number | null | -1;
-    setActiveSectionIndex: (index: number | -1) => void;
+    activeSectionIndex: number | null; // Includes negative indices for standard pages
+    setActiveSectionIndex: (index: number) => void; // Now only accepts number
     handleGenerateTocClick: () => void;
     isGeneratingOutline: boolean;
     isGenerating: boolean;
@@ -59,23 +65,22 @@ function ProjectSidebarContent({
     handleUndo: () => void;
     onCloseSheet?: () => void;
 }) {
-     const handleSectionClick = (index: number | -1) => {
+     const handleSectionClick = (index: number) => {
         setActiveSectionIndex(index);
         onCloseSheet?.(); // Close sheet on selection (mobile)
      };
 
      return (
-        <div className="flex flex-col h-full border-r bg-card"> {/* Use Card background */}
-            <div className="p-4 border-b flex justify-between items-center"> {/* Flex container for title and undo */}
+        <div className="flex flex-col h-full border-r bg-card">
+            <div className="p-4 border-b flex justify-between items-center">
                  <Input
                         id="projectTitleSidebar"
                         value={project.title}
-                        readOnly // Title editing now in main area
-                        className="h-8 text-base font-semibold bg-transparent border-0 shadow-none focus-visible:ring-0 p-0 truncate flex-1 mr-2" // Make title flexible
+                        readOnly
+                        className="h-8 text-base font-semibold bg-transparent border-0 shadow-none focus-visible:ring-0 p-0 truncate flex-1 mr-2"
                         placeholder="Project Title"
                         aria-label="Project Title (Readonly)"
                     />
-                {/* Undo Button */}
                 <Button
                     variant="outline"
                     size="icon"
@@ -88,12 +93,12 @@ function ProjectSidebarContent({
                 </Button>
             </div>
              <ScrollArea className="flex-1 px-2 py-2">
-                 {/* Simplified menu structure */}
                  <nav className="flex flex-col gap-1">
+                     {/* Project Details Button */}
                      <Button
                          variant={activeSectionIndex === -1 ? "secondary" : "ghost"}
                          size="sm"
-                         onClick={() => handleSectionClick(-1)} // Use handler
+                         onClick={() => handleSectionClick(-1)}
                          className="justify-start"
                          aria-current={activeSectionIndex === -1 ? "page" : undefined}
                      >
@@ -101,15 +106,43 @@ function ProjectSidebarContent({
                          Project Details
                      </Button>
                      <Separator className="my-2" />
-                      {/* Table of Contents (Sections List) */}
-                      <p className="px-2 text-xs font-semibold text-muted-foreground mb-1">TABLE OF CONTENTS</p>
+
+                     {/* Standard Report Pages */}
+                     <p className="px-2 text-xs font-semibold text-muted-foreground mb-1">STANDARD PAGES</p>
+                     {STANDARD_REPORT_PAGES.map((pageName) => {
+                        const pageIndex = STANDARD_PAGE_INDICES[pageName];
+                        const isToc = pageName === TOC_SECTION_NAME; // TOC is handled differently later
+                        // Skip rendering TOC button here if it's managed by the sections list below
+                        if (isToc && project.sections.some(s => s.name === TOC_SECTION_NAME)) {
+                            return null;
+                        }
+                        return (
+                            <Button
+                                key={pageName}
+                                variant={activeSectionIndex === pageIndex ? "secondary" : "ghost"}
+                                size="sm"
+                                onClick={() => handleSectionClick(pageIndex)}
+                                className="justify-start truncate"
+                                aria-current={activeSectionIndex === pageIndex ? "page" : undefined}
+                                title={pageName}
+                            >
+                                <FileText className="mr-2 h-4 w-4 flex-shrink-0" />
+                                <span className="truncate">{pageName}</span>
+                            </Button>
+                        );
+                     })}
+
+                     <Separator className="my-2" />
+
+                      {/* Table of Contents (Generated Sections List) */}
+                      <p className="px-2 text-xs font-semibold text-muted-foreground mb-1">REPORT SECTIONS</p>
                        {project.sections?.length > 0 ? (
                           project.sections.map((section, index) => (
                             <Button
                                 key={`${section.name}-${index}`}
                                 variant={activeSectionIndex === index ? "secondary" : "ghost"}
                                 size="sm"
-                                onClick={() => handleSectionClick(index)} // Use handler
+                                onClick={() => handleSectionClick(index)} // Use index >= 0 for regular sections
                                 className="justify-start truncate"
                                 aria-current={activeSectionIndex === index ? "page" : undefined}
                             >
@@ -134,7 +167,7 @@ function ProjectSidebarContent({
                     title={!project.projectContext?.trim() ? "Add project context in Project Details first" : "Generate Table of Contents based on project context"}
                 >
                     {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
-                    {isGeneratingOutline ? 'Generating ToC...' : 'Generate/Update ToC'}
+                    {isGeneratingOutline ? 'Generating Sections...' : 'Generate/Update Sections'}
                 </Button>
                  <Button
                      variant="outline"
@@ -162,7 +195,7 @@ const LogoUpload = ({
     field,
     onUpload,
     onRemove,
-    isUploading, // Optional: to show loading state
+    isUploading,
 }: {
     label: string;
     logoUrl?: string;
@@ -175,7 +208,6 @@ const LogoUpload = ({
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         onUpload(field, event.target.files ? event.target.files[0] : null);
-        // Optional: Clear the input value to allow re-uploading the same file
         if (inputRef.current) {
             inputRef.current.value = '';
         }
@@ -188,32 +220,31 @@ const LogoUpload = ({
         if (file) {
             onUpload(field, file);
         }
-        event.currentTarget.classList.remove('border-primary', 'bg-primary/10'); // Remove drop highlight
+        event.currentTarget.classList.remove('border-primary', 'bg-primary/10');
     };
 
     const handleDragOver = (event: React.DragEvent<HTMLLabelElement>) => {
         event.preventDefault();
         event.stopPropagation();
-        event.currentTarget.classList.add('border-primary', 'bg-primary/10'); // Add drop highlight
+        event.currentTarget.classList.add('border-primary', 'bg-primary/10');
     };
 
     const handleDragLeave = (event: React.DragEvent<HTMLLabelElement>) => {
         event.preventDefault();
         event.stopPropagation();
-        event.currentTarget.classList.remove('border-primary', 'bg-primary/10'); // Remove drop highlight
+        event.currentTarget.classList.remove('border-primary', 'bg-primary/10');
     };
 
     return (
         <div className="space-y-2">
-            {/* Use standard Label styling */}
             <Label htmlFor={`${field}-input`}>{label}</Label>
-            <Label // Use Label as the dropzone trigger
+            <Label
                 htmlFor={`${field}-input`}
                 className={cn(
-                    "flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-muted/50 hover:bg-muted/80 transition-colors duration-200",
-                    !logoUrl && "p-4 text-center", // Padding only if no preview
-                    logoUrl && "relative overflow-hidden", // Style for preview container
-                    "aspect-square sm:aspect-video md:h-32" // Make it square on small, video-like on med, fixed height on large
+                    "flex flex-col items-center justify-center w-full border-2 border-dashed rounded-lg cursor-pointer bg-muted/50 hover:bg-muted/80 transition-colors duration-200",
+                    !logoUrl && "p-4 text-center",
+                    logoUrl && "relative overflow-hidden",
+                    "aspect-square h-32" // Consistent height, aspect-square ensures width adjusts
                 )}
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
@@ -229,7 +260,7 @@ const LogoUpload = ({
                         <img
                             src={logoUrl}
                             alt={`${label} Preview`}
-                            className="absolute inset-0 w-full h-full object-contain p-2" // Contain within bounds
+                            className="absolute inset-0 w-full h-full object-contain p-2"
                             data-ai-hint={`${label.toLowerCase().replace(' logo', '')} logo`}
                         />
                         <Button
@@ -237,7 +268,7 @@ const LogoUpload = ({
                             variant="ghost"
                             size="icon"
                             onClick={(e) => {
-                                e.preventDefault(); // Prevent label click
+                                e.preventDefault();
                                 onRemove(field);
                             }}
                             className="absolute top-1 right-1 z-10 bg-background/50 hover:bg-destructive hover:text-destructive-foreground h-6 w-6 rounded-full"
@@ -250,10 +281,9 @@ const LogoUpload = ({
                     <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center">
                         <UploadCloud className="w-8 h-8 mb-3 text-muted-foreground" />
                         <p className="mb-1 text-sm text-muted-foreground"><span className="font-semibold">Click or drag</span></p>
-                        <p className="text-xs text-muted-foreground">PNG, JPG, GIF, WEBP</p>
+                        <p className="text-xs text-muted-foreground">PNG, JPG, WEBP</p>
                     </div>
                 )}
-                 {/* Hidden file input */}
                 <Input
                     id={`${field}-input`}
                     ref={inputRef}
@@ -268,11 +298,34 @@ const LogoUpload = ({
     );
 };
 
+// Component to display placeholder for standard pages
+const StandardPagePlaceholder = ({ pageName }: { pageName: string }) => (
+    <Card className="shadow-md mb-6">
+        <CardHeader>
+            <CardTitle className="text-primary text-glow-primary flex items-center gap-2">
+                <FileWarning className="w-5 h-5 text-amber-500" /> {pageName}
+            </CardTitle>
+            <CardDescription>
+                This is a standard report page. Its content is typically generated automatically based on project details or requires specific formatting.
+            </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4 min-h-[200px] flex flex-col items-center justify-center text-center">
+            <ShieldAlert className="w-12 h-12 text-muted-foreground opacity-50 mb-4" />
+            <p className="text-muted-foreground">
+                Content for the "{pageName}" is usually auto-generated during the export process or needs manual creation following specific guidelines (like certificates).
+            </p>
+            <p className="text-xs text-muted-foreground">
+                (Direct editing is not available for this standard page type in the editor.)
+            </p>
+        </CardContent>
+    </Card>
+);
+
 
 export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const [projects, setProjects] = useLocalStorage<Project[]>('projects', []);
   const { toast } = useToast();
-  const [activeSectionIndex, setActiveSectionIndex] = useState<number | null | -1>(null); // -1 for Project Details
+  const [activeSectionIndex, setActiveSectionIndex] = useState<number | null>(null); // null initially, -1 for Details, <-1 for standard, >=0 for sections
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [isGeneratingOutline, setIsGeneratingOutline] = useState(false);
@@ -291,9 +344,21 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const [historyIndex, setHistoryIndex] = useState<number>(-1);
   const isUpdatingHistory = useRef(false);
 
+  // Floating Action Button state
+  const [fabPosition, setFabPosition] = useState({ x: 0, y: 0 });
+  const [isDraggingFab, setIsDraggingFab] = useState(false);
+  const fabRef = useRef<HTMLButtonElement>(null);
+  const dragOffset = useRef({ x: 0, y: 0 });
+
+
   // Mark as mounted on client
   useEffect(() => {
     setHasMounted(true);
+     // Initialize FAB position (bottom right corner)
+     // We need container dimensions for accurate positioning, using viewport for now
+     const initialX = window.innerWidth - 80; // Approx width + margin
+     const initialY = window.innerHeight - 80; // Approx height + margin
+     setFabPosition({ x: initialX, y: initialY });
   }, []);
 
   // Derived state: current project
@@ -301,7 +366,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
       if (historyIndex >= 0 && historyIndex < history.length) {
           return history[historyIndex];
       }
-      // Ensure projects is treated as an array even if initially undefined/null from localStorage
       const currentProjects = Array.isArray(projects) ? projects : [];
       return currentProjects.find(p => p.id === projectId);
   }, [projects, projectId, history, historyIndex]);
@@ -322,7 +386,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
       isUpdatingHistory.current = true;
 
       setProjects((prevProjects = []) => {
-        // Ensure prevProjects is an array
         const currentProjectsArray = Array.isArray(prevProjects) ? prevProjects : [];
         const currentProjectIndex = currentProjectsArray.findIndex(p => p.id === projectId);
 
@@ -345,22 +408,35 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                     newHistory.shift();
                 }
                 const newIndex = Math.min(newHistory.length - 1, MAX_HISTORY_LENGTH - 1);
-                setHistoryIndex(newIndex);
+                // Check for actual change before updating index to prevent infinite loops
+                if (newIndex >= 0 && newIndex < newHistory.length && JSON.stringify(newHistory[newIndex]) !== JSON.stringify(prevHistory[historyIndex])) {
+                    setHistoryIndex(newIndex);
+                } else if (newIndex !== historyIndex) {
+                    // If index changes but content doesn't (e.g., truncating history), update index
+                     setHistoryIndex(newIndex);
+                }
                 return newHistory;
             });
         } else {
              setHistory(prevHistory => {
                  const newHistory = [...prevHistory];
                  if (historyIndex >= 0 && historyIndex < newHistory.length) {
-                     newHistory[historyIndex] = updatedProject;
+                    if(JSON.stringify(newHistory[historyIndex]) !== JSON.stringify(updatedProject)) {
+                         newHistory[historyIndex] = updatedProject;
+                     }
                  }
                  return newHistory;
              });
         }
 
         const updatedProjects = [...currentProjectsArray];
-        updatedProjects[currentProjectIndex] = updatedProject;
-        return updatedProjects;
+        // Ensure we don't mutate the state if the project hasn't actually changed
+        if (JSON.stringify(updatedProjects[currentProjectIndex]) !== JSON.stringify(updatedProject)) {
+            updatedProjects[currentProjectIndex] = updatedProject;
+             return updatedProjects;
+        }
+        return currentProjectsArray; // Return original array if no change
+
       });
 
       requestAnimationFrame(() => {
@@ -373,14 +449,13 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
    useEffect(() => {
     if (!hasMounted || projects === undefined || isUpdatingHistory.current) return;
 
-    // Ensure projects is an array
     const currentProjects = Array.isArray(projects) ? projects : [];
     const projectExists = currentProjects.some(p => p.id === projectId);
 
     if (projectExists && isProjectFound !== true) {
       setIsProjectFound(true);
       if (activeSectionIndex === null) {
-        setActiveSectionIndex(-1);
+        setActiveSectionIndex(-1); // Default to Project Details
       }
     } else if (!projectExists && isProjectFound !== false) {
         setIsProjectFound(false);
@@ -401,8 +476,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             const newIndex = historyIndex - 1;
             setHistoryIndex(newIndex);
              const undoneProject = history[newIndex];
+             // Update the main projects array in localStorage
              setProjects((prevProjects = []) =>
-                 // Ensure prevProjects is an array
                  (Array.isArray(prevProjects) ? prevProjects : []).map(p =>
                      p.id === projectId ? undoneProject : p
                  )
@@ -437,12 +512,11 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
   const handleProjectDetailChange = (field: keyof Project, value: string) => {
     if (!project) return;
-    // Ensure only valid string fields are updated this way
-    const validStringFields: (keyof Project)[] = ['title', 'projectContext', 'teamDetails', 'instituteName', 'teamId', 'subject', 'semester', 'branch', 'guideName'];
+    const validStringFields: (keyof Project)[] = ['title', 'projectContext', 'teamDetails', 'instituteName', 'collegeInfo', 'teamId', 'subject', 'semester', 'branch', 'guideName'];
     if (validStringFields.includes(field)) {
         updateProject({ [field]: value });
     } else {
-        console.warn(`Attempted to update non-string field ${field} via handleProjectDetailChange`);
+        console.warn(`Attempted to update non-string/optional field ${String(field)} via handleProjectDetailChange`);
     }
   };
 
@@ -451,71 +525,39 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     updateProject({ projectType: value });
   };
 
-  // --- Logo Upload Handler ---
   const handleLogoUpload = (field: 'universityLogoUrl' | 'collegeLogoUrl', file: File | null) => {
-    if (!project || !file) {
-        // If file is null, it means the input was cleared, do nothing or handle removal logic elsewhere
-        return;
-    };
-
-    // Check if the file is an image
+    if (!project || !file) return;
     if (!file.type.startsWith('image/')) {
-        toast({
-            variant: 'destructive',
-            title: 'Invalid File Type',
-            description: 'Please upload an image file (e.g., PNG, JPG, GIF, WEBP).',
-        });
+        toast({ variant: 'destructive', title: 'Invalid File Type', description: 'Please upload an image file.' });
         return;
     }
-
-    // Check file size (e.g., max 2MB)
     const maxSizeInBytes = 2 * 1024 * 1024; // 2MB
     if (file.size > maxSizeInBytes) {
-         toast({
-            variant: 'destructive',
-            title: 'File Too Large',
-            description: `Please upload an image smaller than ${maxSizeInBytes / (1024 * 1024)}MB.`,
-        });
+         toast({ variant: 'destructive', title: 'File Too Large', description: `Image must be smaller than ${maxSizeInBytes / (1024 * 1024)}MB.` });
         return;
     }
-
-
-    setIsUploadingLogo(prev => ({ ...prev, [field]: true })); // Set uploading state
-
+    setIsUploadingLogo(prev => ({ ...prev, [field]: true }));
     const reader = new FileReader();
     reader.onloadend = () => {
-        const dataUrl = reader.result as string;
-        updateProject({ [field]: dataUrl }); // Store the data URL
-        toast({
-            title: 'Logo Uploaded',
-            description: `${field === 'universityLogoUrl' ? 'University' : 'College'} logo updated.`,
-        });
-        setIsUploadingLogo(prev => ({ ...prev, [field]: false })); // Clear uploading state
+        updateProject({ [field]: reader.result as string });
+        toast({ title: 'Logo Uploaded', description: `${field === 'universityLogoUrl' ? 'University' : 'College'} logo updated.` });
+        setIsUploadingLogo(prev => ({ ...prev, [field]: false }));
     };
     reader.onerror = (error) => {
         console.error("Error reading file:", error);
-        toast({
-            variant: 'destructive',
-            title: 'Upload Failed',
-            description: 'Could not read the uploaded file.',
-        });
-        setIsUploadingLogo(prev => ({ ...prev, [field]: false })); // Clear uploading state
+        toast({ variant: 'destructive', title: 'Upload Failed', description: 'Could not read the file.' });
+        setIsUploadingLogo(prev => ({ ...prev, [field]: false }));
     };
     reader.readAsDataURL(file);
   };
 
-  // --- Logo Removal Handler ---
   const handleRemoveLogo = (field: 'universityLogoUrl' | 'collegeLogoUrl') => {
        if (!project) return;
-       updateProject({ [field]: undefined }); // Set the field to undefined to remove the logo
-       toast({
-           title: 'Logo Removed',
-           description: `${field === 'universityLogoUrl' ? 'University' : 'College'} logo has been removed.`,
-       });
+       updateProject({ [field]: undefined });
+       toast({ title: 'Logo Removed', description: `${field === 'universityLogoUrl' ? 'University' : 'College'} logo removed.` });
    };
 
 
-  // Update sections based on generated ToC
   const updateSectionsFromToc = useCallback((newSectionNames: string[]) => {
     if (!project) return;
 
@@ -530,7 +572,9 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
     newSectionNames.forEach((name, newIndex) => {
         const trimmedName = name.trim();
-        if (!trimmedName || (TOC_SECTION_NAME && trimmedName.toLowerCase() === TOC_SECTION_NAME.toLowerCase())) return;
+        // Exclude standard pages and empty names from being added as regular sections
+        if (!trimmedName || STANDARD_REPORT_PAGES.map(p => p.toLowerCase()).includes(trimmedName.toLowerCase())) return;
+
 
         const existingSection = existingSectionsMap.get(trimmedName.toLowerCase());
 
@@ -553,40 +597,45 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         }
     });
 
-     if (existingSectionsMap.size > 0 && (!TOC_SECTION_NAME || !existingSectionsMap.has(TOC_SECTION_NAME.toLowerCase()))) {
-         sectionsRemoved = true;
-         sectionOrderChanged = true;
+     // Check if any non-standard sections were removed
+     for (const [removedName] of existingSectionsMap.entries()) {
+        if (!STANDARD_REPORT_PAGES.map(p => p.toLowerCase()).includes(removedName)) {
+             sectionsRemoved = true;
+             sectionOrderChanged = true; // Order changes if sections are removed
+             break;
+        }
      }
 
     if (addedCount === 0 && !sectionOrderChanged && !sectionsRemoved) {
-        toast({
-            title: "Table of Contents Unchanged",
-            description: "The generated ToC matches the current section structure.",
-        });
+        toast({ title: "Sections Unchanged", description: "The generated outline matches the current section structure." });
         return;
     }
 
     updateProject(prev => ({
         ...prev,
         sections: updatedSections,
-    }), true); // Ensure history is saved
+    }), true);
 
-    let toastDescription = "Table of Contents updated.";
+    let toastDescription = "Report sections updated.";
     if (addedCount > 0) toastDescription += ` ${addedCount} new section(s) added.`;
     if (preservedCount > 0) toastDescription += ` ${preservedCount} existing section(s) preserved.`;
     if (sectionsRemoved) toastDescription += ` Some sections removed.`;
     if (sectionOrderChanged && addedCount === 0 && !sectionsRemoved) toastDescription = "Section order updated.";
 
-    toast({
-        title: "Table of Contents Updated",
-        description: toastDescription,
-        duration: 7000,
-    });
+    toast({ title: "Sections Updated", description: toastDescription, duration: 7000 });
 
-    setActiveSectionIndex(0);
+    // If the currently active section was removed, switch to Project Details
+     const currentActiveSectionName = activeSectionIndex !== null && activeSectionIndex >= 0 ? project.sections[activeSectionIndex]?.name : null;
+     if (currentActiveSectionName && sectionsRemoved && !updatedSections.some(s => s.name === currentActiveSectionName)) {
+         setActiveSectionIndex(-1);
+     } else if (updatedSections.length > 0 && activeSectionIndex === null) {
+         // If sections were just added and nothing was selected, select the first section
+         setActiveSectionIndex(0);
+     }
+
     setIsMobileSheetOpen(false);
 
-}, [project, updateProject, toast, setActiveSectionIndex]);
+}, [project, updateProject, toast, setActiveSectionIndex, activeSectionIndex]);
 
 
   const handleGenerateSection = async (index: number) => {
@@ -621,21 +670,14 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                lastGenerated: new Date().toISOString(),
            };
            return { ...prev, sections: updatedSections };
-       }, true); // Ensure history is saved
+       }, true);
 
 
-      toast({
-        title: "Section Generated",
-        description: `"${section.name}" content has been updated.`,
-      });
+      toast({ title: "Section Generated", description: `"${section.name}" content updated.` });
 
     } catch (error) {
       console.error("Generation failed:", error);
-      toast({
-        variant: "destructive",
-        title: "Generation Failed",
-        description: error instanceof Error ? error.message : "Could not generate section content.",
-      });
+      toast({ variant: "destructive", title: "Generation Failed", description: error instanceof Error ? error.message : "Could not generate content." });
     } finally {
       setIsGenerating(false);
     }
@@ -660,7 +702,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
           });
       } catch (error) {
           console.error("Summarization failed:", error);
-          toast({ variant: "destructive", title: "Summarization Failed", description: error instanceof Error ? error.message : "Could not summarize section content." });
+          toast({ variant: "destructive", title: "Summarization Failed", description: error instanceof Error ? error.message : "Could not summarize." });
       } finally {
           setIsSummarizing(false);
       }
@@ -675,7 +717,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         if ('error' in result) throw new Error(result.error);
 
         if (!result.suggestedSections?.length) {
-             toast({ variant: "destructive", title: "ToC Generation Failed", description: "AI did not return any suggested sections." });
+             toast({ variant: "destructive", title: "Section Generation Failed", description: "AI did not return suggested sections." });
              setIsGeneratingOutline(false);
              return;
         }
@@ -683,8 +725,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         updateSectionsFromToc(result.suggestedSections);
 
     } catch (error) {
-        console.error("ToC generation failed:", error);
-        toast({ variant: "destructive", title: "ToC Generation Failed", description: error instanceof Error ? error.message : "Could not generate Table of Contents." });
+        console.error("Section generation failed:", error);
+        toast({ variant: "destructive", title: "Section Generation Failed", description: error instanceof Error ? error.message : "Could not generate sections." });
     } finally {
         setIsGeneratingOutline(false);
     }
@@ -703,7 +745,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         }
     };
 
-  // --- AI Suggestions ---
    const handleGetSuggestions = async () => {
      if (!project || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting) return;
 
@@ -724,18 +765,11 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
        if ('error' in result) throw new Error(result.error);
 
        setSuggestions(result.suggestions);
-       toast({
-         title: "AI Suggestions Ready",
-         description: "Suggestions for improvement have been generated below.",
-       });
+       toast({ title: "AI Suggestions Ready", description: "Suggestions for improvement generated." });
 
      } catch (error) {
        console.error("Suggestion generation failed:", error);
-       toast({
-         variant: "destructive",
-         title: "Suggestion Failed",
-         description: error instanceof Error ? error.message : "Could not generate suggestions.",
-       });
+       toast({ variant: "destructive", title: "Suggestion Failed", description: error instanceof Error ? error.message : "Could not generate suggestions." });
      } finally {
        setIsSuggesting(false);
      }
@@ -744,19 +778,71 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
   const handleSaveOnline = () => {
      if (!project) return;
-     toast({
-         title: "Save Online (Coming Soon)",
-         description: "This feature will allow you to save your project to the cloud.",
-     });
+     toast({ title: "Save Online (Coming Soon)", description: "This will save your project to the cloud." });
   };
 
    const handleNavigateToExport = () => {
      if (project) {
        router.push(`/project/${projectId}/export`);
      } else {
-        toast({ variant: "destructive", title: "Navigation Error", description: "Could not find project data to export." });
+        toast({ variant: "destructive", title: "Navigation Error", description: "Project data not found." });
      }
    };
+
+
+    // --- FAB Drag Handlers ---
+    const onFabMouseDown = (e: React.MouseEvent<HTMLButtonElement>) => {
+        if (e.button !== 0) return; // Only left click
+        const target = fabRef.current;
+        if (!target) return;
+        setIsDraggingFab(true);
+        const rect = target.getBoundingClientRect();
+        dragOffset.current = {
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top,
+        };
+        target.style.cursor = 'grabbing';
+        e.preventDefault(); // Prevent text selection
+    };
+
+    const onFabMouseMove = useCallback((e: MouseEvent) => {
+        if (!isDraggingFab || !fabRef.current) return;
+        const parentRect = fabRef.current.parentElement?.getBoundingClientRect();
+        if (!parentRect) return;
+
+        let newX = e.clientX - dragOffset.current.x - parentRect.left;
+        let newY = e.clientY - dragOffset.current.y - parentRect.top;
+
+        // Constrain within parent bounds (considering FAB size)
+        const fabWidth = fabRef.current.offsetWidth;
+        const fabHeight = fabRef.current.offsetHeight;
+        newX = Math.max(0, Math.min(newX, parentRect.width - fabWidth));
+        newY = Math.max(0, Math.min(newY, parentRect.height - fabHeight));
+
+        setFabPosition({ x: newX, y: newY });
+    }, [isDraggingFab]);
+
+    const onFabMouseUp = useCallback(() => {
+        if (isDraggingFab && fabRef.current) {
+            setIsDraggingFab(false);
+            fabRef.current.style.cursor = 'grab';
+        }
+    }, [isDraggingFab]);
+
+    // Add window listeners for FAB drag
+    useEffect(() => {
+        if (isDraggingFab) {
+            window.addEventListener('mousemove', onFabMouseMove);
+            window.addEventListener('mouseup', onFabMouseUp);
+        } else {
+            window.removeEventListener('mousemove', onFabMouseMove);
+            window.removeEventListener('mouseup', onFabMouseUp);
+        }
+        return () => {
+            window.removeEventListener('mousemove', onFabMouseMove);
+            window.removeEventListener('mouseup', onFabMouseUp);
+        };
+    }, [isDraggingFab, onFabMouseMove, onFabMouseUp]);
 
    // --- Render Logic ---
 
@@ -765,19 +851,30 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
    }
 
    if (isProjectFound === false || !project) {
-      // Project is not found or undefined, show error and redirect
-       return ( <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,60px))] text-center p-4"><CloudOff className="h-16 w-16 text-destructive mb-4" /><h2 className="text-2xl font-semibold text-destructive mb-2">Project Not Found</h2><p className="text-muted-foreground mb-6">The project with ID <code className="bg-muted px-1 rounded">{projectId}</code> could not be found. It might have been deleted or the link is incorrect.</p><Button onClick={() => router.push('/')}><Home className="mr-2 h-4 w-4" /> Go to Dashboard</Button></div> );
+       return ( <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,60px))] text-center p-4"><CloudOff className="h-16 w-16 text-destructive mb-4" /><h2 className="text-2xl font-semibold text-destructive mb-2">Project Not Found</h2><p className="text-muted-foreground mb-6">The project with ID <code className="bg-muted px-1 rounded">{projectId}</code> could not be found.</p><Button onClick={() => router.push('/')}><Home className="mr-2 h-4 w-4" /> Go to Dashboard</Button></div> );
    }
 
    const activeSection = activeSectionIndex !== null && activeSectionIndex >= 0 && activeSectionIndex < project.sections.length
     ? project.sections[activeSectionIndex]
     : null;
 
+   // Determine the name of the currently active view (Details, Standard Page, or Section)
+    let activeViewName = project.title ?? 'Project';
+    if (activeSectionIndex === -1) {
+        activeViewName = 'Project Details';
+    } else if (activeSectionIndex < -1) {
+        // Find the standard page name corresponding to the negative index
+        const standardPageEntry = Object.entries(STANDARD_PAGE_INDICES).find(([, index]) => index === activeSectionIndex);
+        activeViewName = standardPageEntry ? standardPageEntry[0] : 'Standard Page';
+    } else if (activeSection) {
+        activeViewName = activeSection.name;
+    }
+
   return (
     <Sheet open={isMobileSheetOpen} onOpenChange={setIsMobileSheetOpen}>
       <div className="flex h-full relative">
 
-        {/* --- Local Project Sidebar (Drawer on Mobile - Content only) --- */}
+        {/* Mobile: Sidebar inside Sheet */}
         <SheetContent side="left" className="p-0 w-64 bg-card md:hidden">
           <SheetHeader className="sr-only">
             <SheetTitle>Project Menu</SheetTitle>
@@ -799,13 +896,12 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
           />
         </SheetContent>
 
-        {/* Desktop Static Sidebar */}
+        {/* Desktop: Static Sidebar */}
         <div
           className={cn(
             "hidden md:flex md:flex-col transition-all duration-300 ease-in-out overflow-y-auto overflow-x-hidden",
-            "w-64 border-r"
+            "w-64 border-r" // Fixed width for desktop sidebar
           )}
-          aria-hidden={false}
         >
            <ProjectSidebarContent
               project={project}
@@ -823,11 +919,10 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         </div>
 
         {/* --- Main Content Area --- */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-hidden relative"> {/* Added relative positioning for FAB */}
           <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/95 backdrop-blur-sm px-4 lg:px-6 flex-shrink-0">
-             {/* The mobile sheet trigger is now the FAB */}
             <h1 className="flex-1 text-lg font-semibold md:text-xl text-primary truncate text-glow-primary">
-              {activeSectionIndex === -1 ? 'Project Details' : activeSection?.name ?? project.title ?? 'Project'}
+              {activeViewName} {/* Use dynamic view name */}
             </h1>
             <div className="flex items-center gap-1 text-xs text-muted-foreground ml-auto mr-2" title={`Project stored ${project.storageType === 'local' ? 'locally' : 'in the cloud'}`}>
               {project.storageType === 'local' ? <CloudOff className="h-4 w-4" /> : <Cloud className="h-4 w-4 text-green-500" />}
@@ -844,16 +939,15 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             </Button>
           </header>
 
-          <ScrollArea className="flex-1 p-4 md:p-6 relative">
+          <ScrollArea className="flex-1 p-4 md:p-6"> {/* Remove relative positioning here */}
             {activeSectionIndex === -1 ? (
               // Project Details Form
               <Card className="shadow-md mb-6">
                 <CardHeader>
                   <CardTitle className="text-glow-primary">Project Details</CardTitle>
-                  <CardDescription>Edit general information about your project. Providing context helps the AI generate a relevant Table of Contents (ToC) and section content.</CardDescription>
+                  <CardDescription>Edit general information. Context helps AI generate relevant sections.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {/* Project Title */}
                   <div>
                     <Label htmlFor="projectTitleMain">Project Title *</Label>
                     <Input
@@ -866,7 +960,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                     />
                   </div>
 
-                  {/* Project Type Toggle */}
                    <div className="space-y-2">
                       <Label>Project Type</Label>
                       <RadioGroup
@@ -885,21 +978,19 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                       </RadioGroup>
                     </div>
 
-                  {/* Project Context */}
                   <div>
                     <Label htmlFor="projectContext">Project Context *</Label>
                     <Textarea
                       id="projectContext"
                       value={project.projectContext}
                       onChange={(e) => handleProjectDetailChange('projectContext', e.target.value)}
-                      placeholder="Briefly describe your project, its goals, scope, and key features or technologies involved. This context is CRUCIAL for generating an accurate Table of Contents."
+                      placeholder="Briefly describe your project, goals, scope, technologies..."
                       className="mt-1 min-h-[120px] focus-visible:glow-primary"
                       required
                     />
-                    <p className="text-xs text-muted-foreground mt-1">This context is used by the AI to generate the Table of Contents.</p>
+                    <p className="text-xs text-muted-foreground mt-1">Crucial for AI section generation.</p>
                   </div>
-                  {/* Logo Uploads */}
-                   {/* Use grid for responsiveness */}
+
                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                       <LogoUpload
                           label="University Logo"
@@ -918,101 +1009,51 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                           isUploading={isUploadingLogo.collegeLogoUrl}
                       />
                    </div>
-                  {/* Institute, Branch, Semester, Subject */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="instituteName">Institute Name</Label>
-                      <Input
-                        id="instituteName"
-                        value={project.instituteName || ''}
-                        onChange={(e) => handleProjectDetailChange('instituteName', e.target.value)}
-                        placeholder="e.g., L. D. College of Engineering"
-                        className="mt-1 focus-visible:glow-primary"
-                      />
+                      <Input id="instituteName" value={project.instituteName || ''} onChange={(e) => handleProjectDetailChange('instituteName', e.target.value)} placeholder="e.g., L. D. College of Engineering" className="mt-1"/>
                     </div>
                     <div>
                       <Label htmlFor="branch">Branch</Label>
-                      <Input
-                        id="branch"
-                        value={project.branch || ''}
-                        onChange={(e) => handleProjectDetailChange('branch', e.target.value)}
-                        placeholder="e.g., Computer Engineering"
-                        className="mt-1 focus-visible:glow-primary"
-                      />
+                      <Input id="branch" value={project.branch || ''} onChange={(e) => handleProjectDetailChange('branch', e.target.value)} placeholder="e.g., Computer Engineering" className="mt-1"/>
                     </div>
                     <div>
                       <Label htmlFor="semester">Semester</Label>
-                      <Input
-                        id="semester"
-                        value={project.semester || ''}
-                        onChange={(e) => handleProjectDetailChange('semester', e.target.value)}
-                        placeholder="e.g., 5"
-                        type="number"
-                        className="mt-1 focus-visible:glow-primary"
-                      />
+                      <Input id="semester" value={project.semester || ''} onChange={(e) => handleProjectDetailChange('semester', e.target.value)} placeholder="e.g., 5" type="number" className="mt-1"/>
                     </div>
                     <div>
                       <Label htmlFor="subject">Subject</Label>
-                      <Input
-                        id="subject"
-                        value={project.subject || ''}
-                        onChange={(e) => handleProjectDetailChange('subject', e.target.value)}
-                        placeholder="e.g., Design Engineering - 1A"
-                        className="mt-1 focus-visible:glow-primary"
-                      />
+                      <Input id="subject" value={project.subject || ''} onChange={(e) => handleProjectDetailChange('subject', e.target.value)} placeholder="e.g., Design Engineering - 1A" className="mt-1"/>
                     </div>
                   </div>
                   <Separator />
-                  {/* Team ID, Guide Name */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="teamId">Team ID</Label>
-                      <Input
-                        id="teamId"
-                        value={project.teamId || ''}
-                        onChange={(e) => handleProjectDetailChange('teamId', e.target.value)}
-                        placeholder="Enter Team ID"
-                        className="mt-1 focus-visible:glow-primary"
-                      />
+                      <Input id="teamId" value={project.teamId || ''} onChange={(e) => handleProjectDetailChange('teamId', e.target.value)} placeholder="Enter Team ID" className="mt-1"/>
                     </div>
                     <div>
                       <Label htmlFor="guideName">Faculty Guide Name</Label>
-                      <Input
-                        id="guideName"
-                        value={project.guideName || ''}
-                        onChange={(e) => handleProjectDetailChange('guideName', e.target.value)}
-                        placeholder="Enter Guide's Name"
-                        className="mt-1 focus-visible:glow-primary"
-                      />
+                      <Input id="guideName" value={project.guideName || ''} onChange={(e) => handleProjectDetailChange('guideName', e.target.value)} placeholder="Enter Guide's Name" className="mt-1"/>
                     </div>
                   </div>
-                  {/* Team Details */}
                   <div>
                     <Label htmlFor="teamDetails">Team Details (Members & Enrollment)</Label>
-                    <Textarea
-                      id="teamDetails"
-                      value={project.teamDetails}
-                      onChange={(e) => handleProjectDetailChange('teamDetails', e.target.value)}
-                      placeholder="Enter team member names and enrollment numbers, one per line (e.g., John Doe - 123456789)"
-                      className="mt-1 min-h-[100px] focus-visible:glow-primary"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">This information will be used in the generated report sections and title page.</p>
+                    <Textarea id="teamDetails" value={project.teamDetails} onChange={(e) => handleProjectDetailChange('teamDetails', e.target.value)} placeholder="John Doe - 123456789&#10;Jane Smith - 987654321" className="mt-1 min-h-[100px]"/>
+                    <p className="text-xs text-muted-foreground mt-1">One member per line.</p>
                   </div>
                 </CardContent>
                 <CardFooter className="flex justify-end">
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={handleGenerateTocClick}
-                    disabled={isGeneratingOutline || isGenerating || isSummarizing || isSuggesting || !project.projectContext?.trim()}
-                    className="hover:glow-primary focus-visible:glow-primary"
-                    title={!project.projectContext?.trim() ? "Add project context above first" : "Generate Table of Contents based on project context"}
-                  >
+                  <Button variant="default" size="sm" onClick={handleGenerateTocClick} disabled={isGeneratingOutline || isGenerating || isSummarizing || isSuggesting || !project.projectContext?.trim()} className="hover:glow-primary focus-visible:glow-primary">
                     {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
-                    {isGeneratingOutline ? 'Generating ToC...' : 'Generate/Update ToC'}
+                    {isGeneratingOutline ? 'Generating Sections...' : 'Generate/Update Sections'}
                   </Button>
                 </CardFooter>
               </Card>
+            ) : activeSectionIndex < -1 ? (
+                 // Standard Page Placeholder
+                 <StandardPagePlaceholder pageName={activeViewName} />
             ) : activeSection ? (
               // Section Editor
               <div className="space-y-6">
@@ -1026,13 +1067,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                     <CardContent className="space-y-4">
                       <div>
                         <Label htmlFor={`section-prompt-${activeSectionIndex}`}>Generation Prompt</Label>
-                        <Textarea
-                          id={`section-prompt-${activeSectionIndex}`}
-                          value={activeSection.prompt}
-                          onChange={(e) => handleSectionPromptChange(activeSectionIndex, e.target.value)}
-                          placeholder="Enter instructions for the AI..."
-                          className="mt-1 min-h-[100px] font-mono text-sm focus-visible:glow-primary"
-                        />
+                        <Textarea id={`section-prompt-${activeSectionIndex}`} value={activeSection.prompt} onChange={(e) => handleSectionPromptChange(activeSectionIndex, e.target.value)} placeholder="Instructions for the AI..." className="mt-1 min-h-[100px] font-mono text-sm focus-visible:glow-primary" />
                       </div>
                       <Button onClick={() => handleGenerateSection(activeSectionIndex)} disabled={isGenerating || isSummarizing || isGeneratingOutline || isSuggesting} className="hover:glow-primary focus-visible:glow-primary">
                         {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
@@ -1044,26 +1079,13 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 <Card className="shadow-md mb-6">
                   <CardHeader>
                     <CardTitle>{activeSection.name} - Content</CardTitle>
-                    <CardDescription>
-                      Edit the generated or existing content below.
-                    </CardDescription>
+                    <CardDescription>Edit the content below.</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <Textarea
-                      id={`section-content-${activeSectionIndex}`}
-                      value={activeSection.content}
-                      onChange={(e) => handleSectionContentChange(activeSectionIndex, e.target.value)}
-                      placeholder={"Generated content will appear here. You can also write manually."}
-                      className="min-h-[400px] text-base focus-visible:glow-primary"
-                    />
+                    <Textarea id={`section-content-${activeSectionIndex}`} value={activeSection.content} onChange={(e) => handleSectionContentChange(activeSectionIndex, e.target.value)} placeholder={"Generated content appears here..."} className="min-h-[400px] text-base focus-visible:glow-primary" />
                   </CardContent>
                     <CardFooter className="flex justify-end">
-                      <Button
-                        variant="outline"
-                        onClick={() => handleSummarizeSection(activeSectionIndex)}
-                        disabled={isSummarizing || isGenerating || isGeneratingOutline || isSuggesting || !activeSection.content?.trim()}
-                        className="hover:glow-accent focus-visible:glow-accent"
-                      >
+                      <Button variant="outline" onClick={() => handleSummarizeSection(activeSectionIndex)} disabled={isSummarizing || isGenerating || isGeneratingOutline || isSuggesting || !activeSection.content?.trim()} className="hover:glow-accent focus-visible:glow-accent">
                         {isSummarizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ScrollText className="mr-2 h-4 w-4" />}
                         {isSummarizing ? 'Summarizing...' : 'Summarize'}
                       </Button>
@@ -1071,28 +1093,20 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 </Card>
               </div>
             ) : (
+              // Initial state or section not found
               <div className="flex items-center justify-center h-full">
                  <Card className="text-center py-8 px-6 max-w-md mx-auto shadow-md">
                     <CardHeader>
-                      <CardTitle className="text-xl text-primary text-glow-primary">Table of Contents Needed</CardTitle>
-                      <CardDescription className="mt-2">
-                        Your project report sections are managed via the Table of Contents (ToC).
-                      </CardDescription>
+                      <CardTitle className="text-xl text-primary text-glow-primary">Select or Generate Sections</CardTitle>
+                      <CardDescription className="mt-2">Choose an item from the sidebar or generate sections if none exist.</CardDescription>
                     </CardHeader>
                     <CardContent className="mt-4 space-y-4">
-                      <p>Go to <Button variant="link" className="p-0 h-auto text-base" onClick={() => setActiveSectionIndex(-1)}>Project Details</Button>, provide a title and context, then click "Generate/Update ToC" below or in the details section.</p>
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={handleGenerateTocClick}
-                        disabled={isGeneratingOutline || isGenerating || isSummarizing || isSuggesting || !project.projectContext?.trim()}
-                        className="hover:glow-primary focus-visible:glow-primary"
-                        title={!project.projectContext?.trim() ? "Add project context in Project Details first" : "Generate Table of Contents based on project context"}
-                      >
+                       <p>Go to <Button variant="link" className="p-0 h-auto text-base" onClick={() => setActiveSectionIndex(-1)}>Project Details</Button>, provide context, then click "Generate Sections".</p>
+                      <Button variant="default" size="sm" onClick={handleGenerateTocClick} disabled={isGeneratingOutline || isGenerating || isSummarizing || isSuggesting || !project.projectContext?.trim()} className="hover:glow-primary focus-visible:glow-primary">
                         {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
-                        {isGeneratingOutline ? 'Generating ToC...' : 'Generate/Update ToC'}
+                        {isGeneratingOutline ? 'Generating...' : 'Generate Sections'}
                       </Button>
-                      <p className="text-xs text-muted-foreground mt-3">The AI will create the necessary sections based on your project context.</p>
+                      <p className="text-xs text-muted-foreground mt-3">The AI will create sections based on your project context.</p>
                     </CardContent>
                   </Card>
               </div>
@@ -1101,61 +1115,56 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             {/* AI Suggestions Section */}
             <Card className="shadow-md mt-6">
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-primary text-glow-primary">
-                        <Sparkles className="w-5 h-5" /> AI Suggestions
-                    </CardTitle>
-                    <CardDescription>Ask the AI for feedback or specific improvements on your report.</CardDescription>
+                    <CardTitle className="flex items-center gap-2 text-primary text-glow-primary"><Sparkles className="w-5 h-5" /> AI Suggestions</CardTitle>
+                    <CardDescription>Ask the AI for feedback on your report.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div>
-                        <Label htmlFor="suggestion-input">What would you like suggestions on? (Optional)</Label>
-                        <Input
-                            id="suggestion-input"
-                            value={suggestionInput}
-                            onChange={(e) => setSuggestionInput(e.target.value)}
-                            placeholder="e.g., Improve the flow, Add more technical details, Check clarity..."
-                            className="mt-1 focus-visible:glow-primary"
-                        />
+                        <Label htmlFor="suggestion-input">Focus area (Optional)</Label>
+                        <Input id="suggestion-input" value={suggestionInput} onChange={(e) => setSuggestionInput(e.target.value)} placeholder="e.g., Improve flow, Check clarity..." className="mt-1 focus-visible:glow-primary" />
                     </div>
-                    <Button
-                        onClick={handleGetSuggestions}
-                        disabled={isSuggesting || isGenerating || isSummarizing || isGeneratingOutline}
-                        className="hover:glow-primary focus-visible:glow-primary"
-                    >
+                    <Button onClick={handleGetSuggestions} disabled={isSuggesting || isGenerating || isSummarizing || isGeneratingOutline} className="hover:glow-primary focus-visible:glow-primary">
                         {isSuggesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquareQuote className="mr-2 h-4 w-4" />}
                         {isSuggesting ? 'Getting Suggestions...' : 'Get Suggestions'}
                     </Button>
-
-                    {/* Display Suggestions */}
                     {suggestions && (
                         <div className="mt-4 p-4 border rounded-md bg-muted/30">
                              <h4 className="font-semibold mb-2 text-foreground">Suggestions:</h4>
-                             <div
-                                className="prose prose-sm max-w-none dark:prose-invert text-foreground"
-                                dangerouslySetInnerHTML={{ __html: marked.parse(suggestions) }}
-                             />
+                             <div className="prose prose-sm max-w-none dark:prose-invert text-foreground" dangerouslySetInnerHTML={{ __html: marked.parse(suggestions) }} />
                         </div>
                     )}
                 </CardContent>
             </Card>
 
-             {/* Floating Action Button (FAB) for Mobile Project Sidebar Toggle */}
-             {/* Removed absolute positioning, place inside ScrollArea if FAB needs to scroll */}
-             {/* Or keep fixed if it should overlay content */}
-            <div className="fixed bottom-6 right-6 z-20 md:hidden"> {/* Keep fixed positioning */}
-                 <SheetTrigger asChild>
-                     <Button
-                         variant="default" // Use default style for FAB
-                         size="icon"
-                         className="rounded-full shadow-lg w-14 h-14 hover:glow-primary focus-visible:glow-primary" // Larger FAB
-                         title="Open project menu"
-                     >
-                         <Menu className="h-6 w-6" />
-                     </Button>
-                 </SheetTrigger>
-            </div>
-
           </ScrollArea>
+
+            {/* Floating Action Button (FAB) for Mobile/Draggable Sidebar Toggle */}
+            <SheetTrigger asChild>
+                <Button
+                    ref={fabRef}
+                    variant="default"
+                    size="icon"
+                    className={cn(
+                        "fixed z-20 rounded-full shadow-lg w-14 h-14 hover:glow-primary focus-visible:glow-primary cursor-grab active:cursor-grabbing",
+                        "md:hidden" // Hide on medium and larger screens where static sidebar is shown
+                    )}
+                    style={{
+                        left: `${fabPosition.x}px`,
+                        top: `${fabPosition.y}px`,
+                    }}
+                    onMouseDown={onFabMouseDown}
+                    onClick={(e) => {
+                        // Prevent sheet opening if it was a drag
+                        if (isDraggingFab) {
+                             e.preventDefault();
+                        }
+                    }}
+                    title="Open project menu"
+                    aria-label="Open project menu"
+                 >
+                    <Menu className="h-6 w-6" />
+                 </Button>
+            </SheetTrigger>
         </div>
 
         {/* Context Warning Dialog */}
@@ -1164,9 +1173,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             <AlertDialogHeader>
               <AlertDialogTitle>Project Context May Be Limited</AlertDialogTitle>
               <AlertDialogDescription>
-                The project context provided is quite short. Generating an accurate Table of Contents might be difficult.
-                Consider adding more details to the "Project Context" field in Project Details for better results.
-                Do you want to proceed with ToC generation anyway?
+                The project context is short. Generating accurate sections might be difficult.
+                Consider adding more details in "Project Context" for better results. Proceed anyway?
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
