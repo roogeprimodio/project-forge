@@ -125,61 +125,59 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
     return (
         <div className="group w-full"> {/* Ensure group takes full width */}
              {/* Main row containing toggle, content button, and edit buttons */}
-            <div className="flex group/item relative w-full"> {/* Use w-full here */}
+            <div className="flex group/item relative w-full items-center"> {/* Use w-full and items-center here */}
 
-                {/* Wrapper for Button and Edit controls to manage layout */}
-                <div
-                    className="flex flex-1 min-w-0 items-center h-8" // Allow this div to grow, align items vertically
-                    style={{ paddingLeft: `${level * 1.5}rem` }} // Apply indentation
-                >
-                    {/* Toggle Button */}
-                    {hasSubSections ? (
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={handleToggleExpand}
-                            className="h-6 w-6 mr-1 text-muted-foreground hover:bg-muted/50 flex-shrink-0"
-                            aria-label={isExpanded ? "Collapse section" : "Expand section"}
-                            tabIndex={-1}
-                        >
-                            {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                        </Button>
-                    ) : (
-                        <span className="w-6 mr-1 flex-shrink-0"></span> // Placeholder for alignment
-                    )}
+                {/* Indentation Spacer */}
+                <div style={{ width: `${level * 1.5}rem` }} className="flex-shrink-0 h-8"></div>
 
-                    {/* Section Content Button */}
+                {/* Toggle Button */}
+                {hasSubSections ? (
                     <Button
-                        variant={(isActive || isNameEditing) && !isEditing ? "secondary" : "ghost"}
-                        size="sm"
-                        onClick={handleSectionClick}
-                        className={cn(
-                            "justify-start text-left flex-1 group/btn h-full min-w-0 px-1 flex items-center", // Use h-full, flex items-center, justify-start, text-left
-                            isEditing ? 'pr-[70px]' : 'pr-2' // Adjust right padding
-                        )}
-                        aria-current={isActive && !isEditing && !isNameEditing ? "page" : undefined}
-                        title={section.name} // Tooltip
-                        disabled={isEditing && !isNameEditing}
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleToggleExpand}
+                        className="h-6 w-6 mr-1 text-muted-foreground hover:bg-muted/50 flex-shrink-0"
+                        aria-label={isExpanded ? "Collapse section" : "Expand section"}
+                        tabIndex={-1} // Make it non-focusable directly, accessible via parent
                     >
-                        {/* Numbering - Ensure it's left-aligned within its span */}
-                        <span className="mr-1.5 font-medium text-muted-foreground min-w-[2em] text-right flex-shrink-0">{numbering}</span>
-                        <FileText className="mr-1.5 h-4 w-4 flex-shrink-0" />
-                        {isNameEditing ? (
-                            <Input
-                                ref={inputRef}
-                                value={tempName}
-                                onChange={handleNameChange}
-                                onKeyDown={handleNameKeyDown}
-                                onBlur={handleNameBlur}
-                                className="h-6 px-1 text-sm flex-1 bg-transparent border-b border-primary focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-primary text-left" // text-left
-                                onClick={(e) => e.stopPropagation()}
-                                onMouseDown={(e) => e.stopPropagation()}
-                            />
-                        ) : (
-                            <span className="flex-1 truncate text-left">{section.name}</span> // text-left
-                        )}
+                        {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                     </Button>
-                </div>
+                ) : (
+                    // Placeholder for alignment when no sub-sections exist
+                    <span className="w-6 mr-1 flex-shrink-0"></span>
+                )}
+
+                {/* Section Content Button */}
+                <Button
+                    variant={(isActive || isNameEditing) && !isEditing ? "secondary" : "ghost"}
+                    size="sm"
+                    onClick={handleSectionClick}
+                    className={cn(
+                        "justify-start text-left flex-1 group/btn h-8 min-w-0 px-1 flex items-center", // Use h-8, flex items-center, justify-start, text-left
+                        isEditing ? 'pr-[70px]' : 'pr-2' // Adjust right padding
+                    )}
+                    aria-current={isActive && !isEditing && !isNameEditing ? "page" : undefined}
+                    title={section.name} // Tooltip
+                    disabled={isEditing && !isNameEditing}
+                >
+                    {/* Numbering - Removed text-right */}
+                    <span className="mr-1.5 font-medium text-muted-foreground min-w-[2em] flex-shrink-0">{numbering}</span>
+                    <FileText className="mr-1.5 h-4 w-4 flex-shrink-0" />
+                    {isNameEditing ? (
+                        <Input
+                            ref={inputRef}
+                            value={tempName}
+                            onChange={handleNameChange}
+                            onKeyDown={handleNameKeyDown}
+                            onBlur={handleNameBlur}
+                            className="h-6 px-1 text-sm flex-1 bg-transparent border-b border-primary focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-primary text-left" // text-left
+                            onClick={(e) => e.stopPropagation()}
+                            onMouseDown={(e) => e.stopPropagation()}
+                        />
+                    ) : (
+                        <span className="flex-1 truncate text-left">{section.name}</span> // text-left
+                    )}
+                </Button>
 
 
                  {/* Edit, Delete, and Add Sub-section Buttons (visible only in edit mode) */}
@@ -206,4 +204,5 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
             )}
         </div>
     );
-};
+}
+    
