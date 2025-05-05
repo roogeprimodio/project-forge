@@ -125,27 +125,30 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
     return (
         <div className="group w-full"> {/* Ensure group takes full width */}
              {/* Main row containing toggle, content button, and edit buttons */}
-            <div className="flex group/item relative w-full items-center"> {/* Use w-full and items-center here */}
+            <div className="flex group/item relative w-full"> {/* Use w-full, REMOVED items-center */}
 
-                {/* Indentation Spacer */}
-                <div style={{ width: `${level * 1.5}rem` }} className="flex-shrink-0 h-8"></div>
+                 {/* Indentation Spacer and Toggle */}
+                 <div
+                    className="flex flex-shrink-0 h-8" // Fixed height for alignment, REMOVED items-center
+                    style={{ paddingLeft: `${level * 1.5}rem` }} // Indentation based on level
+                >
+                    {/* Toggle Button Logic */}
+                    {hasSubSections ? (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={handleToggleExpand}
+                            className="h-6 w-6 mr-1 text-muted-foreground hover:bg-muted/50 flex-shrink-0"
+                            aria-label={isExpanded ? "Collapse section" : "Expand section"}
+                            tabIndex={-1} // Make it non-focusable directly, accessible via parent
+                        >
+                            {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                        </Button>
+                    ) : (
+                        <span className="w-6 mr-1 flex-shrink-0"></span> // Placeholder for alignment
+                    )}
+                 </div>
 
-                {/* Toggle Button */}
-                {hasSubSections ? (
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={handleToggleExpand}
-                        className="h-6 w-6 mr-1 text-muted-foreground hover:bg-muted/50 flex-shrink-0"
-                        aria-label={isExpanded ? "Collapse section" : "Expand section"}
-                        tabIndex={-1} // Make it non-focusable directly, accessible via parent
-                    >
-                        {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                    </Button>
-                ) : (
-                    // Placeholder for alignment when no sub-sections exist
-                    <span className="w-6 mr-1 flex-shrink-0"></span>
-                )}
 
                 {/* Section Content Button */}
                 <Button
@@ -153,14 +156,15 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
                     size="sm"
                     onClick={handleSectionClick}
                     className={cn(
-                        "justify-start text-left flex-1 group/btn h-8 min-w-0 px-1 flex items-center", // Use h-8, flex items-center, justify-start, text-left
-                        isEditing ? 'pr-[70px]' : 'pr-2' // Adjust right padding
+                        "justify-start text-left flex-1 group/btn h-8 min-w-0 flex items-center", // Use items-center here for vertical alignment
+                        "pl-0 pr-1", // REMOVED left padding (px-1 -> pl-0 pr-1), kept right padding
+                        isEditing ? 'pr-[70px]' : 'pr-1' // Adjust right padding based on edit mode
                     )}
                     aria-current={isActive && !isEditing && !isNameEditing ? "page" : undefined}
                     title={section.name} // Tooltip
                     disabled={isEditing && !isNameEditing}
                 >
-                    {/* Numbering - Removed text-right */}
+                    {/* Numbering */}
                     <span className="mr-1.5 font-medium text-muted-foreground min-w-[2em] flex-shrink-0">{numbering}</span>
                     <FileText className="mr-1.5 h-4 w-4 flex-shrink-0" />
                     {isNameEditing ? (
