@@ -26,6 +26,7 @@ import { v4 as uuidv4 } from 'uuid';
 import AiDiagramGenerator from './ai-diagram-generator'; // Import the new component
 import MermaidDiagram from './mermaid-diagram'; // Import diagram renderer
 import { ProjectSidebarContent } from './project-sidebar-content'; // Import ProjectSidebarContent
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // Import Tabs
 
 interface ProjectEditorProps {
   projectId: string;
@@ -171,6 +172,44 @@ const StandardPagePlaceholder = ({ pageName }: { pageName: string }) => (
         </CardContent>
     </Card>
 );
+
+// Component for rendering Markdown preview
+const MarkdownPreview = React.memo(({ content }: { content: string }) => {
+    const [renderedHtml, setRenderedHtml] = useState('');
+    const [isClient, setIsClient] = useState(false);
+
+    useEffect(() => {
+        setIsClient(true); // Mark as client-side
+    }, []);
+
+    useEffect(() => {
+        if (isClient && content) {
+            // Ensure marked runs only on the client after mount
+             try {
+                setRenderedHtml(marked.parse(content));
+             } catch (error) {
+                 console.error("Error parsing Markdown:", error);
+                 setRenderedHtml("<p class='text-destructive'>Error rendering preview.</p>");
+             }
+        } else {
+            setRenderedHtml(''); // Clear if no content or on server
+        }
+    }, [content, isClient]); // Re-render when content changes on the client
+
+    if (!isClient) {
+        // Render nothing or a placeholder on the server/during hydration
+        return <div className="prose prose-sm dark:prose-invert max-w-none p-4 border rounded min-h-[400px] bg-muted/20 flex items-center justify-center"><Loader2 className="animate-spin h-6 w-6 text-muted-foreground"/></div>;
+    }
+
+    return (
+        <div
+            className="prose prose-sm dark:prose-invert max-w-none p-4 border rounded min-h-[400px] bg-muted/20" // Added background for contrast
+            dangerouslySetInnerHTML={{ __html: renderedHtml || '<p class="italic text-muted-foreground">Nothing to preview yet.</p>' }}
+        />
+    );
+});
+MarkdownPreview.displayName = 'MarkdownPreview';
+
 
 export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const [projects, setProjects] = useLocalStorage<Project[]>('projects', []);
@@ -815,8 +854,9 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
    };
 
    const handlePreview = () => {
-       // Placeholder for future preview functionality
-       toast({ title: "Preview (Coming Soon)", description: "This will show a preview of the generated report." });
+       // Placeholder for future preview functionality - now handled by Tabs
+       // toast({ title: "Preview (Coming Soon)", description: "This will show a preview of the generated report." });
+       // We will use the Preview Tab now.
    };
 
 
@@ -1028,47 +1068,76 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                   </CardContent>
                 </Card>
 
-                {/* Section Content Card */}
-              <Card className="shadow-md mb-6">
-                <CardHeader>
-                  <CardTitle>{activeSection.name} - Content</CardTitle>
-                  <CardDescription>Edit the content below. You can use Markdown syntax, and insert AI-generated diagrams.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                   {/* Toggle for Diagram Generator */}
-                   <Button variant="outline" size="sm" onClick={() => setShowDiagramGenerator(!showDiagramGenerator)} className="hover:glow-accent focus-visible:glow-accent">
-                       <Projector className="mr-2 h-4 w-4" /> {showDiagramGenerator ? 'Hide Diagram Generator' : 'AI Diagram Generator'}
-                   </Button>
+                {/* Section Content Card with Edit/Preview Tabs */}
+                <Card className="shadow-md mb-6">
+                   <CardHeader>
+                     <CardTitle>{activeSection.name} - Content</CardTitle>
+                     <CardDescription>Edit the content using Markdown, insert diagrams, and preview the output.</CardDescription>
+                   </CardHeader>
+                   <CardContent>
+                     <Tabs defaultValue="edit" className="w-full">
+                       <TabsList className="grid w-full grid-cols-2 mb-4">
+                         <TabsTrigger value="edit">Edit</TabsTrigger>
+                         <TabsTrigger value="preview">Preview</TabsTrigger>
+                       </TabsList>
 
-                   {/* AI Diagram Generator Component */}
-                   {showDiagramGenerator && (
-                       <Card className="bg-muted/50 p-4">
-                           <AiDiagramGenerator onDiagramGenerated={handleDiagramGenerated} />
-                       </Card>
-                   )}
+                       {/* Edit Tab */}
+                       <TabsContent value="edit" className="space-y-4">
+                           {/* Toggle for Diagram Generator */}
+                           <Button variant="outline" size="sm" onClick={() => setShowDiagramGenerator(!showDiagramGenerator)} className="hover:glow-accent focus-visible:glow-accent">
+                               <Projector className="mr-2 h-4 w-4" /> {showDiagramGenerator ? 'Hide Diagram Generator' : 'AI Diagram Generator'}
+                           </Button>
 
-                  <Textarea id={`section-content-${activeSection.id}`} value={activeSection.content} onChange={(e) => handleSectionContentChange(activeSection.id, e.target.value)} onBlur={handleSectionContentBlur} placeholder={"Generated content appears here..."} className="min-h-[400px] text-base focus-visible:glow-primary" />
+                           {/* AI Diagram Generator Component */}
+                           {showDiagramGenerator && (
+                               <Card className="bg-muted/50 p-4">
+                                   <AiDiagramGenerator onDiagramGenerated={handleDiagramGenerated} />
+                               </Card>
+                           )}
 
-                  {/* Display Rendered Mermaid Diagrams from Content */}
-                   <div className="space-y-4">
-                    {activeSection.content?.match(/```mermaid\n([\s\S]*?)\n```/g)?.map((block, index) => {
-                        const code = block.replace(/```mermaid\n/, '').replace(/\n```/, '');
-                        return (
-                            <div key={`diagram-${activeSection.id}-${index}`} className="my-4">
-                                <MermaidDiagram chart={code} />
+                           <Textarea id={`section-content-${activeSection.id}`} value={activeSection.content} onChange={(e) => handleSectionContentChange(activeSection.id, e.target.value)} onBlur={handleSectionContentBlur} placeholder={"Generated content appears here. Use Markdown..."} className="min-h-[400px] text-base focus-visible:glow-primary font-mono" />
+
+                           {/* Display Rendered Mermaid Diagrams from Content (optional in edit mode, maybe just show code block) */}
+                           {/*
+                           <div className="space-y-4">
+                               {activeSection.content?.match(/```mermaid\n([\s\S]*?)\n```/g)?.map((block, index) => {
+                                   const code = block.replace(/```mermaid\n/, '').replace(/\n```/, '');
+                                   return (
+                                       <div key={`diagram-edit-${activeSection.id}-${index}`} className="my-4">
+                                           <p className="text-xs font-semibold mb-1">Mermaid Diagram Code:</p>
+                                           <pre className="p-2 bg-muted rounded text-xs overflow-x-auto"><code>{code}</code></pre>
+                                           <p className="text-xs text-muted-foreground mt-1">(Preview in the 'Preview' tab)</p>
+                                       </div>
+                                   );
+                               })}
+                           </div>
+                            */}
+                       </TabsContent>
+
+                       {/* Preview Tab */}
+                       <TabsContent value="preview">
+                           <MarkdownPreview content={activeSection.content || ''} />
+                            {/* Render Mermaid diagrams specifically in preview */}
+                            <div className="space-y-4 mt-4">
+                                {activeSection.content?.match(/```mermaid\n([\s\S]*?)\n```/g)?.map((block, index) => {
+                                    const code = block.replace(/```mermaid\n/, '').replace(/\n```/, '');
+                                    return (
+                                        <div key={`diagram-preview-${activeSection.id}-${index}`} className="my-4">
+                                            <MermaidDiagram chart={code} />
+                                        </div>
+                                    );
+                                })}
                             </div>
-                        );
-                    })}
-                  </div>
-
-                </CardContent>
-                  <CardFooter className="flex justify-end">
-                    <Button variant="outline" onClick={() => handleSummarizeSection(activeSection.id)} disabled={isSummarizing || isGenerating || isGeneratingOutline || isSuggesting || !activeSection.content?.trim()} className="hover:glow-accent focus-visible:glow-accent">
-                      {isSummarizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ScrollText className="mr-2 h-4 w-4" />}
-                      {isSummarizing ? 'Summarizing...' : 'Summarize'}
-                    </Button>
-                  </CardFooter>
-              </Card>
+                       </TabsContent>
+                     </Tabs>
+                   </CardContent>
+                   <CardFooter className="flex justify-end">
+                     <Button variant="outline" onClick={() => handleSummarizeSection(activeSection.id)} disabled={isSummarizing || isGenerating || isGeneratingOutline || isSuggesting || !activeSection.content?.trim()} className="hover:glow-accent focus-visible:glow-accent">
+                       {isSummarizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ScrollText className="mr-2 h-4 w-4" />}
+                       {isSummarizing ? 'Summarizing...' : 'Summarize'}
+                     </Button>
+                   </CardFooter>
+                </Card>
             </div>
         );
     } else {
@@ -1160,10 +1229,12 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
               {project.storageType === 'local' ? <CloudOff className="h-4 w-4" /> : <Cloud className="h-4 w-4 text-green-500" />}
               <span>{project.storageType === 'local' ? 'Local' : 'Cloud'}</span>
             </div>
-             {/* Preview Button */}
+             {/* Preview Button (Removed as it's now a Tab) */}
+             {/*
              <Button variant="outline" size="sm" onClick={handlePreview} disabled={!project} className="ml-2 focus-visible:glow-accent">
                 <Eye className="mr-2 h-4 w-4" /> Preview
              </Button>
+              */}
              {/* Export Button */}
             <Button variant="outline" size="sm" onClick={handleNavigateToExport} className="hover:glow-accent focus-visible:glow-accent ml-2">
               <Download className="mr-2 h-4 w-4" /> Export Report
