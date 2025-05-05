@@ -11,8 +11,8 @@ export interface Project {
   projectContext: string; // Added field to store initial project context
   teamDetails: string; // Simple string for now, represents team members & enrollments. TODO: Refactor to Array<{name: string, enrollment: string}>
   instituteName?: string; // Changed to optional, as it might not always be provided
-  universityLogoUrl?: string; // Added: Optional URL for University Logo
-  collegeLogoUrl?: string; // Added: Optional URL for College Logo
+  universityLogoUrl?: string; // Will store Data URL if image is uploaded
+  collegeLogoUrl?: string; // Will store Data URL if image is uploaded
   teamId?: string; // Optional team ID
   subject?: string; // e.g., Design Engineering - 1A
   semester?: string; // e.g., 5
@@ -39,3 +39,4 @@ export const COMMON_SECTIONS = [
   "References",
   "Appendix",
 ];
+

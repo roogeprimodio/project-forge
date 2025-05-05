@@ -35,11 +35,11 @@ function ProjectSidebarContent({
     project,
     activeSectionIndex,
     setActiveSectionIndex,
-    handleGenerateTocClick, // Renamed prop
+    handleGenerateTocClick,
     isGeneratingOutline,
     isGenerating,
     isSummarizing,
-    isSuggesting, // Added
+    isSuggesting,
     handleSaveOnline,
     canUndo,
     handleUndo,
@@ -48,11 +48,11 @@ function ProjectSidebarContent({
     project: Project;
     activeSectionIndex: number | null | -1;
     setActiveSectionIndex: (index: number | -1) => void;
-    handleGenerateTocClick: () => void; // Renamed prop type
+    handleGenerateTocClick: () => void;
     isGeneratingOutline: boolean;
     isGenerating: boolean;
     isSummarizing: boolean;
-    isSuggesting: boolean; // Added
+    isSuggesting: boolean;
     handleSaveOnline: () => void;
     canUndo: boolean;
     handleUndo: () => void;
@@ -120,7 +120,6 @@ function ProjectSidebarContent({
                          <p className="px-2 text-xs text-muted-foreground italic">Generate a ToC to populate sections.</p>
                        )}
 
-                     {/* Removed Add Standard/Custom Section parts */}
                  </nav>
              </ScrollArea>
              <div className="p-4 border-t space-y-2">
@@ -162,59 +161,54 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const [activeSectionIndex, setActiveSectionIndex] = useState<number | null | -1>(null); // -1 for Project Details
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
-  const [isGeneratingOutline, setIsGeneratingOutline] = useState(false); // State for ToC generation
-  const [isSuggesting, setIsSuggesting] = useState(false); // State for suggestion generation
-  const [suggestionInput, setSuggestionInput] = useState(''); // State for suggestion text input
-  const [suggestions, setSuggestions] = useState<string | null>(null); // State to store AI suggestions
-  // Removed customSectionName state
-  const [isProjectFound, setIsProjectFound] = useState<boolean | null>(null); // null: loading, true: found, false: not found
-  const [isMobileSheetOpen, setIsMobileSheetOpen] = useState(false); // State for mobile sheet visibility
-  const [hasMounted, setHasMounted] = useState(false); // Track hydration
-  const [showOutlineContextAlert, setShowOutlineContextAlert] = useState(false); // Alert for insufficient context for ToC
+  const [isGeneratingOutline, setIsGeneratingOutline] = useState(false);
+  const [isSuggesting, setIsSuggesting] = useState(false);
+  const [suggestionInput, setSuggestionInput] = useState('');
+  const [suggestions, setSuggestions] = useState<string | null>(null);
+  const [isProjectFound, setIsProjectFound] = useState<boolean | null>(null);
+  const [isMobileSheetOpen, setIsMobileSheetOpen] = useState(false);
+  const [hasMounted, setHasMounted] = useState(false);
+  const [showOutlineContextAlert, setShowOutlineContextAlert] = useState(false);
   const router = useRouter();
 
   // Undo/Redo state
   const [history, setHistory] = useState<Project[]>([]);
   const [historyIndex, setHistoryIndex] = useState<number>(-1);
-  const isUpdatingHistory = useRef(false); // Flag to prevent history loops
+  const isUpdatingHistory = useRef(false);
 
   // Mark as mounted on client
   useEffect(() => {
     setHasMounted(true);
   }, []);
 
-
-  // Derived state: current project (use directly from history if available)
+  // Derived state: current project
   const project = useMemo(() => {
       if (historyIndex >= 0 && historyIndex < history.length) {
           return history[historyIndex];
       }
-      // Fallback to projects from localStorage if history is empty/invalid
       return Array.isArray(projects) ? projects.find(p => p.id === projectId) : undefined;
   }, [projects, projectId, history, historyIndex]);
 
-   // Effect to initialize history when project is loaded
+   // Effect to initialize history
   useEffect(() => {
     if (hasMounted && project && history.length === 0 && historyIndex === -1) {
-        console.log("Initializing history with project:", project);
         setHistory([project]);
         setHistoryIndex(0);
     }
-  }, [project, hasMounted, history.length, historyIndex]); // Run only when project is first defined and history is empty
-
+  }, [project, hasMounted, history.length, historyIndex]);
 
   // Update project and history
   const updateProject = useCallback((updatedData: Partial<Project> | ((prev: Project) => Project), saveToHistory: boolean = true) => {
       if (!project) return;
 
-      isUpdatingHistory.current = true; // Prevent triggering localStorage save from history update
+      isUpdatingHistory.current = true;
 
       setProjects((prevProjects = []) => {
         const currentProjectIndex = (prevProjects || []).findIndex(p => p.id === projectId);
         if (currentProjectIndex === -1) {
             console.error("Project not found in setProjects during update");
             requestAnimationFrame(() => { isUpdatingHistory.current = false; });
-            return prevProjects || []; // Return current state if project not found
+            return prevProjects || [];
         }
 
         const currentProject = prevProjects[currentProjectIndex];
@@ -226,16 +220,14 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             setHistory(prevHistory => {
                 const newHistory = prevHistory.slice(0, historyIndex + 1);
                 newHistory.push(updatedProject);
-                // Limit history size
                 if (newHistory.length > MAX_HISTORY_LENGTH) {
-                    newHistory.shift(); // Remove the oldest entry
+                    newHistory.shift();
                 }
                 const newIndex = Math.min(newHistory.length - 1, MAX_HISTORY_LENGTH - 1);
                 setHistoryIndex(newIndex);
                 return newHistory;
             });
         } else {
-             // If not saving to history (e.g., undo/redo), just update the current history entry
              setHistory(prevHistory => {
                  const newHistory = [...prevHistory];
                  if (historyIndex >= 0 && historyIndex < newHistory.length) {
@@ -245,33 +237,30 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
              });
         }
 
-        // Update localStorage with the latest state
         const updatedProjects = [...prevProjects];
         updatedProjects[currentProjectIndex] = updatedProject;
         return updatedProjects;
       });
 
-      // Use requestAnimationFrame to ensure state updates are flushed before resetting the flag
       requestAnimationFrame(() => {
         isUpdatingHistory.current = false;
       });
 
   }, [project, historyIndex, setProjects, projectId]);
 
-
    // Effect to check if project exists and set initial state
    useEffect(() => {
-    if (!hasMounted || projects === undefined || isUpdatingHistory.current) return; // Don't run on server, before hydration, or during history updates
+    if (!hasMounted || projects === undefined || isUpdatingHistory.current) return;
 
     const projectExists = Array.isArray(projects) && projects.some(p => p.id === projectId);
 
     if (projectExists && isProjectFound !== true) {
       setIsProjectFound(true);
       if (activeSectionIndex === null) {
-        setActiveSectionIndex(-1); // Default to project details if project exists
+        setActiveSectionIndex(-1);
       }
     } else if (!projectExists && isProjectFound !== false) {
-        setIsProjectFound(false); // Set definitively to false
+        setIsProjectFound(false);
         toast({
             variant: "destructive",
             title: "Project Not Found",
@@ -285,10 +274,9 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     // --- Undo/Redo Handlers ---
     const handleUndo = useCallback(() => {
         if (historyIndex > 0) {
-            isUpdatingHistory.current = true; // Prevent recursive updates
+            isUpdatingHistory.current = true;
             const newIndex = historyIndex - 1;
             setHistoryIndex(newIndex);
-             // Update localStorage with the undone state from history
              const undoneProject = history[newIndex];
              setProjects((prevProjects = []) =>
                  (prevProjects || []).map(p =>
@@ -302,7 +290,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         }
     }, [historyIndex, history, setProjects, projectId, toast]);
 
-    // Simple check if undo is possible
     const canUndo = historyIndex > 0;
 
 
@@ -326,12 +313,46 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
   const handleProjectDetailChange = (field: keyof Project, value: string) => {
     if (!project) return;
-    if (field === 'storageType') return; // Prevent direct modification of storageType
+    if (field === 'storageType') return;
     updateProject({ [field]: value });
   };
 
+  // --- Logo Upload Handler ---
+  const handleLogoUpload = (field: 'universityLogoUrl' | 'collegeLogoUrl', file: File | null) => {
+    if (!project || !file) return;
 
-  // Renamed: setSectionsFromOutline to updateSectionsFromToc
+    // Check if the file is an image
+    if (!file.type.startsWith('image/')) {
+        toast({
+            variant: 'destructive',
+            title: 'Invalid File Type',
+            description: 'Please upload an image file (e.g., PNG, JPG, GIF).',
+        });
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+        const dataUrl = reader.result as string;
+        updateProject({ [field]: dataUrl }); // Store the data URL
+        toast({
+            title: 'Logo Uploaded',
+            description: `${field === 'universityLogoUrl' ? 'University' : 'College'} logo updated.`,
+        });
+    };
+    reader.onerror = (error) => {
+        console.error("Error reading file:", error);
+        toast({
+            variant: 'destructive',
+            title: 'Upload Failed',
+            description: 'Could not read the uploaded file.',
+        });
+    };
+    reader.readAsDataURL(file);
+  };
+
+
+  // Update sections based on generated ToC
   const updateSectionsFromToc = useCallback((newSectionNames: string[]) => {
     if (!project) return;
 
@@ -342,26 +363,22 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     let sectionOrderChanged = false;
     let sectionsRemoved = false;
 
-    // Track original indices for order change detection
     const originalIndices = new Map(project.sections.map((s, i) => [s.name.toLowerCase(), i]));
 
     newSectionNames.forEach((name, newIndex) => {
         const trimmedName = name.trim();
-        // Skip empty names & ToC section itself if TOC_SECTION_NAME is defined
         if (!trimmedName || (TOC_SECTION_NAME && trimmedName.toLowerCase() === TOC_SECTION_NAME.toLowerCase())) return;
 
         const existingSection = existingSectionsMap.get(trimmedName.toLowerCase());
 
         if (existingSection) {
-            // Preserve existing section, update its order
             updatedSections.push(existingSection);
             if (originalIndices.get(trimmedName.toLowerCase()) !== newIndex) {
-                sectionOrderChanged = true; // Order changed
+                sectionOrderChanged = true;
             }
-            existingSectionsMap.delete(trimmedName.toLowerCase()); // Mark as used
+            existingSectionsMap.delete(trimmedName.toLowerCase());
             preservedCount++;
         } else {
-            // Add new section
             updatedSections.push({
                 name: trimmedName,
                 prompt: `Generate the ${trimmedName} section for the project titled "${project.title}". Consider the project context: ${project.projectContext || '[No context provided]'}. [Add more specific instructions here if needed]`,
@@ -369,18 +386,15 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 lastGenerated: undefined,
             });
             addedCount++;
-            sectionOrderChanged = true; // Adding is a change
+            sectionOrderChanged = true;
         }
     });
 
-     // Check if any sections were removed (exist in map means they weren't in newSectionNames)
-     // Ignore if only ToC was removed implicitly and TOC_SECTION_NAME is defined
      if (existingSectionsMap.size > 0 && (!TOC_SECTION_NAME || !existingSectionsMap.has(TOC_SECTION_NAME.toLowerCase()))) {
          sectionsRemoved = true;
-         sectionOrderChanged = true; // Removal is a change
+         sectionOrderChanged = true;
      }
 
-    // Only update and show toast if there's a meaningful change
     if (addedCount === 0 && !sectionOrderChanged && !sectionsRemoved) {
         toast({
             title: "Table of Contents Unchanged",
@@ -389,11 +403,10 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         return;
     }
 
-    // Update project with history management
     updateProject(prev => ({
         ...prev,
-        sections: updatedSections, // Replace sections entirely with the new ordered list
-    }), true); // Explicitly save this structural change to history
+        sections: updatedSections,
+    }), true);
 
     let toastDescription = "Table of Contents updated.";
     if (addedCount > 0) toastDescription += ` ${addedCount} new section(s) added.`;
@@ -404,11 +417,11 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     toast({
         title: "Table of Contents Updated",
         description: toastDescription,
-        duration: 7000, // Longer duration for more info
+        duration: 7000,
     });
 
-    setActiveSectionIndex(0); // Go to the first section after update
-    setIsMobileSheetOpen(false); // Close mobile sheet after updating
+    setActiveSectionIndex(0);
+    setIsMobileSheetOpen(false);
 
 }, [project, updateProject, toast, setActiveSectionIndex]);
 
@@ -420,14 +433,12 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     setIsGenerating(true);
 
     try {
-      // Ensure required fields for the AI action are present
       const input = {
         projectTitle: project.title || 'Untitled Project',
         sectionName: section.name,
         prompt: section.prompt,
         teamDetails: project.teamDetails || '',
         instituteName: project.instituteName || '',
-        // Include optional fields if they exist
         teamId: project.teamId,
         subject: project.subject,
         semester: project.semester,
@@ -439,7 +450,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
       if ('error' in result) throw new Error(result.error);
 
-       // Use updateProject to manage state and history
        updateProject(prev => {
            const updatedSections = [...prev.sections];
            updatedSections[index] = {
@@ -493,13 +503,11 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
       }
   };
 
-  // Renamed: proceedWithOutlineGeneration to proceedWithTocGeneration
   const proceedWithTocGeneration = useCallback(async () => {
     if (!project || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting) return;
 
-    setIsGeneratingOutline(true); // Use the same state, maybe rename state later if needed
+    setIsGeneratingOutline(true);
     try {
-        // Use generateOutlineAction which is already defined for generating sections
         const result = await generateOutlineAction({ projectTitle: project.title, projectContext: project.projectContext || '' });
         if ('error' in result) throw new Error(result.error);
 
@@ -509,7 +517,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
              return;
         }
 
-        // Use the renamed handler to update sections based on the generated outline (ToC)
         updateSectionsFromToc(result.suggestedSections);
 
     } catch (error) {
@@ -521,16 +528,15 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 }, [project, isGenerating, isSummarizing, isGeneratingOutline, isSuggesting, updateSectionsFromToc, toast]);
 
 
-    // Renamed: handleGenerateOutlineClick to handleGenerateTocClick
     const handleGenerateTocClick = () => {
         if (!project || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting) return;
 
         const contextLength = project.projectContext?.trim().length || 0;
 
         if (contextLength < MIN_CONTEXT_LENGTH) {
-            setShowOutlineContextAlert(true); // Open the confirmation dialog
+            setShowOutlineContextAlert(true);
         } else {
-            proceedWithTocGeneration(); // Context is sufficient, proceed directly
+            proceedWithTocGeneration();
         }
     };
 
@@ -539,7 +545,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
      if (!project || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting) return;
 
      setIsSuggesting(true);
-     setSuggestions(null); // Clear previous suggestions
+     setSuggestions(null);
      try {
        const allSectionsContent = project.sections
          .map(s => `## ${s.name}\n\n${s.content || '[Empty Section]'}`)
@@ -549,7 +555,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
          projectTitle: project.title,
          projectContext: project.projectContext,
          allSectionsContent: allSectionsContent,
-         focusArea: suggestionInput || undefined, // Pass user input if available
+         focusArea: suggestionInput || undefined,
        });
 
        if ('error' in result) throw new Error(result.error);
@@ -591,7 +597,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
    // --- Render Logic ---
 
-   if (!hasMounted || isProjectFound === null) { // Show loading until mounted and project status known
+   if (!hasMounted || isProjectFound === null) {
      return ( <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,60px))] text-center p-4"><Loader2 className="h-16 w-16 animate-spin text-primary mb-4" /><p className="text-lg text-muted-foreground">Loading project...</p></div> );
    }
 
@@ -607,23 +613,20 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     : null;
 
   return (
-    // Wrap the entire return content with the Sheet component
     <Sheet open={isMobileSheetOpen} onOpenChange={setIsMobileSheetOpen}>
-      {/* Main container for the editor layout */}
-      <div className="flex h-full relative"> {/* Use full height and relative positioning */}
+      <div className="flex h-full relative">
 
         {/* --- Local Project Sidebar (Drawer on Mobile - Content only) --- */}
-        <SheetContent side="left" className="p-0 w-64 bg-card md:hidden"> {/* Hide on desktop */}
+        <SheetContent side="left" className="p-0 w-64 bg-card md:hidden">
           <SheetHeader className="sr-only">
             <SheetTitle>Project Menu</SheetTitle>
             <SheetDescription>Navigate project sections and details</SheetDescription>
           </SheetHeader>
-          {/* Pass the renamed handler */}
           <ProjectSidebarContent
             project={project}
             activeSectionIndex={activeSectionIndex}
             setActiveSectionIndex={setActiveSectionIndex}
-            handleGenerateTocClick={handleGenerateTocClick} // Pass renamed handler
+            handleGenerateTocClick={handleGenerateTocClick}
             isGeneratingOutline={isGeneratingOutline}
             isGenerating={isGenerating}
             isSummarizing={isSummarizing}
@@ -635,20 +638,19 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
           />
         </SheetContent>
 
-        {/* Desktop Static Sidebar (Always rendered, width controlled by CSS) */}
+        {/* Desktop Static Sidebar */}
         <div
           className={cn(
-            "hidden md:flex md:flex-col transition-all duration-300 ease-in-out overflow-y-auto overflow-x-hidden", // Flex column layout
-            "w-64 border-r" // Static width for desktop
+            "hidden md:flex md:flex-col transition-all duration-300 ease-in-out overflow-y-auto overflow-x-hidden",
+            "w-64 border-r"
           )}
-          aria-hidden={false} // Always accessible on desktop, though content might be visually hidden if needed
+          aria-hidden={false}
         >
-          {/* Pass the renamed handler */}
            <ProjectSidebarContent
               project={project}
               activeSectionIndex={activeSectionIndex}
               setActiveSectionIndex={setActiveSectionIndex}
-              handleGenerateTocClick={handleGenerateTocClick} // Pass renamed handler
+              handleGenerateTocClick={handleGenerateTocClick}
               isGeneratingOutline={isGeneratingOutline}
               isGenerating={isGenerating}
               isSummarizing={isSummarizing}
@@ -656,16 +658,13 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
               handleSaveOnline={handleSaveOnline}
               canUndo={canUndo}
               handleUndo={handleUndo}
-              // No onCloseSheet needed for desktop
             />
         </div>
 
         {/* --- Main Content Area --- */}
-        <div className="flex-1 flex flex-col overflow-hidden"> {/* Allow main content to scroll */}
-          {/* Sticky Header for Main Content */}
+        <div className="flex-1 flex flex-col overflow-hidden">
           <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/95 backdrop-blur-sm px-4 lg:px-6 flex-shrink-0">
-            {/* Mobile Sheet Trigger is now handled by the floating button below */}
-
+             {/* The mobile sheet trigger is now the FAB */}
             <h1 className="flex-1 text-lg font-semibold md:text-xl text-primary truncate text-glow-primary">
               {activeSectionIndex === -1 ? 'Project Details' : activeSection?.name ?? project.title ?? 'Project'}
             </h1>
@@ -684,7 +683,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             </Button>
           </header>
 
-          <ScrollArea className="flex-1 p-4 md:p-6 relative"> {/* Make content scrollable & relative */}
+          <ScrollArea className="flex-1 p-4 md:p-6 relative">
             {activeSectionIndex === -1 ? (
               // Project Details Form
               <Card className="shadow-md mb-6">
@@ -714,35 +713,33 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                       onChange={(e) => handleProjectDetailChange('projectContext', e.target.value)}
                       placeholder="Briefly describe your project, its goals, scope, and key features or technologies involved. This context is CRUCIAL for generating an accurate Table of Contents."
                       className="mt-1 min-h-[120px] focus-visible:glow-primary"
-                      required // Make context required for ToC generation
+                      required
                     />
                     <p className="text-xs text-muted-foreground mt-1">This context is used by the AI to generate the Table of Contents.</p>
                   </div>
-                  {/* Logo URLs */}
+                  {/* Logo Uploads */}
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                      <div>
-                        <Label htmlFor="universityLogoUrl">University Logo URL</Label>
+                        <Label htmlFor="universityLogoUpload">University Logo</Label>
                         <Input
-                            id="universityLogoUrl"
-                            value={project.universityLogoUrl || ''}
-                            onChange={(e) => handleProjectDetailChange('universityLogoUrl', e.target.value)}
-                            placeholder="https://example.com/uni_logo.png"
-                            className="mt-1 focus-visible:glow-primary"
+                            id="universityLogoUpload"
+                            type="file"
+                            accept="image/*" // Accept only image files
+                            onChange={(e) => handleLogoUpload('universityLogoUrl', e.target.files ? e.target.files[0] : null)}
+                            className="mt-1 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 focus-visible:glow-primary"
                         />
-                         {/* Optional: Preview Image */}
                          {project.universityLogoUrl && <img src={project.universityLogoUrl} alt="University Logo Preview" className="mt-2 max-h-16 border rounded" data-ai-hint="university logo"/>}
                       </div>
                       <div>
-                         <Label htmlFor="collegeLogoUrl">College Logo URL</Label>
+                         <Label htmlFor="collegeLogoUpload">College Logo</Label>
                          <Input
-                            id="collegeLogoUrl"
-                            value={project.collegeLogoUrl || ''}
-                            onChange={(e) => handleProjectDetailChange('collegeLogoUrl', e.target.value)}
-                            placeholder="https://example.com/college_logo.png"
-                            className="mt-1 focus-visible:glow-primary"
+                            id="collegeLogoUpload"
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => handleLogoUpload('collegeLogoUrl', e.target.files ? e.target.files[0] : null)}
+                            className="mt-1 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 focus-visible:glow-primary"
                          />
-                          {/* Optional: Preview Image */}
-                         {project.collegeLogoUrl && <img src={project.collegeLogoUrl} alt="College Logo Preview" className="mt-2 max-h-16 border rounded" data-ai-hint="college logo"/>}
+                          {project.collegeLogoUrl && <img src={project.collegeLogoUrl} alt="College Logo Preview" className="mt-2 max-h-16 border rounded" data-ai-hint="college logo"/>}
                        </div>
                    </div>
                   {/* Institute, Branch, Semester, Subject */}
@@ -827,11 +824,10 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                   </div>
                 </CardContent>
                 <CardFooter className="flex justify-end">
-                   {/* Generate/Update ToC Button in Footer */}
                   <Button
                     variant="default"
                     size="sm"
-                    onClick={handleGenerateTocClick} // Use renamed handler
+                    onClick={handleGenerateTocClick}
                     disabled={isGeneratingOutline || isGenerating || isSummarizing || isSuggesting || !project.projectContext?.trim()}
                     className="hover:glow-primary focus-visible:glow-primary"
                     title={!project.projectContext?.trim() ? "Add project context above first" : "Generate Table of Contents based on project context"}
@@ -869,7 +865,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                     </CardContent>
                   </Card>
 
-                <Card className="shadow-md mb-6"> {/* Added margin-bottom */}
+                <Card className="shadow-md mb-6">
                   <CardHeader>
                     <CardTitle>{activeSection.name} - Content</CardTitle>
                     <CardDescription>
@@ -899,7 +895,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 </Card>
               </div>
             ) : (
-              // Initial State - No Section Selected or Empty Project
               <div className="flex items-center justify-center h-full">
                  <Card className="text-center py-8 px-6 max-w-md mx-auto shadow-md">
                     <CardHeader>
@@ -913,7 +908,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                       <Button
                         variant="default"
                         size="sm"
-                        onClick={handleGenerateTocClick} // Use renamed handler
+                        onClick={handleGenerateTocClick}
                         disabled={isGeneratingOutline || isGenerating || isSummarizing || isSuggesting || !project.projectContext?.trim()}
                         className="hover:glow-primary focus-visible:glow-primary"
                         title={!project.projectContext?.trim() ? "Add project context in Project Details first" : "Generate Table of Contents based on project context"}
@@ -927,7 +922,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
               </div>
             )}
 
-            {/* AI Suggestions Section (Always visible below content) */}
+            {/* AI Suggestions Section */}
             <Card className="shadow-md mt-6">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-primary text-glow-primary">
@@ -968,14 +963,13 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 </CardContent>
             </Card>
 
-            {/* Floating Action Button (FAB) for Mobile Project Sidebar Toggle */}
-             <div className="absolute bottom-6 right-6 z-20"> {/* Keep FAB for mobile */}
-                 {/* Mobile: Sheet Trigger */}
+             {/* Floating Action Button (FAB) for Mobile Project Sidebar Toggle */}
+             <div className="fixed bottom-6 right-6 z-20 md:hidden"> {/* Only show on mobile */}
                  <SheetTrigger asChild>
                      <Button
-                         variant="default" // Use default style for FAB
+                         variant="default"
                          size="icon"
-                         className="rounded-full shadow-lg w-14 h-14 hover:glow-primary focus-visible:glow-primary md:hidden" // Hide FAB on desktop
+                         className="rounded-full shadow-lg w-14 h-14 hover:glow-primary focus-visible:glow-primary"
                          title="Open project menu"
                      >
                          <Menu className="h-6 w-6" />
@@ -984,9 +978,9 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
              </div>
 
           </ScrollArea>
-        </div> {/* End Main Content Area */}
+        </div>
 
-        {/* Context Warning Dialog for ToC Generation */}
+        {/* Context Warning Dialog */}
         <AlertDialog open={showOutlineContextAlert} onOpenChange={setShowOutlineContextAlert}>
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -999,12 +993,12 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={proceedWithTocGeneration}>Generate Anyway</AlertDialogAction> {/* Use renamed handler */}
+              <AlertDialogAction onClick={proceedWithTocGeneration}>Generate Anyway</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
 
-      </div> {/* End Main Flex Container */}
-    </Sheet> // Close the wrapping Sheet component
+      </div>
+    </Sheet>
   );
 }
