@@ -61,11 +61,14 @@ export async function generateOutlineAction(input: GenerateProjectOutlineInput):
     }
     const result = await generateProjectOutline(input);
     console.log("Outline generation result:", result);
-    if (!result || typeof result !== 'object' || !Array.isArray(result.suggestedSections)) {
-        console.warn("AI outline generation returned unexpected format, providing fallback.");
-        return { suggestedSections: ["Introduction", "Main Content", "Conclusion", "References"] };
+
+    // Check if the result itself is an error object (from the flow's fallback)
+    // or if the structure is invalid.
+    if (!result || typeof result !== 'object' || !Array.isArray(result.sections)) {
+        console.warn("AI outline generation returned unexpected format or fallback. Result:", result);
+        return { error: "AI failed to generate a valid outline structure. Please try again or adjust the project context." };
     }
-    return result;
+    return result; // Should have the 'sections' key now
   } catch (error) {
     console.error("Error generating project outline:", error);
     const errorMessage = error instanceof Error ? error.message : "An unknown error occurred during outline generation.";

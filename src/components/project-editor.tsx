@@ -25,7 +25,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { v4 as uuidv4 } from 'uuid';
 import AiDiagramGenerator from './ai-diagram-generator'; // Import the new component
 import MermaidDiagram from './mermaid-diagram'; // Import diagram renderer
-import { ProjectSidebarContent } from './project-sidebar-content'; // Correct import path
+import { ProjectSidebarContent } from '@/components/project-sidebar-content'; // Correct import path
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // Import Tabs
 import { updateProject as updateProjectHelper } from '@/lib/project-utils'; // Import the helper function
 
@@ -292,13 +292,13 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   // --- Event Handlers for UI interactions ---
 
   // Set active section in the sidebar
-    const handleSetActiveSection = useCallback((idOrIndex: SectionIdentifier) => {
+  const handleSetActiveSection = useCallback((idOrIndex: SectionIdentifier) => {
       const newActiveId = String(idOrIndex); // Always treat as string ID internally
-       if (activeSectionId !== newActiveId) {
-            setActiveSectionId(newActiveId);
-            setShowDiagramGenerator(false); // Hide diagram generator when changing sections
-        }
-    }, [activeSectionId]); // Depend only on activeSectionId
+      if (activeSectionId !== newActiveId) {
+          setActiveSectionId(newActiveId);
+          setShowDiagramGenerator(false); // Hide diagram generator when changing sections
+      }
+  }, [activeSectionId]); // Depend only on activeSectionId
 
   // Check if project exists on mount and handle redirects
   useEffect(() => {
@@ -457,6 +457,13 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     const updateSectionsFromToc = useCallback((outline: GeneratedSectionOutline) => {
         if (!project) return;
 
+        // Basic check if the outline has the expected structure
+        if (!outline || !Array.isArray(outline.sections)) {
+            toast({ variant: "destructive", title: "Section Update Failed", description: "Received invalid outline structure from AI." });
+            return;
+        }
+
+
         // Recursive function to convert AI outline structure to Project Section structure
          const convertOutlineToSections = (outlineSections: OutlineSection[], level = 0): HierarchicalProjectSection[] => {
              return outlineSections.map(outlineSection => {
@@ -589,19 +596,15 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 projectContext: project.projectContext || ''
             });
 
-            if ('error' in result) {
-                // Specific handling for invalid argument error (potentially bad context)
-                 if (result.error.includes("Request contains an invalid argument")) {
-                     toast({ variant: "destructive", title: "Section Generation Failed", description: "There might be an issue with the project context provided. Please review and try again." });
-                 } else {
-                     throw new Error(result.error); // Throw other errors
-                 }
-                 setIsGeneratingOutline(false);
-                 return; // Stop execution
+             // Explicitly check if the result has an 'error' property
+            if (result && typeof result === 'object' && 'error' in result) {
+                toast({ variant: "destructive", title: "Section Generation Failed", description: result.error || "An unknown error occurred from the AI." });
+                setIsGeneratingOutline(false);
+                return; // Stop execution
             }
 
             // Basic validation of the AI response format (now expecting hierarchical)
-            if (!result || typeof result !== 'object' || !Array.isArray(result.sections)) {
+             if (!result || typeof result !== 'object' || !Array.isArray(result.sections)) {
                  toast({ variant: "destructive", title: "Section Generation Failed", description: "AI did not return the expected hierarchical section structure." });
                  setIsGeneratingOutline(false);
                  return; // Stop execution
@@ -812,7 +815,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     } else {
       window.removeEventListener('mousemove', onFabMouseMove);
       window.removeEventListener('mouseup', onFabMouseUp);
-    }
+    };
     return () => {
       window.removeEventListener('mousemove', onFabMouseMove);
       window.removeEventListener('mouseup', onFabMouseUp);
@@ -1131,26 +1134,28 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         </div>
 
         {/* Floating Action Button (FAB) for Mobile Sidebar */}
-         <Button
-             ref={fabRef}
-             variant="default"
-             size="icon"
-             className={cn(
-                 "fixed z-20 rounded-full shadow-lg w-14 h-14 hover:glow-primary focus-visible:glow-primary cursor-grab active:cursor-grabbing",
-                 "md:hidden" // Hide FAB on medium screens and up
-             )}
-             style={{ left: `${fabPosition.x}px`, top: `${fabPosition.y}px`, position: 'fixed' }} // Ensure position is fixed
-             onMouseDown={onFabMouseDown}
-             onClick={(e) => {
-                 if (!isDraggingFab) { // Only trigger sheet if not dragging
-                    setIsMobileSheetOpen(true);
-                 }
-             }}
-             title="Open project menu"
-             aria-label="Open project menu"
-         >
-             <Menu className="h-6 w-6" />
-         </Button>
+         <SheetTrigger asChild>
+             <Button
+                 ref={fabRef}
+                 variant="default"
+                 size="icon"
+                 className={cn(
+                     "fixed z-20 rounded-full shadow-lg w-14 h-14 hover:glow-primary focus-visible:glow-primary cursor-grab active:cursor-grabbing",
+                     "md:hidden" // Hide FAB on medium screens and up
+                 )}
+                 style={{ left: `${fabPosition.x}px`, top: `${fabPosition.y}px`, position: 'fixed' }} // Ensure position is fixed
+                 onMouseDown={onFabMouseDown}
+                 onClick={(e) => {
+                     if (!isDraggingFab) { // Only trigger sheet if not dragging
+                        setIsMobileSheetOpen(true);
+                     }
+                 }}
+                 title="Open project menu"
+                 aria-label="Open project menu"
+             >
+                 <Menu className="h-6 w-6" />
+             </Button>
+         </SheetTrigger>
 
 
         {/* Context Warning Dialog */}
