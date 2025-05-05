@@ -71,6 +71,29 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
           onAddSection(parentId);
       };
 
+     // Recursive function to render sections and sub-sections
+     const renderSections = (sections: HierarchicalProjectSection[], level: number, parentNumbering: string = ''): React.ReactNode[] => {
+        return sections.map((section, index) => {
+            const currentNumbering = parentNumbering ? `${parentNumbering}.${index + 1}` : `${index + 1}`;
+            return (
+                <HierarchicalSectionItem
+                    key={section.id} // Ensure unique key is applied
+                    section={section}
+                    level={level}
+                    numbering={currentNumbering}
+                    activeSectionId={activeSectionId}
+                    setActiveSectionId={setActiveSectionId}
+                    onEditSectionName={onEditSectionName}
+                    onDeleteSection={onDeleteSection}
+                    onAddSubSection={handleAddNewSection}
+                    isEditing={isEditingSections}
+                    onCloseSheet={onCloseSheet}
+                />
+            );
+        });
+     };
+
+
      return (
         <div className="flex flex-col h-full border-r bg-card">
             <div className="p-4 border-b flex justify-between items-center">
@@ -145,23 +168,7 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                             </Button>
                        </div>
                        {project.sections?.length > 0 ? (
-                          project.sections.map((section, index) => (
-                            // ** Apply the key directly to the HierarchicalSectionItem component **
-                            // Ensure section.id is unique within the project.sections array.
-                            <HierarchicalSectionItem
-                                key={section.id} // Apply key here to the component rendered by map
-                                section={section}
-                                level={0}
-                                numbering={`${index + 1}`} // Pass initial numbering
-                                activeSectionId={activeSectionId}
-                                setActiveSectionId={(id) => handleSectionClick(id)} // Pass string ID
-                                onEditSectionName={onEditSectionName}
-                                onDeleteSection={onDeleteSection} // Pass handler
-                                onAddSubSection={handleAddNewSection} // Pass add sub-section handler
-                                isEditing={isEditingSections}
-                                onCloseSheet={onCloseSheet}
-                            />
-                          ))
+                            renderSections(project.sections, 0) // Use the render function
                        ) : (
                          <p className="px-2 text-xs text-muted-foreground italic">Generate or add sections.</p>
                        )}

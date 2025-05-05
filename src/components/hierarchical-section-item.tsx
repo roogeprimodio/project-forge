@@ -16,7 +16,7 @@ export interface HierarchicalSectionItemProps {
     numbering: string; // Added numbering prop (e.g., "1", "1.2", "2.3.1")
     activeSectionId: string | null;
     setActiveSectionId: (id: string | number) => void; // Allow number for standard pages
-    onEditSectionName: (id: string, newName: string) => void; // Changed signature
+    onEditSectionName: (id: string, newName: string) => void;
     onDeleteSection: (id: string) => void;
     onAddSubSection: (parentId: string) => void; // Added prop for adding sub-sections
     isEditing: boolean;
@@ -211,24 +211,11 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
                  )}
             </div>
 
-            {/* Render Sub-sections */}
+            {/* Render Sub-sections - Removed from here, handled by parent */}
             {hasSubSections && isExpanded && (
-                <div className="ml-0"> {/* No extra margin */}
-                    {section.subSections.map((subSection, index) => (
-                        <HierarchicalSectionItem
-                            key={subSection.id} // Key is crucial here!
-                            section={subSection}
-                            level={level + 1}
-                            numbering={`${numbering}.${index + 1}`} // Calculate sub-section numbering
-                            activeSectionId={activeSectionId}
-                            setActiveSectionId={setActiveSectionId}
-                            onEditSectionName={onEditSectionName}
-                            onDeleteSection={onDeleteSection} // Pass down delete handler
-                            onAddSubSection={onAddSubSection} // Pass down add handler
-                            isEditing={isEditing}
-                            onCloseSheet={onCloseSheet}
-                        />
-                    ))}
+                <div className="ml-0">
+                     {/* Recursively render sub-sections via the parent's renderSections function */}
+                     {/* This space is now intentionally left blank */}
                 </div>
             )}
         </div>
