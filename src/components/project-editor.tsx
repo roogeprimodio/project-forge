@@ -12,7 +12,7 @@ import { Separator } from '@/components/ui/separator';
 import { BookOpen, Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, List, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles } from 'lucide-react'; // Use MessageSquareQuote
 import Link from 'next/link';
 import type { Project, ProjectSection } from '@/types/project';
-import { COMMON_SECTIONS } from '@/types/project';
+import { COMMON_SECTIONS, TOC_SECTION_NAME } from '@/types/project'; // Ensure TOC_SECTION_NAME is imported
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { useToast } from '@/hooks/use-toast';
 import { generateSectionAction, summarizeSectionAction, generateOutlineAction, suggestImprovementsAction } from '@/app/actions';
@@ -35,7 +35,7 @@ function ProjectSidebarContent({
     project,
     activeSectionIndex,
     setActiveSectionIndex,
-    handleGenerateOutlineClick, // Renamed prop
+    handleGenerateTocClick, // Renamed prop
     isGeneratingOutline,
     isGenerating,
     isSummarizing,
@@ -48,8 +48,7 @@ function ProjectSidebarContent({
     project: Project;
     activeSectionIndex: number | null | -1;
     setActiveSectionIndex: (index: number | -1) => void;
-    // Removed addSection, customSectionName, setCustomSectionName
-    handleGenerateOutlineClick: () => void; // Renamed prop type
+    handleGenerateTocClick: () => void; // Renamed prop type
     isGeneratingOutline: boolean;
     isGenerating: boolean;
     isSummarizing: boolean;
@@ -118,7 +117,7 @@ function ProjectSidebarContent({
                             </Button>
                           ))
                        ) : (
-                         <p className="px-2 text-xs text-muted-foreground italic">Generate an outline to populate the ToC.</p>
+                         <p className="px-2 text-xs text-muted-foreground italic">Generate a ToC to populate sections.</p>
                        )}
 
                      {/* Removed Add Standard/Custom Section parts */}
@@ -129,7 +128,7 @@ function ProjectSidebarContent({
                  <Button
                     variant="outline"
                     size="sm"
-                    onClick={handleGenerateOutlineClick}
+                    onClick={handleGenerateTocClick}
                     disabled={isGeneratingOutline || isGenerating || isSummarizing || isSuggesting || !project.projectContext?.trim()}
                     className="w-full hover:glow-accent focus-visible:glow-accent"
                     title={!project.projectContext?.trim() ? "Add project context in Project Details first" : "Generate Table of Contents based on project context"}
@@ -331,7 +330,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     updateProject({ [field]: value });
   };
 
-  // Removed addSection function
 
   // Renamed: setSectionsFromOutline to updateSectionsFromToc
   const updateSectionsFromToc = useCallback((newSectionNames: string[]) => {
@@ -349,7 +347,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
     newSectionNames.forEach((name, newIndex) => {
         const trimmedName = name.trim();
-        if (!trimmedName) return; // Skip empty names
+        if (!trimmedName || trimmedName.toLowerCase() === TOC_SECTION_NAME.toLowerCase()) return; // Skip empty names & ToC section itself
 
         const existingSection = existingSectionsMap.get(trimmedName.toLowerCase());
 
@@ -375,7 +373,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     });
 
      // Check if any sections were removed (exist in map means they weren't in newSectionNames)
-     if (existingSectionsMap.size > 0) {
+     if (existingSectionsMap.size > 0 && !existingSectionsMap.has(TOC_SECTION_NAME.toLowerCase())) { // Ignore if only ToC was removed implicitly
          sectionsRemoved = true;
          sectionOrderChanged = true; // Removal is a change
      }
@@ -610,7 +608,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     // Wrap the entire return content with the Sheet component
     <Sheet open={isMobileSheetOpen} onOpenChange={setIsMobileSheetOpen}>
       {/* Main container for the editor layout */}
-      <div className="flex h-full relative"> {/* Use full height and relative positioning for floating button */}
+      <div className="flex h-full relative"> {/* Use full height and relative positioning */}
 
         {/* --- Local Project Sidebar (Drawer on Mobile - Content only) --- */}
         <SheetContent side="left" className="p-0 w-64 bg-card md:hidden"> {/* Hide on desktop */}
@@ -623,7 +621,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             project={project}
             activeSectionIndex={activeSectionIndex}
             setActiveSectionIndex={setActiveSectionIndex}
-            handleGenerateOutlineClick={handleGenerateTocClick} // Pass renamed handler
+            handleGenerateTocClick={handleGenerateTocClick} // Pass renamed handler
             isGeneratingOutline={isGeneratingOutline}
             isGenerating={isGenerating}
             isSummarizing={isSummarizing}
@@ -648,7 +646,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
               project={project}
               activeSectionIndex={activeSectionIndex}
               setActiveSectionIndex={setActiveSectionIndex}
-              handleGenerateOutlineClick={handleGenerateTocClick} // Pass renamed handler
+              handleGenerateTocClick={handleGenerateTocClick} // Pass renamed handler
               isGeneratingOutline={isGeneratingOutline}
               isGenerating={isGenerating}
               isSummarizing={isSummarizing}
@@ -664,7 +662,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         <div className="flex-1 flex flex-col overflow-hidden"> {/* Allow main content to scroll */}
           {/* Sticky Header for Main Content */}
           <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/95 backdrop-blur-sm px-4 lg:px-6 flex-shrink-0">
-            {/* Mobile Sheet Trigger (Now FAB) */}
+            {/* Mobile Sheet Trigger is now handled by the floating button below */}
 
             <h1 className="flex-1 text-lg font-semibold md:text-xl text-primary truncate text-glow-primary">
               {activeSectionIndex === -1 ? 'Project Details' : activeSection?.name ?? project.title ?? 'Project'}
@@ -684,7 +682,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             </Button>
           </header>
 
-          <ScrollArea className="flex-1 p-4 md:p-6 relative"> {/* Make content scrollable & relative for floating button */}
+          <ScrollArea className="flex-1 p-4 md:p-6 relative"> {/* Make content scrollable & relative */}
             {activeSectionIndex === -1 ? (
               // Project Details Form
               <Card className="shadow-md mb-6">
@@ -969,19 +967,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             </Card>
 
 
-            {/* Floating Action Button (FAB) for Mobile Sidebar Toggle */}
-            <div className="fixed bottom-6 right-6 z-20 md:hidden"> {/* Only show on mobile */}
-              <SheetTrigger asChild>
-                <Button
-                  variant="default" // Use default style for FAB
-                  size="icon"
-                  className="rounded-full w-14 h-14 shadow-lg hover:glow-primary focus-visible:glow-primary"
-                  aria-label="Open project menu"
-                >
-                  <Menu className="h-6 w-6" />
-                </Button>
-              </SheetTrigger>
-            </div>
+            {/* REMOVED: Floating Action Button (FAB) for Mobile Sidebar Toggle */}
+
           </ScrollArea>
         </div> {/* End Main Content Area */}
 
