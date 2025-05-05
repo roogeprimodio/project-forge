@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Settings, Undo, Lightbulb, Cloud, CloudOff, PlusCircle, FileText, Loader2, Edit3, Trash2, ChevronRight, ChevronDown } from 'lucide-react';
+import { Settings, Undo, Lightbulb, Cloud, CloudOff, PlusCircle, FileText, Loader2, Edit3, Trash2, ChevronRight, ChevronDown } from 'lucide-react'; // Added Chevron icons
 import type { Project, SectionIdentifier, HierarchicalProjectSection } from '@/types/project';
 import { STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, findSectionById } from '@/types/project';
 import { HierarchicalSectionItem } from './hierarchical-section-item'; // Import the hierarchical item
@@ -234,3 +234,5 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
         </div>
      );
 }
+
+    

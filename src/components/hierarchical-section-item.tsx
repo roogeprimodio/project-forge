@@ -4,7 +4,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input'; // Import Input for editing
-import { FileText, Trash2, Edit3, ChevronDown, ChevronRight, PlusCircle } from 'lucide-react'; // Added PlusCircle
+import { FileText, Trash2, Edit3, ChevronDown, ChevronRight, PlusCircle } from 'lucide-react'; // Added PlusCircle, ChevronDown, ChevronRight
 import type { HierarchicalProjectSection, SectionIdentifier } from '@/types/project';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast'; // Import useToast
@@ -198,3 +198,5 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
         </div>
     );
 };
+
+    
