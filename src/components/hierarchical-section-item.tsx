@@ -134,42 +134,42 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
              {/* Main row containing content button and edit buttons */}
             <div className="flex group/item relative w-full items-center"> {/* Use w-full and items-center */}
 
+                 {/* Indentation Spacer */}
+                 <div
+                     className="flex-shrink-0 h-full"
+                     style={{ width: `${level * 1.5}rem` }}
+                 />
+
+                 {/* Expand/Collapse Toggle (if applicable) */}
+                 {hasSubSections ? (
+                     <Button
+                         variant="ghost"
+                         size="icon"
+                         onClick={handleToggleExpand} // Separate toggle handler
+                         className="h-6 w-6 mr-1 text-muted-foreground hover:bg-muted/50 flex-shrink-0"
+                         aria-label={isExpanded ? "Collapse section" : "Expand section"}
+                         tabIndex={0} // Make toggle focusable independently
+                     >
+                         {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                     </Button>
+                 ) : (
+                     <span className="w-6 mr-1 flex-shrink-0"></span> // Placeholder for alignment
+                 )}
+
                 {/* Section Content Button */}
                 <Button
                     variant="ghost" // Use ghost variant for clickable area
                     onClick={handleSectionClick}
                     className={cn(
-                        "flex items-center justify-start text-left flex-1 group/btn h-8 min-w-0 pl-0", // Use pl-0 here, indentation handled by inner div
+                        "flex items-center justify-start text-left flex-1 group/btn h-8 min-w-0 pl-0 pr-1", // Adjusted padding
                         (isActive || isNameEditing) && !isEditing ? "bg-secondary" : "hover:bg-ghost",
-                        isEditing ? 'pr-[70px]' : 'pr-1 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md',
+                        isEditing ? 'pr-[70px]' : 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md',
                     )}
                     disabled={isEditing || isNameEditing} // Disable button interaction during edits
                     aria-current={isActive && !isEditing && !isNameEditing ? "page" : undefined}
                     title={section.name} // Tooltip
                     tabIndex={isEditing ? -1 : 0} // Focusable only when not editing
                 >
-                     {/* Indentation and Toggle */}
-                     <div
-                         className="flex items-center flex-shrink-0 h-full" // Use h-full for vertical alignment
-                         style={{ paddingLeft: `${level * 1.5}rem` }} // Apply indentation here
-                         onClick={(e) => e.stopPropagation()} // Prevent clicks on this div from triggering parent button during edit
-                     >
-                         {hasSubSections ? (
-                             <Button
-                                 variant="ghost"
-                                 size="icon"
-                                 onClick={handleToggleExpand} // Separate toggle handler
-                                 className="h-6 w-6 mr-1 text-muted-foreground hover:bg-muted/50 flex-shrink-0"
-                                 aria-label={isExpanded ? "Collapse section" : "Expand section"}
-                                 tabIndex={0} // Make toggle focusable independently
-                             >
-                                 {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                             </Button>
-                         ) : (
-                             <span className="w-6 mr-1 flex-shrink-0"></span> // Placeholder for alignment
-                         )}
-                     </div>
-
                     {/* Numbering */}
                     <span className="font-medium text-muted-foreground flex-shrink-0 mr-1">{numbering}</span>
                     {/* Icon */}
