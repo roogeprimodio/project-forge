@@ -144,19 +144,17 @@ const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = ({
             {hasSubSections && isExpanded && (
                 <div className="ml-0"> {/* No extra margin here, padding handled by button style */}
                     {section.subSections.map((subSection) => (
-                       <React.Fragment key={subSection.id}> {/* Use Fragment key */}
-                            <HierarchicalSectionItem
-                                key={subSection.id} // Key on the component itself
-                                section={subSection}
-                                level={level + 1}
-                                activeSectionId={activeSectionId}
-                                setActiveSectionId={setActiveSectionId}
-                                onEditSectionName={onEditSectionName}
-                                onDeleteSection={onDeleteSection} // Pass down delete handler
-                                isEditing={isEditing}
-                                onCloseSheet={onCloseSheet}
-                            />
-                       </React.Fragment>
+                        <HierarchicalSectionItem
+                            key={subSection.id} // Key directly on the sub-item
+                            section={subSection}
+                            level={level + 1}
+                            activeSectionId={activeSectionId}
+                            setActiveSectionId={setActiveSectionId}
+                            onEditSectionName={onEditSectionName}
+                            onDeleteSection={onDeleteSection} // Pass down delete handler
+                            isEditing={isEditing}
+                            onCloseSheet={onCloseSheet}
+                        />
                     ))}
                 </div>
             )}
@@ -264,21 +262,19 @@ function ProjectSidebarContent({
                         const pageIndex = STANDARD_PAGE_INDICES[pageName];
                         const pageId = String(pageIndex); // Use string representation
                         return (
-                           <React.Fragment key={pageId}> {/* Use Fragment key */}
-                                <Button
-                                    key={pageId} // Key on the button itself
-                                    variant={activeSectionId === pageId ? "secondary" : "ghost"}
-                                    size="sm"
-                                    onClick={() => handleSectionClick(pageIndex)} // Pass numeric index
-                                    className="justify-start truncate"
-                                    aria-current={activeSectionId === pageId ? "page" : undefined}
-                                    title={pageName}
-                                    disabled={isEditingSections} // Disable during edit mode
-                                >
-                                    <FileText className="mr-2 h-4 w-4 flex-shrink-0" />
-                                    <span className="truncate">{pageName}</span>
-                                </Button>
-                            </React.Fragment>
+                            <Button
+                                key={pageId} // Key on the button itself
+                                variant={activeSectionId === pageId ? "secondary" : "ghost"}
+                                size="sm"
+                                onClick={() => handleSectionClick(pageIndex)} // Pass numeric index
+                                className="justify-start truncate"
+                                aria-current={activeSectionId === pageId ? "page" : undefined}
+                                title={pageName}
+                                disabled={isEditingSections} // Disable during edit mode
+                            >
+                                <FileText className="mr-2 h-4 w-4 flex-shrink-0" />
+                                <span className="truncate">{pageName}</span>
+                            </Button>
                         );
                      })}
 
@@ -298,19 +294,17 @@ function ProjectSidebarContent({
                        </div>
                        {project.sections?.length > 0 ? (
                           project.sections.map((section) => (
-                            <React.Fragment key={section.id}> {/* Use Fragment key */}
-                                <HierarchicalSectionItem
-                                    key={section.id} // Key on the component
-                                    section={section}
-                                    level={0}
-                                    activeSectionId={activeSectionId}
-                                    setActiveSectionId={(id) => handleSectionClick(id)} // Pass string ID
-                                    onEditSectionName={onEditSectionName}
-                                    onDeleteSection={onDeleteSection} // Pass handler
-                                    isEditing={isEditingSections}
-                                    onCloseSheet={onCloseSheet}
-                                />
-                            </React.Fragment>
+                            <HierarchicalSectionItem
+                                key={section.id} // Key directly on the list item component
+                                section={section}
+                                level={0}
+                                activeSectionId={activeSectionId}
+                                setActiveSectionId={(id) => handleSectionClick(id)} // Pass string ID
+                                onEditSectionName={onEditSectionName}
+                                onDeleteSection={onDeleteSection} // Pass handler
+                                isEditing={isEditingSections}
+                                onCloseSheet={onCloseSheet}
+                            />
                           ))
                        ) : (
                          <p className="px-2 text-xs text-muted-foreground italic">Generate or add sections.</p>
