@@ -205,13 +205,15 @@ const LogoUpload = ({
 
     return (
         <div className="space-y-2">
-            <Label htmlFor={`${field}-input`} className="font-medium">{label}</Label>
+            {/* Use standard Label styling */}
+            <Label htmlFor={`${field}-input`}>{label}</Label>
             <Label // Use Label as the dropzone trigger
                 htmlFor={`${field}-input`}
                 className={cn(
                     "flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-muted/50 hover:bg-muted/80 transition-colors duration-200",
                     !logoUrl && "p-4 text-center", // Padding only if no preview
-                    logoUrl && "relative overflow-hidden" // Style for preview container
+                    logoUrl && "relative overflow-hidden", // Style for preview container
+                    "aspect-square sm:aspect-video md:h-32" // Make it square on small, video-like on med, fixed height on large
                 )}
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
@@ -245,9 +247,9 @@ const LogoUpload = ({
                         </Button>
                     </>
                 ) : (
-                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                    <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center">
                         <UploadCloud className="w-8 h-8 mb-3 text-muted-foreground" />
-                        <p className="mb-1 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
+                        <p className="mb-1 text-sm text-muted-foreground"><span className="font-semibold">Click or drag</span></p>
                         <p className="text-xs text-muted-foreground">PNG, JPG, GIF, WEBP</p>
                     </div>
                 )}
@@ -299,8 +301,11 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
       if (historyIndex >= 0 && historyIndex < history.length) {
           return history[historyIndex];
       }
-      return Array.isArray(projects) ? projects.find(p => p.id === projectId) : undefined;
+      // Ensure projects is treated as an array even if initially undefined/null from localStorage
+      const currentProjects = Array.isArray(projects) ? projects : [];
+      return currentProjects.find(p => p.id === projectId);
   }, [projects, projectId, history, historyIndex]);
+
 
    // Effect to initialize history
   useEffect(() => {
@@ -317,14 +322,17 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
       isUpdatingHistory.current = true;
 
       setProjects((prevProjects = []) => {
-        const currentProjectIndex = (prevProjects || []).findIndex(p => p.id === projectId);
+        // Ensure prevProjects is an array
+        const currentProjectsArray = Array.isArray(prevProjects) ? prevProjects : [];
+        const currentProjectIndex = currentProjectsArray.findIndex(p => p.id === projectId);
+
         if (currentProjectIndex === -1) {
             console.error("Project not found in setProjects during update");
             requestAnimationFrame(() => { isUpdatingHistory.current = false; });
-            return prevProjects || [];
+            return currentProjectsArray;
         }
 
-        const currentProject = prevProjects[currentProjectIndex];
+        const currentProject = currentProjectsArray[currentProjectIndex];
         const updatedProject = typeof updatedData === 'function'
             ? updatedData(currentProject)
             : { ...currentProject, ...updatedData, updatedAt: new Date().toISOString() };
@@ -350,7 +358,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
              });
         }
 
-        const updatedProjects = [...prevProjects];
+        const updatedProjects = [...currentProjectsArray];
         updatedProjects[currentProjectIndex] = updatedProject;
         return updatedProjects;
       });
@@ -365,7 +373,9 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
    useEffect(() => {
     if (!hasMounted || projects === undefined || isUpdatingHistory.current) return;
 
-    const projectExists = Array.isArray(projects) && projects.some(p => p.id === projectId);
+    // Ensure projects is an array
+    const currentProjects = Array.isArray(projects) ? projects : [];
+    const projectExists = currentProjects.some(p => p.id === projectId);
 
     if (projectExists && isProjectFound !== true) {
       setIsProjectFound(true);
@@ -392,7 +402,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             setHistoryIndex(newIndex);
              const undoneProject = history[newIndex];
              setProjects((prevProjects = []) =>
-                 (prevProjects || []).map(p =>
+                 // Ensure prevProjects is an array
+                 (Array.isArray(prevProjects) ? prevProjects : []).map(p =>
                      p.id === projectId ? undoneProject : p
                  )
              );
@@ -558,7 +569,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     updateProject(prev => ({
         ...prev,
         sections: updatedSections,
-    }), true);
+    }), true); // Ensure history is saved
 
     let toastDescription = "Table of Contents updated.";
     if (addedCount > 0) toastDescription += ` ${addedCount} new section(s) added.`;
@@ -610,7 +621,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                lastGenerated: new Date().toISOString(),
            };
            return { ...prev, sections: updatedSections };
-       });
+       }, true); // Ensure history is saved
 
 
       toast({
@@ -754,7 +765,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
    }
 
    if (isProjectFound === false || !project) {
-      // No changes needed here as project is loaded from history or direct state
+      // Project is not found or undefined, show error and redirect
        return ( <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,60px))] text-center p-4"><CloudOff className="h-16 w-16 text-destructive mb-4" /><h2 className="text-2xl font-semibold text-destructive mb-2">Project Not Found</h2><p className="text-muted-foreground mb-6">The project with ID <code className="bg-muted px-1 rounded">{projectId}</code> could not be found. It might have been deleted or the link is incorrect.</p><Button onClick={() => router.push('/')}><Home className="mr-2 h-4 w-4" /> Go to Dashboard</Button></div> );
    }
 
@@ -888,7 +899,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                     <p className="text-xs text-muted-foreground mt-1">This context is used by the AI to generate the Table of Contents.</p>
                   </div>
                   {/* Logo Uploads */}
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                   {/* Use grid for responsiveness */}
+                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                       <LogoUpload
                           label="University Logo"
                           logoUrl={project.universityLogoUrl}
@@ -1128,7 +1140,9 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             </Card>
 
              {/* Floating Action Button (FAB) for Mobile Project Sidebar Toggle */}
-            <div className="fixed bottom-6 right-6 z-20 md:hidden"> {/* Only show on mobile */}
+             {/* Removed absolute positioning, place inside ScrollArea if FAB needs to scroll */}
+             {/* Or keep fixed if it should overlay content */}
+            <div className="fixed bottom-6 right-6 z-20 md:hidden"> {/* Keep fixed positioning */}
                  <SheetTrigger asChild>
                      <Button
                          variant="default" // Use default style for FAB
