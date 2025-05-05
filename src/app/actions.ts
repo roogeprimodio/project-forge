@@ -4,11 +4,12 @@ import { generateReportSection, GenerateReportSectionInput } from '@/ai/flows/ge
 import type { GenerateReportSectionOutput } from '@/ai/flows/generate-report-section';
 import { summarizeReportSection, SummarizeReportSectionInput } from '@/ai/flows/summarize-report-section';
 import type { SummarizeReportSectionOutput } from '@/ai/flows/summarize-report-section';
-// Removed generateTableOfContents imports
-import { generateProjectOutline, GenerateProjectOutlineInput } from '@/ai/flows/generate-project-outline'; // Import outline flow
-import type { GenerateProjectOutlineOutput } from '@/ai/flows/generate-project-outline'; // Import outline flow types
-import { suggestImprovements, SuggestImprovementsInput } from '@/ai/flows/suggest-improvements'; // Import suggestion flow
-import type { SuggestImprovementsOutput } from '@/ai/flows/suggest-improvements'; // Import suggestion flow types
+import { generateProjectOutline, GenerateProjectOutlineInput } from '@/ai/flows/generate-project-outline';
+import type { GenerateProjectOutlineOutput } from '@/ai/flows/generate-project-outline';
+import { suggestImprovements, SuggestImprovementsInput } from '@/ai/flows/suggest-improvements';
+import type { SuggestImprovementsOutput } from '@/ai/flows/suggest-improvements';
+import { generateDiagramMermaid, GenerateDiagramMermaidInput } from '@/ai/flows/generate-diagram-mermaid'; // Import diagram flow
+import type { GenerateDiagramMermaidOutput } from '@/ai/flows/generate-diagram-mermaid'; // Import diagram flow types
 
 
 /**
@@ -48,8 +49,6 @@ export async function summarizeSectionAction(input: SummarizeReportSectionInput)
   }
 }
 
-// Removed generateTocAction
-
 /**
  * Server action to generate a project outline (list of sections) using the AI flow.
  * Handles potential errors during the AI call.
@@ -62,7 +61,6 @@ export async function generateOutlineAction(input: GenerateProjectOutlineInput):
     }
     const result = await generateProjectOutline(input);
     console.log("Outline generation result:", result);
-    // Ensure the result structure is correct
     if (!result || typeof result !== 'object' || !Array.isArray(result.suggestedSections)) {
         console.warn("AI outline generation returned unexpected format, providing fallback.");
         return { suggestedSections: ["Introduction", "Main Content", "Conclusion", "References"] };
@@ -88,6 +86,26 @@ export async function suggestImprovementsAction(input: SuggestImprovementsInput)
   } catch (error) {
     console.error("Error suggesting improvements:", error);
     const errorMessage = error instanceof Error ? error.message : "An unknown error occurred while suggesting improvements.";
+    return { error: errorMessage };
+  }
+}
+
+/**
+ * Server action to generate Mermaid diagram code using the AI flow.
+ * Handles potential errors during the AI call.
+ */
+export async function generateDiagramAction(input: GenerateDiagramMermaidInput): Promise<GenerateDiagramMermaidOutput | { error: string }> {
+  try {
+    console.log("Generating diagram with input:", input);
+    if (!input.description?.trim()) {
+      return { error: "Diagram description cannot be empty." };
+    }
+    const result = await generateDiagramMermaid(input);
+    console.log("Diagram generation result:", result);
+    return result;
+  } catch (error) {
+    console.error("Error generating diagram:", error);
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred during diagram generation.";
     return { error: errorMessage };
   }
 }
