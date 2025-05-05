@@ -301,7 +301,7 @@ function ProjectSidebarContent({
                           project.sections.map((section) => (
                             // Apply the key directly to the HierarchicalSectionItem component
                             <HierarchicalSectionItem
-                                key={section.id} // Ensure key is unique and directly on the component rendered by map
+                                key={section.id} // Key directly on the component rendered by map
                                 section={section}
                                 level={0}
                                 activeSectionId={activeSectionId}
@@ -1576,8 +1576,9 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         </div>
 
         {/* Floating Action Button (FAB) for Mobile Project Sidebar Toggle */}
-         <SheetTrigger asChild>
-             <Button
+        {/* Wrap the FAB with SheetTrigger */}
+        <SheetTrigger asChild>
+            <Button
                 ref={fabRef}
                 variant="default" // Use default style for FAB
                 size="icon"
@@ -1585,11 +1586,11 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                     "fixed z-20 rounded-full shadow-lg w-14 h-14 hover:glow-primary focus-visible:glow-primary cursor-grab active:cursor-grabbing",
                     "md:hidden" // Hide on medium and larger screens
                 )}
-                 style={{
+                style={{
                     left: `${fabPosition.x}px`,
                     top: `${fabPosition.y}px`,
                     position: 'fixed', // Ensure it uses fixed positioning relative to viewport
-                 }}
+                }}
                 onMouseDown={onFabMouseDown}
                 onClick={(e) => {
                     // Prevent sheet opening if it was a drag
@@ -1600,10 +1601,10 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 }}
                 title="Open project menu"
                 aria-label="Open project menu"
-             >
+            >
                 <Menu className="h-6 w-6" />
-             </Button>
-         </SheetTrigger>
+            </Button>
+        </SheetTrigger>
 
 
         {/* Context Warning Dialog */}
