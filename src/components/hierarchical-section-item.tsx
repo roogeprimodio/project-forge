@@ -18,7 +18,7 @@ export interface HierarchicalSectionItemProps {
     setActiveSectionId: (id: SectionIdentifier) => void;
     onEditSectionName: (id: string, newName: string) => void;
     onDeleteSection: (id: string) => void;
-    onAddSubSection: (parentId: string) => void; // Function to add a sub-section
+    onAddSubSection: (parentId: string) => void; // Function to add a sub-section to a specific parent
     isEditing: boolean;
     onCloseSheet?: () => void;
     // Prop to pass down the recursive rendering function
@@ -191,12 +191,10 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
             {/* Render Sub-sections recursively */}
             {hasSubSections && isExpanded && (
                 <div className="ml-0"> {/* No extra margin here, indentation handled by paddingLeft */}
-                    {/* Use the passed render function for sub-sections */}
+                    {/* Use the passed render function for sub-sections, passing the current numbering */}
                     {renderSubSections(section.subSections!, level + 1, numbering)}
                 </div>
             )}
         </div>
     );
 };
-
-    

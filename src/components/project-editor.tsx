@@ -12,7 +12,7 @@ import { Separator } from '@/components/ui/separator';
 import { Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, FileWarning, Eye, Projector, Undo } from 'lucide-react'; // Added Projector, Undo icons
 import Link from 'next/link';
 import type { Project, HierarchicalProjectSection, GeneratedSectionOutline, SectionIdentifier, OutlineSection } from '@/types/project'; // Use hierarchical type, Import OutlineSection
-import { findSectionById, updateSectionById, deleteSectionById, STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, TOC_SECTION_NAME } from '@/types/project'; // Import helpers and standard pages/indices
+import { findSectionById, updateSectionById, deleteSectionById, STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, TOC_SECTION_NAME } from '@/lib/project-utils'; // Import helpers from lib
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { useToast } from '@/hooks/use-toast';
 import { generateSectionAction, summarizeSectionAction, generateOutlineAction, suggestImprovementsAction } from '@/app/actions';
@@ -25,8 +25,10 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { v4 as uuidv4 } from 'uuid';
 import AiDiagramGenerator from './ai-diagram-generator'; // Import the new component
 import MermaidDiagram from './mermaid-diagram'; // Import diagram renderer
-import { ProjectSidebarContent } from './project-sidebar-content'; // Import ProjectSidebarContent
+import { ProjectSidebarContent } from '../project-sidebar-content'; // Correct import path
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // Import Tabs
+import { updateProject as updateProjectHelper } from '@/lib/project-utils'; // Import the helper function
+
 
 interface ProjectEditorProps {
   projectId: string;
@@ -281,90 +283,9 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
 
   // Update project state and optionally save to history
-    const updateProject = useCallback((updatedData: Partial<Project> | ((prev: Project) => Project), saveToHistory: boolean = true) => {
-      if (!project && !(typeof updatedData === 'function')) return; // Exit if project doesn't exist and not using function update
-
-      isUpdatingHistory.current = true; // Prevent feedback loop with history effect
-
-      // Update the main projects list in local storage
-      setProjects((prevProjects = []) => {
-        const currentProjectsArray = Array.isArray(prevProjects) ? prevProjects : [];
-        const currentProjectIndex = currentProjectsArray.findIndex(p => p.id === projectId);
-
-        // Determine the project to update (either from current state or use the one passed if creating)
-        let projectToUpdate: Project | undefined;
-        if (currentProjectIndex !== -1) {
-          projectToUpdate = currentProjectsArray[currentProjectIndex];
-        } else if (typeof updatedData === 'function' && project) {
-          // If using function update and project exists (likely from history)
-          projectToUpdate = project;
-        }
-
-        if (!projectToUpdate) {
-          console.error("Project not found in setProjects during update");
-          requestAnimationFrame(() => { isUpdatingHistory.current = false; }); // Reset flag
-          return currentProjectsArray; // Return unchanged list
-        }
-
-        // Apply the updates
-        const updatedProject = typeof updatedData === 'function'
-          ? updatedData(projectToUpdate)
-          : { ...projectToUpdate, ...updatedData, updatedAt: new Date().toISOString() };
-
-
-        // --- History Management ---
-        if (saveToHistory) {
-          setHistory(prevHistory => {
-            // Trim history after current index (if user undid changes)
-            const newHistory = prevHistory.slice(0, historyIndex + 1);
-            // Add new state only if it's different from the last one
-             if (newHistory.length === 0 || JSON.stringify(newHistory[newHistory.length - 1]) !== JSON.stringify(updatedProject)) {
-                 newHistory.push(updatedProject);
-             }
-             // Limit history size
-            if (newHistory.length > MAX_HISTORY_LENGTH) {
-              newHistory.shift(); // Remove the oldest entry
-            }
-             const newIndex = Math.min(newHistory.length - 1, MAX_HISTORY_LENGTH - 1);
-            setHistoryIndex(newIndex); // Update index to the latest state
-            return newHistory;
-          });
-        } else {
-           // If not saving to history (e.g., during typing), just update the current history state
-           setHistory(prevHistory => {
-              const newHistory = [...prevHistory];
-              if (historyIndex >= 0 && historyIndex < newHistory.length) {
-                 // Update only if different to avoid unnecessary state changes
-                 if (JSON.stringify(newHistory[historyIndex]) !== JSON.stringify(updatedProject)) {
-                    newHistory[historyIndex] = updatedProject;
-                 }
-              }
-              return newHistory;
-           });
-        }
-
-
-        // --- Update Main Projects Array (for localStorage) ---
-        const updatedProjects = [...currentProjectsArray];
-        if (currentProjectIndex !== -1) {
-          // Update existing project if found
-           if (JSON.stringify(updatedProjects[currentProjectIndex]) !== JSON.stringify(updatedProject)) {
-               updatedProjects[currentProjectIndex] = updatedProject;
-               return updatedProjects;
-           }
-        } else if (!saveToHistory && project) {
-             // This case might happen if the project was loaded from history but not in the main 'projects' list yet
-             // Avoid adding it back if we're just doing intermediate updates (saveToHistory=false)
-        } else {
-           console.warn("ProjectEditor updateProject: Project index not found, state may not be saved correctly.")
-        }
-        return currentProjectsArray; // Return potentially updated or original array
-      });
-
-      // Reset the flag after the state update cycle
-       requestAnimationFrame(() => { isUpdatingHistory.current = false; });
-    }, [project, historyIndex, setProjects, projectId]); // Dependencies: project, historyIndex, setProjects, projectId
-
+   const updateProject = useCallback((updatedData: Partial<Project> | ((prev: Project) => Project), saveToHistory: boolean = true) => {
+       updateProjectHelper(updatedData, saveToHistory, projectId, project, setProjects, setHistory, setHistoryIndex, isUpdatingHistory, historyIndex, MAX_HISTORY_LENGTH);
+   }, [projectId, project, setProjects, setHistory, setHistoryIndex, historyIndex]);
 
 
   // Check if project exists on mount and handle redirects
@@ -538,9 +459,9 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         if (!project) return;
 
         // Recursive function to convert AI outline structure to Project Section structure
-         const convertOutlineToSections = (outlineSections: OutlineSection[]): HierarchicalProjectSection[] => {
+         const convertOutlineToSections = (outlineSections: OutlineSection[], level = 0): HierarchicalProjectSection[] => {
              return outlineSections.map(outlineSection => {
-                 const newId = uuidv4();
+                 const newId = uuidv4(); // Generate unique ID for each section and sub-section
                  return {
                      id: newId,
                      name: outlineSection.name.trim(),
@@ -548,7 +469,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                      content: '',
                      lastGenerated: undefined,
                      // Recursively convert sub-sections
-                     subSections: outlineSection.subSections ? convertOutlineToSections(outlineSection.subSections) : [],
+                     subSections: outlineSection.subSections ? convertOutlineToSections(outlineSection.subSections, level + 1) : [], // Pass level down
                  };
              });
          };
@@ -794,46 +715,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         setSectionToDelete(null);
     };
 
-    // Add a new section (top-level or sub-section)
-    const handleAddSection = (parentId?: string) => {
-        if (!project) return;
-
-        const newSection: HierarchicalProjectSection = {
-            id: uuidv4(),
-            name: 'New Section',
-            prompt: `Generate content for New Section...`,
-            content: '',
-            subSections: [],
-        };
-
-        updateProject(prev => {
-            // Recursive function to add the section at the correct level
-            const addRecursive = (sections: HierarchicalProjectSection[]): HierarchicalProjectSection[] => {
-                 if (!parentId) {
-                     // Add to top level
-                     return [...sections, newSection];
-                 }
-                 // Find the parent and add as sub-section
-                 return sections.map(section => {
-                     if (section.id === parentId) {
-                         return {
-                             ...section,
-                             subSections: [...(section.subSections || []), newSection]
-                         };
-                     }
-                     if (section.subSections) {
-                         // Recursively search in sub-sections
-                         return { ...section, subSections: addRecursive(section.subSections) };
-                     }
-                     return section; // Return unchanged if not the parent and no sub-sections
-                 });
-            };
-            return { ...prev, sections: addRecursive(prev.sections) };
-        }, true); // saveToHistory = true
-
-        toast({ title: "Section Added" });
-         setIsEditingSections(true); // Ensure edit mode is active after adding
-    };
+    // Add Section is now handled internally by ProjectSidebarContent
 
 
   // --- Placeholder Actions ---
@@ -851,12 +733,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
      } else {
         toast({ variant: "destructive", title: "Navigation Error", description: "Project data not found." });
      }
-   };
-
-   const handlePreview = () => {
-       // Placeholder for future preview functionality - now handled by Tabs
-       // toast({ title: "Preview (Coming Soon)", description: "This will show a preview of the generated report." });
-       // We will use the Preview Tab now.
    };
 
 
@@ -1097,21 +973,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
                            <Textarea id={`section-content-${activeSection.id}`} value={activeSection.content} onChange={(e) => handleSectionContentChange(activeSection.id, e.target.value)} onBlur={handleSectionContentBlur} placeholder={"Generated content appears here. Use Markdown..."} className="min-h-[400px] text-base focus-visible:glow-primary font-mono" />
 
-                           {/* Display Rendered Mermaid Diagrams from Content (optional in edit mode, maybe just show code block) */}
-                           {/*
-                           <div className="space-y-4">
-                               {activeSection.content?.match(/```mermaid\n([\s\S]*?)\n```/g)?.map((block, index) => {
-                                   const code = block.replace(/```mermaid\n/, '').replace(/\n```/, '');
-                                   return (
-                                       <div key={`diagram-edit-${activeSection.id}-${index}`} className="my-4">
-                                           <p className="text-xs font-semibold mb-1">Mermaid Diagram Code:</p>
-                                           <pre className="p-2 bg-muted rounded text-xs overflow-x-auto"><code>{code}</code></pre>
-                                           <p className="text-xs text-muted-foreground mt-1">(Preview in the 'Preview' tab)</p>
-                                       </div>
-                                   );
-                               })}
-                           </div>
-                            */}
                        </TabsContent>
 
                        {/* Preview Tab */}
@@ -1175,6 +1036,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
           {/* Render Sidebar Content Component */}
           <ProjectSidebarContent
             project={project}
+            updateProject={updateProject} // Pass updateProject function
             activeSectionId={activeSectionId}
             setActiveSectionId={handleSetActiveSection}
             handleGenerateTocClick={handleGenerateTocClick}
@@ -1190,7 +1052,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             setIsEditingSections={setIsEditingSections}
             onEditSectionName={handleEditSectionName}
             onDeleteSection={handleDeleteSection}
-            onAddSection={handleAddSection}
+            // onAddSection is handled internally
           />
         </SheetContent>
 
@@ -1199,6 +1061,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
            {/* Render Sidebar Content Component */}
             <ProjectSidebarContent
                 project={project}
+                updateProject={updateProject} // Pass updateProject function
                 activeSectionId={activeSectionId}
                 setActiveSectionId={handleSetActiveSection}
                 handleGenerateTocClick={handleGenerateTocClick}
@@ -1213,7 +1076,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 setIsEditingSections={setIsEditingSections}
                 onEditSectionName={handleEditSectionName}
                 onDeleteSection={handleDeleteSection}
-                onAddSection={handleAddSection}
+                 // onAddSection is handled internally
             />
         </div>
 
@@ -1229,12 +1092,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
               {project.storageType === 'local' ? <CloudOff className="h-4 w-4" /> : <Cloud className="h-4 w-4 text-green-500" />}
               <span>{project.storageType === 'local' ? 'Local' : 'Cloud'}</span>
             </div>
-             {/* Preview Button (Removed as it's now a Tab) */}
-             {/*
-             <Button variant="outline" size="sm" onClick={handlePreview} disabled={!project} className="ml-2 focus-visible:glow-accent">
-                <Eye className="mr-2 h-4 w-4" /> Preview
-             </Button>
-              */}
              {/* Export Button */}
             <Button variant="outline" size="sm" onClick={handleNavigateToExport} className="hover:glow-accent focus-visible:glow-accent ml-2">
               <Download className="mr-2 h-4 w-4" /> Export Report

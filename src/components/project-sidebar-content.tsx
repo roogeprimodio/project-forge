@@ -6,15 +6,18 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Settings, Undo, Lightbulb, Cloud, CloudOff, PlusCircle, FileText, Loader2, Edit3, Trash2, ChevronRight, ChevronDown } from 'lucide-react'; // Added Chevron icons
+import { Settings, Undo, Lightbulb, Cloud, CloudOff, PlusCircle, FileText, Loader2, ChevronRight, ChevronDown, Edit3, Trash2 } from 'lucide-react'; // Import necessary icons
 import type { Project, SectionIdentifier, HierarchicalProjectSection } from '@/types/project';
 import { STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, findSectionById } from '@/types/project';
 import { HierarchicalSectionItem } from './hierarchical-section-item'; // Import the hierarchical item
 import { useToast } from '@/hooks/use-toast';
+import { v4 as uuidv4 } from 'uuid'; // Import uuid for generating unique IDs
+import { updateProject as updateProjectHelper } from '@/lib/project-utils'; // Import the helper function
 
 // Props interface for ProjectSidebarContent
 export interface ProjectSidebarContentProps {
     project: Project;
+    updateProject: (updatedData: Partial<Project> | ((prev: Project) => Project), saveToHistory?: boolean) => void; // Pass updateProject function
     activeSectionId: string | null;
     setActiveSectionId: (id: SectionIdentifier) => void;
     handleGenerateTocClick: () => void;
@@ -30,7 +33,7 @@ export interface ProjectSidebarContentProps {
     setIsEditingSections: (editing: boolean) => void;
     onEditSectionName: (id: string, newName: string) => void;
     onDeleteSection: (id: string) => void; // Handler for deleting sections
-    onAddSection: (parentId?: string) => void; // Handler for adding sections/sub-sections
+    // onAddSection is now handled internally by handleAddSectionLocal
 }
 
 /**
@@ -42,6 +45,7 @@ export interface ProjectSidebarContentProps {
  */
 export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
     project,
+    updateProject, // Receive updateProject function
     activeSectionId,
     setActiveSectionId,
     handleGenerateTocClick,
@@ -57,7 +61,6 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
     setIsEditingSections,
     onEditSectionName,
     onDeleteSection, // Get delete handler
-    onAddSection, // Get add handler
 }) => {
      const { toast } = useToast();
 
@@ -66,14 +69,61 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
          onCloseSheet?.();
      };
 
-     // Add Section (Top Level)
-     const handleAddNewSection = () => {
-          onAddSection(); // Call parent handler without parentId for top-level
-      };
+     // Add a new section (top-level or sub-section) locally
+     const handleAddSectionLocal = (parentId?: string) => {
+         if (!project) return;
+
+         const newSection: HierarchicalProjectSection = {
+             id: uuidv4(), // Generate unique ID
+             name: 'New Section', // Default name
+             prompt: `Generate content for New Section... [Add specific instructions here, considering context: ${project.projectContext || ''}]`,
+             content: '',
+             lastGenerated: undefined,
+             subSections: [], // Initialize with empty sub-sections
+         };
+
+         // Use the helper function to update the project state
+         updateProject(prev => {
+            // Recursive function to add the section at the correct level
+            const addRecursive = (sections: HierarchicalProjectSection[]): HierarchicalProjectSection[] => {
+                 if (!parentId) {
+                     // Add to top level
+                     return [...sections, newSection];
+                 }
+                 // Find the parent and add as sub-section
+                 return sections.map(section => {
+                     if (section.id === parentId) {
+                         // Ensure subSections exists before spreading
+                         const currentSubSections = section.subSections || [];
+                         return {
+                             ...section,
+                             subSections: [...currentSubSections, newSection]
+                         };
+                     }
+                     if (section.subSections && section.subSections.length > 0) {
+                         // Recursively search in sub-sections
+                         const updatedSubSections = addRecursive(section.subSections);
+                         // Only create a new object if sub-sections actually changed to avoid unnecessary re-renders
+                         if (updatedSubSections !== section.subSections) {
+                            return { ...section, subSections: updatedSubSections };
+                         }
+                     }
+                     return section; // Return unchanged section if not the parent and no sub-sections needed update
+                 });
+            };
+            // Return the new project state with updated sections
+             return { ...prev, sections: addRecursive(prev.sections || []) }; // Ensure sections is an array
+         }, true); // saveToHistory = true
+
+         toast({ title: parentId ? "Sub-section Added" : "Section Added" });
+         setIsEditingSections(true); // Ensure edit mode is active after adding
+     };
+
 
      // Recursive function to render sections and sub-sections
     const renderSectionsRecursive = (sections: HierarchicalProjectSection[], level: number, parentNumbering: string = ''): React.ReactNode[] => {
         return sections.map((section, index) => {
+            // Calculate numbering based on level and index (1-based)
             const currentNumbering = parentNumbering ? `${parentNumbering}.${index + 1}` : `${index + 1}`;
             return (
                 <HierarchicalSectionItem
@@ -85,7 +135,7 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                     setActiveSectionId={setActiveSectionId} // Pass function directly
                     onEditSectionName={onEditSectionName}
                     onDeleteSection={onDeleteSection} // Pass handler
-                    onAddSubSection={onAddSection} // Pass add sub-section handler
+                    onAddSubSection={handleAddSectionLocal} // Use local add handler for sub-sections
                     isEditing={isEditingSections}
                     onCloseSheet={onCloseSheet}
                     renderSubSections={renderSectionsRecursive} // Pass the render function for recursion
@@ -179,7 +229,7 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                  <ScrollArea className="flex-1 w-full overflow-x-auto px-2 pb-2"> {/* Take remaining space */}
                      <nav className="flex flex-col gap-1 whitespace-nowrap">
                        {project.sections?.length > 0 ? (
-                          // Call the recursive rendering function
+                          // Call the recursive rendering function starting at level 0
                           renderSectionsRecursive(project.sections, 0)
                        ) : (
                          <p className="px-2 text-xs text-muted-foreground italic">Generate or add sections.</p>
@@ -190,7 +240,7 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                                 key="add-new-section-button" // Stable key
                                 variant="outline"
                                 size="sm"
-                                onClick={handleAddNewSection}
+                                onClick={() => handleAddSectionLocal()} // Add top-level section
                                 className="justify-start mt-2 text-muted-foreground hover:text-primary"
                                 title="Add new top-level section"
                             >
@@ -234,5 +284,3 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
         </div>
      );
 }
-
-    
