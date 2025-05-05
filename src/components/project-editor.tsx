@@ -240,8 +240,10 @@ function ProjectSidebarContent({
                     <Undo className="h-4 w-4" />
                 </Button>
             </div>
-             <ScrollArea className="flex-1 px-2 py-2">
-                 <nav className="flex flex-col gap-1">
+             {/* Ensure ScrollArea handles horizontal overflow */}
+             <ScrollArea className="flex-1 px-2 py-2 overflow-x-auto"> {/* Add overflow-x-auto */}
+                 {/* Ensure nav prevents wrapping to allow horizontal scroll */}
+                 <nav className="flex flex-col gap-1 whitespace-nowrap"> {/* Add whitespace-nowrap */}
                      {/* Project Details Button */}
                      <Button
                          variant={activeSectionId === String(-1) ? "secondary" : "ghost"} // Compare as string
@@ -261,9 +263,10 @@ function ProjectSidebarContent({
                      {STANDARD_REPORT_PAGES.map((pageName) => {
                         const pageIndex = STANDARD_PAGE_INDICES[pageName];
                         const pageId = String(pageIndex); // Use string representation
+                        // Ensure key is unique and on the mapped element
                         return (
                             <Button
-                                key={pageId} // Key on the button itself
+                                key={pageId} // Key directly on the button
                                 variant={activeSectionId === pageId ? "secondary" : "ghost"}
                                 size="sm"
                                 onClick={() => handleSectionClick(pageIndex)} // Pass numeric index
@@ -294,9 +297,9 @@ function ProjectSidebarContent({
                        </div>
                        {project.sections?.length > 0 ? (
                           project.sections.map((section) => (
-                            // Ensure the key is on the outermost element returned by map
+                            // Key directly on the HierarchicalSectionItem component
                             <HierarchicalSectionItem
-                                key={section.id} // Key directly on the list item component
+                                key={section.id}
                                 section={section}
                                 level={0}
                                 activeSectionId={activeSectionId}
@@ -313,6 +316,7 @@ function ProjectSidebarContent({
                        {/* Add New Section Button (visible in edit mode or if no sections) */}
                         {isEditingSections && (
                             <Button
+                                key="add-new-section-button" // Added key for stability if needed
                                 variant="outline"
                                 size="sm"
                                 onClick={handleAddNewSection}
