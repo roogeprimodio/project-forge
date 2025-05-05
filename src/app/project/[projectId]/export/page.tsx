@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { Loader2, ChevronLeft, Download, CloudOff, Home, FileWarning, Eye } from 'lucide-react'; // Added Eye icon
+import { Loader2, ChevronLeft, Download, CloudOff, Home, FileWarning, Eye } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import 'jspdf-autotable'; // Ensure autotable plugin is imported for advanced features if needed
 import { marked } from 'marked'; // For converting Markdown to HTML (used as intermediate for PDF)
@@ -77,7 +77,7 @@ export default function ExportPage() {
   };
 
   // --- Common PDF Generation Logic ---
-  const createPdfDocument = async (project: Project) => {
+  const createPdfDocument = async (project: Project): Promise<jsPDF> => {
     const doc = new jsPDF({
       orientation: 'p',
       unit: 'mm',
@@ -89,10 +89,10 @@ export default function ExportPage() {
     let yPos = margin;
     let currentPage = 1;
 
-    const addHeaderFooter = (sectionName?: string) => {
+    const addHeaderFooter = (currentPageNum: number, totalPagesNum: number, sectionName?: string) => {
         if (!addHeadersFooters) return;
         const headerText = `${project.title} ${sectionName ? `- ${sectionName}` : ''}`;
-        const footerText = `Page ${currentPage}`;
+        const footerText = `Page ${currentPageNum} of ${totalPagesNum}`;
 
         doc.setFontSize(8);
         doc.setTextColor(150); // Light gray color
@@ -106,69 +106,79 @@ export default function ExportPage() {
         doc.text(footerText, pageWidth / 2, pageHeight - margin / 2, { align: 'center' });
 
         doc.setTextColor(0); // Reset color
-        doc.setFontSize(12); // Reset font size
+        doc.setFontSize(12); // Reset font size for main content
     };
 
 
     const checkAndAddPage = (requiredHeight: number = 10) => {
       if (yPos + requiredHeight > pageHeight - margin) {
-        addHeaderFooter(); // Add footer to current page before adding new one
+        // Don't add header/footer here, do it after content is placed or during final loop
         doc.addPage();
         currentPage++;
         yPos = margin;
-        addHeaderFooter(); // Add header to new page
       }
     };
 
-    const addFormattedText = async (text: string, size: number, style = 'normal', options: { align?: 'left' | 'center' | 'right', isHtml?: boolean } = {}) => {
-      const maxWidth = pageWidth - 2 * margin;
-      doc.setFontSize(size);
-      doc.setFont('helvetica', style);
+    const addFormattedText = async (
+        text: string,
+        size: number,
+        style: 'normal' | 'bold' | 'italic' | 'bolditalic' = 'normal',
+        options: { align?: 'left' | 'center' | 'right'; isHtml?: boolean } = {}
+    ) => {
+        const maxWidth = pageWidth - 2 * margin;
+        doc.setFontSize(size);
+        doc.setFont('helvetica', style);
 
-      if (options.isHtml) {
-        try {
-          await doc.html(text, {
-            callback: function (docInstance) {
-                // jsPDF's html method handles pagination internally.
-                // We need to get the final Y position after rendering.
-                yPos = docInstance.internal.pageSize.height - margin; // Move cursor near bottom after html content
-                currentPage = docInstance.internal.pages.length -1; // Update current page count
-            },
-            x: margin,
-            y: yPos,
-            html2canvas: { scale: 0.26 },
-            margin: [margin, margin, margin, margin], // Top, Right, Bottom, Left
-            autoPaging: 'text',
-            width: maxWidth,
-          });
-          // Refetch yPos after html rendering which might add pages
-           yPos = doc.internal.pageSize.height - margin; // Assume it ends near the bottom margin
-           currentPage = doc.internal.pages.length -1; // Update current page
+        let textToAdd = text;
+        if (options.isHtml) {
+            // Basic HTML cleanup for jsPDF's limited support
+            textToAdd = textToAdd
+                .replace(/<\/?(div|p|br)[^>]*>/gi, '\n') // Replace divs, p, br with newlines
+                .replace(/<\/?b[^>]*>|<\/?strong[^>]*>/gi, '**') // Placeholder for bold (jsPDF doesn't directly support complex HTML)
+                .replace(/<\/?i[^>]*>|<\/?em[^>]*>/gi, '_')     // Placeholder for italic
+                .replace(/<[^>]+>/g, '')              // Remove remaining HTML tags
+                .replace(/&nbsp;/g, ' ')              // Replace non-breaking spaces
+                .replace(/\n{3,}/g, '\n\n')          // Collapse multiple newlines
+                .trim();
 
-        } catch (htmlError) {
-          console.warn("PDF HTML rendering failed, falling back to text:", htmlError);
-          const lines = doc.splitTextToSize(text.replace(/<[^>]+>/g, ''), maxWidth);
-          lines.forEach((line: string) => {
-            checkAndAddPage(size * 0.35 + 2);
-            doc.text(line, options.align === 'center' ? pageWidth / 2 : margin, yPos, { align: options.align || 'left' });
-            yPos += size * 0.35 + 2;
-          });
+             // For actual HTML rendering (more complex, less reliable with pagination)
+             /*
+             try {
+               await doc.html(text, {
+                 callback: (docInstance) => {
+                   yPos = docInstance.internal.pageSize.height - margin; // Needs refinement
+                 },
+                 x: margin,
+                 y: yPos,
+                 width: maxWidth,
+                 windowWidth: maxWidth, // Important for scaling
+                 autoPaging: 'text', // 'text' or 'slice'
+                 margin: [0, margin, margin, margin] // T, R, B, L - Adjust as needed
+               });
+               yPos = doc.internal.pageSize.getHeight() - margin; // Update yPos after html rendering
+               return; // Exit early as html function handles text placement
+             } catch (htmlError) {
+               console.warn("PDF HTML rendering may have issues, falling back to text:", htmlError);
+               // Fallback logic below will handle it as plain text
+               textToAdd = text.replace(/<[^>]+>/g, ''); // Basic strip tags for fallback
+             }
+             */
         }
-      } else {
-        const lines = doc.splitTextToSize(text, maxWidth);
+
+
+        const lines = doc.splitTextToSize(textToAdd, maxWidth);
         lines.forEach((line: string) => {
-          checkAndAddPage(size * 0.35 + 2);
-          doc.text(line, options.align === 'center' ? pageWidth / 2 : margin, yPos, { align: options.align || 'left' });
-          yPos += size * 0.35 + 2;
+            // Estimate line height based on font size
+            const lineHeight = size * 0.35 * 1.2; // size * ptToMm * lineSpacingFactor
+            checkAndAddPage(lineHeight);
+            doc.text(line, options.align === 'center' ? pageWidth / 2 : margin, yPos, { align: options.align || 'left' });
+            yPos += lineHeight;
         });
-      }
-      checkAndAddPage(5); // Add space after the block
-      yPos += 5;
+        checkAndAddPage(5); // Add space after the block
+        yPos += 5; // Small gap after text block
     };
 
     // --- PDF Content Generation ---
-    addHeaderFooter(); // Add header/footer to the first page
-
     if (includeTitlePage) {
       checkAndAddPage(40); // Estimate space needed
       await addFormattedText(project.title, 22, 'bold', { align: 'center' });
@@ -185,7 +195,6 @@ export default function ExportPage() {
       doc.addPage(); // Start sections on a new page after the title page
       currentPage++;
       yPos = margin;
-      addHeaderFooter(); // Add header for the new page
     }
 
     for (const section of project.sections) {
@@ -193,22 +202,32 @@ export default function ExportPage() {
 
       checkAndAddPage(20); // Space for section title
       await addFormattedText(section.name, 16, 'bold'); // Section Title
+      yPos += 2; // Small gap after title
 
-      const htmlContent = await marked.parse(section.content || '');
+      // Convert Markdown to basic text/HTML before passing to addFormattedText
+      // jsPDF has very limited HTML support, so we pass isHtml: true to do basic cleanup.
+      // For better fidelity, consider a server-side solution or a more robust client-side library.
+      const content = section.content || '[Content not generated]';
+      const parsedHtmlAttempt = await marked.parse(content); // Convert markdown
 
       checkAndAddPage(10); // Minimum space before content
-      // Wrap HTML content in a div for jsPDF html function
-      const contentDiv = `<div style="font-family: Helvetica; font-size: 12pt;">${htmlContent || '[Content not generated]'}</div>`;
-      await addFormattedText(contentDiv, 12, 'normal', { isHtml: true });
+      await addFormattedText(parsedHtmlAttempt, 12, 'normal', { isHtml: true }); // Pass as HTML
 
       checkAndAddPage(5); // Ensure space before potential next section title
       yPos += 5;
     }
 
-    // Add final footer if headers/footers enabled
-    if(addHeadersFooters) {
-        addHeaderFooter();
-    }
+     // --- Add Headers and Footers in a final pass ---
+     if (addHeadersFooters) {
+        const totalPages = doc.internal.pages.length - 1; // Get total number of pages
+        for (let i = 1; i <= totalPages; i++) {
+            doc.setPage(i);
+            // Ideally, determine the section name for the header based on page content start
+            // For simplicity, we'll use a generic header or omit section name
+            addHeaderFooter(i, totalPages);
+        }
+        doc.setPage(totalPages); // Go back to the last page
+     }
 
 
     return doc;
@@ -221,22 +240,27 @@ export default function ExportPage() {
     doc.save(`${project.title.replace(/ /g, '_')}_report.pdf`);
   };
 
-  // PDF Preview Function
+  // PDF Preview Function using direct browser rendering
   const handlePreview = async () => {
      if (!project || format !== 'pdf') {
         toast({ variant: "destructive", title: "Preview Unavailable", description: "Preview is only available for PDF format." });
         return;
      }
      setIsPreviewing(true);
-     toast({ title: "Generating Preview...", description: "This may take a moment." });
+     toast({ title: "Generating Preview...", description: "Opening PDF in a new tab..." });
      try {
        const doc = await createPdfDocument(project);
-       // Open in new tab
+
+       // Open in new tab using data URL.
+       // Note: Google Drive Viewer (gview) cannot access client-side generated
+       // data URIs or blob URLs directly because they are not publicly hosted.
+       // Opening directly in the browser is the standard client-side approach.
        doc.output('dataurlnewwindow');
-       // No success toast needed as the new tab opens
+
+       // No explicit success toast needed, as the new tab opening serves as confirmation.
      } catch (error) {
        console.error("Preview generation failed:", error);
-       toast({ variant: "destructive", title: "Preview Failed", description: error instanceof Error ? error.message : "An unknown error occurred." });
+       toast({ variant: "destructive", title: "Preview Failed", description: error instanceof Error ? error.message : "An unknown error occurred generating the PDF preview." });
      } finally {
        setIsPreviewing(false);
      }
@@ -262,6 +286,7 @@ export default function ExportPage() {
           const mdContent = generateMarkdown();
           const mdBlob = new Blob([mdContent], { type: 'text/markdown;charset=utf-8' });
           downloadBlob(mdBlob, `${project.title.replace(/ /g, '_')}_report.md`);
+          toast({ title: "Export Successful", description: `Report exported as ${format.toUpperCase()}.` });
           break;
         // case 'docx': // Re-enable when implemented
         //   generateDocx();
@@ -269,17 +294,13 @@ export default function ExportPage() {
         case 'pdf':
           toast({ title: "Generating PDF...", description: "This may take a moment for longer reports."});
           await generatePdfForExport(); // Use the specific export function
+          // Add success toast for PDF export
+          toast({ title: "Export Successful", description: `Report exported as PDF.` });
           break;
       }
-       if (format !== 'pdf') { // PDF toast is handled inside generatePdf start
-           toast({ title: "Export Successful", description: `Report exported as ${format.toUpperCase()}.` });
-       } else {
-           // Add success toast for PDF export as well, as generatePdfForExport doesn't show one
-            toast({ title: "Export Successful", description: `Report exported as PDF.` });
-       }
     } catch (error) {
         console.error("Export failed:", error);
-        toast({ variant: "destructive", title: "Export Failed", description: error instanceof Error ? error.message : "An unknown error occurred." });
+        toast({ variant: "destructive", title: "Export Failed", description: error instanceof Error ? error.message : "An unknown error occurred during export." });
     } finally {
         setIsExporting(false);
     }
@@ -329,7 +350,7 @@ export default function ExportPage() {
                 <SelectItem value="docx" disabled>DOCX (.docx) - Coming Soon</SelectItem>
               </SelectContent>
             </Select>
-             {format === 'pdf' && <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1"><FileWarning className="h-3 w-3 text-amber-500"/> PDF formatting might differ from screen preview.</p>}
+             {format === 'pdf' && <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1"><FileWarning className="h-3 w-3 text-amber-500"/> PDF formatting has limitations and may differ from screen.</p>}
              {format === 'docx' && <p className="text-xs text-muted-foreground mt-1">DOCX export is not yet available.</p>}
           </div>
 
