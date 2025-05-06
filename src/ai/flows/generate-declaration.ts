@@ -16,7 +16,6 @@ const GenerateDeclarationInputSchema = z.object({
   degree: z.string().optional().default('Bachelor of Engineering').describe('The degree for which the project is submitted.'),
   branch: z.string().describe('The branch or department.'),
   instituteName: z.string().describe('The name of the institute or college.'),
-  // guideName: z.string().describe('The name of the project guide.'), // Guide name not typically in declaration text
   submissionDate: z.string().optional().default(new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })).describe('The date of submission. Defaults to current date.'),
 });
 export type GenerateDeclarationInput = z.infer<typeof GenerateDeclarationInputSchema>;
@@ -32,7 +31,11 @@ export async function generateDeclaration(input: GenerateDeclarationInput): Prom
 
 const prompt = ai.definePrompt({
   name: 'generateDeclarationPrompt',
-  input: { schema: GenerateDeclarationInputSchema.extend({ teamDetailsLines: z.array(z.string()).optional(), pronoun: z.string().optional() }) },
+  input: { schema: GenerateDeclarationInputSchema.extend({
+    teamDetailsLines: z.array(z.string()).optional(),
+    pronoun: z.string().optional(),
+    objectPronoun: z.string().optional().describe('The object pronoun to use (e.g., "us" or "me") based on team size.'),
+  }) },
   output: { schema: GenerateDeclarationOutputSchema },
   prompt: `You are an AI assistant tasked with generating a student project declaration. The output must be the HTML content for the declaration, ready to be rendered.
 
@@ -49,6 +52,7 @@ const prompt = ai.definePrompt({
     **[Team Member Names & Enrollment Numbers Placeholder]**
     {{/if}}
   - Pronoun to use (I/We): {{{pronoun}}}
+  - Object Pronoun (me/us): {{{objectPronoun}}}
   - Degree: {{{degree}}}
   - Branch: {{{branch}}}
   - Institute: {{{instituteName}}}
@@ -66,8 +70,9 @@ const prompt = ai.definePrompt({
       *   For Submission Date: Use the value of \`{{{submissionDate}}}\`.
       *   For Place (City/Town): Always use "[City/Town Placeholder]" as this is not an input.
   4.  Use the determined pronoun ({{{pronoun}}}) for "We, the undersigned" or "I, the undersigned".
-  5.  Ensure text alignment and formatting (bold, headings) match the provided HTML structure.
-  6.  Signature blocks should list student names and enrollment numbers as provided in \`teamDetailsLines\` if available, otherwise from \`teamDetails\`.
+  5.  Use the determined object pronoun ({{{objectPronoun}}}) for "work done by us/me".
+  6.  Ensure text alignment and formatting (bold, headings) match the provided HTML structure.
+  7.  Signature blocks should list student names and enrollment numbers as provided in \`teamDetailsLines\` if available, otherwise from \`teamDetails\`.
 
   **Required Output Structure (HTML content):**
   <div style="font-family: 'Times New Roman', serif; padding: 20px; margin: 20px; page-break-after: always;">
@@ -81,7 +86,7 @@ const prompt = ai.definePrompt({
   "{{{projectTitle}}}"
   </p>
   <p style="font-size: 12pt; line-height: 1.8; text-align: justify; margin-bottom: 20px;">
-  submitted for the degree of <strong>{{{degree}}}</strong> in <strong>{{{branch}}}</strong> at <strong>{{{instituteName}}}</strong>, is a record of original work done by {{{pronounHelper 'us' ../pronoun 'me'}}}. This work has not been submitted in part or full for any other degree or diploma of any university or institution.
+  submitted for the degree of <strong>{{{degree}}}</strong> in <strong>{{{branch}}}</strong> at <strong>{{{instituteName}}}</strong>, is a record of original work done by {{{objectPronoun}}}. This work has not been submitted in part or full for any other degree or diploma of any university or institution.
   </p>
 
   <br><br><br>
@@ -114,12 +119,7 @@ const prompt = ai.definePrompt({
   </div>
 
   Generate the HTML content now.
-  `,
-  helpers: {
-    pronounHelper: (pluralForm: string, pronoun: string, singularForm: string) => {
-        return pronoun === "We" ? pluralForm : singularForm;
-    }
-  }
+  `
 });
 
 const generateDeclarationFlow = ai.defineFlow(
@@ -142,12 +142,12 @@ const generateDeclarationFlow = ai.defineFlow(
     const teamDetailsLines = input.teamDetails !== "[Team Member Names & Enrollment Numbers Placeholder]" ? input.teamDetails.split('\n').filter(line => line.trim() !== '') : [];
     const isPlural = teamDetailsLines.length > 1 || (teamDetailsLines.length === 0 && input.teamDetails.includes('\n'));
 
-
     const processedInput = {
       ...input,
       teamDetailsLines: teamDetailsLines.length > 0 ? teamDetailsLines : undefined,
       teamDetails: teamDetailsLines.length > 0 ? undefined : input.teamDetails,
       pronoun: isPlural ? "We" : "I",
+      objectPronoun: isPlural ? "us" : "me", // Calculate object pronoun here
     };
     const { output } = await prompt(processedInput);
     return output!;
