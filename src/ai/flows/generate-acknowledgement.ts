@@ -36,16 +36,22 @@ const prompt = ai.definePrompt({
   output: { schema: GenerateAcknowledgementOutputSchema },
   prompt: `You are an AI assistant tasked with writing a heartfelt and professional acknowledgement section for a student project report. The output must be in Markdown format, strictly adhering to the HTML structure provided for layout.
 
-  **Project & People Details (Use these to customize):**
+  **Project & People Details (Use these to customize the template):**
   - Project Title: {{{projectTitle}}}
   - Project Guide: {{{guideName}}}
   - Institute: {{{instituteName}}}
   - Branch/Department: {{{branch}}}
-  {{#if hodName}}- Head of Department: {{{hodName}}}{{/if}}
+  {{#if hodName}}- Head of Department: {{{hodName}}}{{else}}- Head of Department: [HOD Name Placeholder (if not thanking HOD explicitly)]{{/if}}
   - Team Members & Enrollment (for signature and pronoun):
+    {{#if teamDetailsLines.length}}
     {{#each teamDetailsLines}}
     - {{this}}
     {{/each}}
+    {{else if teamDetails}}
+    - {{{teamDetails}}}
+    {{else}}
+    - [Team Member Names & Enrollment Placeholder]
+    {{/if}}
   {{#if additionalThanks}}- Specific people/groups to thank: {{{additionalThanks}}}{{/if}}
   - Pronoun to use (I/We): {{{pronoun}}}
   - Possessive Pronoun (my/our): {{{possessivePronoun}}}
@@ -53,12 +59,19 @@ const prompt = ai.definePrompt({
   **Instructions for Generating the Acknowledgement:**
   1.  Output ONLY the Markdown and HTML content as per the structure below. Do not include any other text, explanations, or conversational elements.
   2.  Replace placeholders like \`{{{guideName}}}\` with the actual data.
-  3.  Use a sincere, appreciative, and formal tone.
-  4.  Start with a general statement about the effort and support received, using {{{pronoun}}} and {{{possessivePronoun}}} appropriately.
-  5.  Specifically thank the project guide, **{{{guideName}}}**, for their guidance, support, and mentorship.
-  6.  Thank the **{{{instituteName}}}** and the Department of **{{{branch}}}**. If a Head of Department (HOD) name ({{{hodName}}}) is provided, thank them explicitly.
-  7.  If specific additional thanks ({{{additionalThanks}}}) are provided, incorporate them naturally.
-  8.  Conclude with a closing and the names and enrollment numbers of all team members (from \`teamDetailsLines\`).
+  3.  **Placeholder Usage:** If a piece of information is not provided or is an empty string, use the corresponding placeholder text from the list below within the generated HTML structure.
+      *   For Project Guide: Use "[Guide Name Placeholder]"
+      *   For Institute Name: Use "[Institute Name Placeholder]"
+      *   For Branch/Department: Use "[Branch/Department Placeholder]"
+      *   For Head of Department (if hodName is empty/not provided and you are supposed to thank HOD): Use "[HOD Name Placeholder]" (template has logic for this)
+      *   For Team Members (if teamDetailsLines and teamDetails are empty): Use "[Team Member Name(s) & Enrollment Placeholder(s)]"
+      *   For additional thanks section (if additionalThanks is empty): Omit the paragraph.
+  4.  Use a sincere, appreciative, and formal tone.
+  5.  Start with a general statement about the effort and support received, using {{{pronoun}}} and {{{possessivePronoun}}} appropriately.
+  6.  Specifically thank the project guide, **{{{guideName}}}**, for their guidance, support, and mentorship.
+  7.  Thank the **{{{instituteName}}}** and the Department of **{{{branch}}}**. If a Head of Department (HOD) name ({{{hodName}}}) is provided, thank them explicitly.
+  8.  If specific additional thanks ({{{additionalThanks}}}) are provided, incorporate them naturally.
+  9.  Conclude with a closing and the names and enrollment numbers of all team members (from \`teamDetailsLines\` or \`teamDetails\`).
 
   **Required Output Structure (Markdown with embedded HTML for layout):**
   \`\`\`markdown
@@ -92,9 +105,15 @@ const prompt = ai.definePrompt({
 
   <br><br>
   <div style="font-size: 12pt; margin-top: 40px; text-align: right;">
-  {{#each teamDetailsLines}}
-  <div style="margin-bottom: 5px;"><strong>{{this}}</strong></div>
-  {{/each}}
+  {{#if teamDetailsLines.length}}
+    {{#each teamDetailsLines}}
+    <div style="margin-bottom: 5px;"><strong>{{this}}</strong></div>
+    {{/each}}
+  {{else if teamDetails}}
+    <div style="margin-bottom: 5px;"><strong>{{{teamDetails}}}</strong></div>
+  {{else}}
+    <div style="margin-bottom: 5px;"><strong>[Team Member Name(s) & Enrollment Placeholder(s)]</strong></div>
+  {{/if}}
   </div>
 
   </div>
@@ -122,13 +141,24 @@ const generateAcknowledgementFlow = ai.defineFlow(
     inputSchema: GenerateAcknowledgementInputSchema,
     outputSchema: GenerateAcknowledgementOutputSchema,
   },
-  async input => {
-    const teamDetailsLines = input.teamDetails.split('\n').filter(line => line.trim() !== '');
-    const isPlural = teamDetailsLines.length > 1;
+  async (rawInput) => {
+     const input = {
+      projectTitle: rawInput.projectTitle || "[Project Title Placeholder]", // Should always have a title from project context
+      guideName: rawInput.guideName || "[Guide Name Placeholder]",
+      instituteName: rawInput.instituteName || "[Institute Name Placeholder]",
+      branch: rawInput.branch || "[Branch/Department Placeholder]",
+      hodName: rawInput.hodName || undefined, // Let template handle placeholder if undefined and needed
+      teamDetails: rawInput.teamDetails || "[Team Member Name(s) & Enrollment Placeholder(s)]",
+      additionalThanks: rawInput.additionalThanks, // Optional, template handles if missing
+    };
+
+    const teamDetailsLines = input.teamDetails !== "[Team Member Name(s) & Enrollment Placeholder(s)]" ? input.teamDetails.split('\n').filter(line => line.trim() !== '') : [];
+    const isPlural = teamDetailsLines.length > 1 || (teamDetailsLines.length === 0 && input.teamDetails.includes('\n')); // Check if raw input implies plural
     
     const processedInput = {
       ...input,
-      teamDetailsLines: teamDetailsLines,
+      teamDetailsLines: teamDetailsLines.length > 0 ? teamDetailsLines : undefined,
+      teamDetails: teamDetailsLines.length > 0 ? undefined : input.teamDetails, // Pass raw teamDetails only if no lines
       pronoun: isPlural ? "We" : "I",
       possessivePronoun: isPlural ? "our" : "my",
     };
@@ -137,4 +167,3 @@ const generateAcknowledgementFlow = ai.defineFlow(
     return output!;
   }
 );
-

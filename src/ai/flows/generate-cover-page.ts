@@ -38,7 +38,7 @@ const prompt = ai.definePrompt({
   output: { schema: GenerateCoverPageOutputSchema },
   prompt: `You are an AI assistant tasked with generating a professional cover page for a student project report in Markdown format, strictly adhering to the HTML structure provided below for layout.
 
-  **Project Details:**
+  **Project Details (Use these to customize the template):**
   - Project Title: {{{projectTitle}}}
   - Submitted by:
     {{#if teamDetailsLines}}
@@ -53,53 +53,74 @@ const prompt = ai.definePrompt({
   - Institute: {{{instituteName}}}
   {{#if universityName}}- University: {{{universityName}}} (Affiliated to){{/if}}
   - Submission Date: {{{submissionDate}}}
-  {{#if universityLogoUrl}}- University Logo: {{universityLogoUrl}} {{/if}}
-  {{#if collegeLogoUrl}}- College Logo: {{collegeLogoUrl}} {{/if}}
+  {{#if universityLogoUrl}}- University Logo (use if provided): {{universityLogoUrl}} {{/if}}
+  {{#if collegeLogoUrl}}- College Logo (use if provided): {{collegeLogoUrl}} {{/if}}
 
   **Instructions:**
   1.  Output ONLY the Markdown and HTML content as per the structure below. Do NOT include any other text, explanations, or conversational elements.
   2.  Replace placeholders like \`{{{projectTitle}}}\` with the actual data provided.
-  3.  If a logo URL is provided, embed it using Markdown image syntax (\`![Alt text](URL)\`) within a centered div.
-  4.  Ensure all text is properly centered or aligned as indicated in the HTML structure.
-  5.  Team members should be listed one per line, bolded.
+  3.  **Placeholder Usage:** If a piece of information is not provided or is an empty string, use the corresponding placeholder text from the list below within the generated HTML structure.
+      *   For Project Title: Use "[Project Title Placeholder]"
+      *   For Team Details (if {{{teamDetails}}} is empty and teamDetailsLines is empty/not provided): Use "[Team Member Names & Enrollment Numbers Placeholder]"
+      *   For Degree: Use "[Degree Placeholder]" (e.g., Bachelor of Engineering)
+      *   For Branch: Use "[Branch Placeholder]" (e.g., Computer Engineering)
+      *   For Institute Name: Use "[Institute Name Placeholder]"
+      *   For University Name (if applicable): Use "[University Name Placeholder]"
+      *   For Submission Date: Use "[Submission Date Placeholder]"
+  4.  If a logo URL (universityLogoUrl or collegeLogoUrl) is provided, embed it using Markdown image syntax (\`![Alt text](URL)\`) within a centered div. If not provided, omit the img tag entirely.
+  5.  Ensure all text is properly centered or aligned as indicated in the HTML structure.
+  6.  Team members should be listed one per line, bolded, based on \`teamDetailsLines\`. If \`teamDetailsLines\` is empty, use the raw \`teamDetails\` string (and apply placeholder if that's also empty).
 
   **Required Output Structure (Markdown with embedded HTML for layout):**
 
   \`\`\`markdown
-  <div style="text-align: center; font-family: Times New Roman, serif; page-break-after: always;">
-  {{#if universityLogoUrl}}
-  <img src="{{{universityLogoUrl}}}" alt="University Logo" style="height: 80px; margin-bottom: 15px; margin-top: 30px;">
-  <br>
-  {{/if}}
-  {{#if collegeLogoUrl}}
-  <img src="{{{collegeLogoUrl}}}" alt="College Logo" style="height: 70px; margin-bottom: 25px;">
-  <br>
-  {{/if}}
+  <div style="text-align: center; font-family: 'Times New Roman', serif; page-break-after: always; border: 1px solid #ccc; padding: 20px; min-height: 250mm; display: flex; flex-direction: column; justify-content: space-between;">
 
-  <h1 style="font-size: 24pt; font-weight: bold; margin-top: 50px; margin-bottom: 30px;">{{{projectTitle}}}</h1>
-
-  <p style="font-size: 12pt; margin-bottom: 5px;"><em>A Project Report Submitted By</em></p>
-
-  <div style="font-size: 14pt; font-weight: bold; margin-bottom: 20px;">
-  {{#each teamDetailsLines}}
-  {{this}}<br>
-  {{/each}}
+  <div>
+    {{#if universityLogoUrl}}
+    <img src="{{{universityLogoUrl}}}" alt="University Logo" style="height: 80px; margin-bottom: 15px; margin-top: 30px;">
+    <br>
+    {{/if}}
+    {{#if collegeLogoUrl}}
+    <img src="{{{collegeLogoUrl}}}" alt="College Logo" style="height: 70px; margin-bottom: 25px;">
+    <br>
+    {{/if}}
   </div>
 
-  <p style="font-size: 12pt; margin-bottom: 5px;"><em>In partial fulfillment for the award of the degree of</em></p>
-  <p style="font-size: 16pt; font-weight: bold; margin-bottom: 5px;">{{{degree}}}</p>
-  <p style="font-size: 12pt; margin-bottom: 5px;"><em>In</em></p>
-  <p style="font-size: 14pt; font-weight: bold; margin-bottom: 20px;">{{{branch}}}</p>
+  <div style="flex-grow: 1; display: flex; flex-direction: column; justify-content: center;">
+    <h1 style="font-size: 24pt; font-weight: bold; margin-top: 10px; margin-bottom: 30px;">{{{projectTitle}}}</h1>
 
-  <p style="font-size: 12pt; margin-bottom: 5px;"><em>At</em></p>
-  <p style="font-size: 14pt; font-weight: bold;">{{{instituteName}}}</p>
-  {{#if universityName}}
-  <p style="font-size: 12pt; margin-bottom: 50px;">(Affiliated to {{{universityName}}})</p>
-  {{else}}
-  <div style="margin-bottom: 50px;"></div>
-  {{/if}}
+    <p style="font-size: 12pt; margin-bottom: 5px;"><em>A Project Report Submitted By</em></p>
 
-  <p style="font-size: 12pt; margin-top: auto;">{{{submissionDate}}}</p>
+    <div style="font-size: 14pt; font-weight: bold; margin-bottom: 20px;">
+    {{#if teamDetailsLines.length}}
+      {{#each teamDetailsLines}}
+      {{this}}<br>
+      {{/each}}
+    {{else if teamDetails}}
+      {{{teamDetails}}}
+    {{else}}
+      [Team Member Names & Enrollment Numbers Placeholder]
+    {{/if}}
+    </div>
+
+    <p style="font-size: 12pt; margin-bottom: 5px;"><em>In partial fulfillment for the award of the degree of</em></p>
+    <p style="font-size: 16pt; font-weight: bold; margin-bottom: 5px;">{{{degree}}}</p>
+    <p style="font-size: 12pt; margin-bottom: 5px;"><em>In</em></p>
+    <p style="font-size: 14pt; font-weight: bold; margin-bottom: 20px;">{{{branch}}}</p>
+
+    <p style="font-size: 12pt; margin-bottom: 5px;"><em>At</em></p>
+    <p style="font-size: 14pt; font-weight: bold;">{{{instituteName}}}</p>
+    {{#if universityName}}
+    <p style="font-size: 12pt; margin-bottom: 30px;">(Affiliated to {{{universityName}}})</p>
+    {{else}}
+    <div style="margin-bottom: 30px;"></div>
+    {{/if}}
+  </div>
+
+  <div style="margin-top: auto;">
+    <p style="font-size: 12pt;">{{{submissionDate}}}</p>
+  </div>
   </div>
   \`\`\`
 
@@ -113,16 +134,29 @@ const generateCoverPageFlow = ai.defineFlow(
     inputSchema: GenerateCoverPageInputSchema,
     outputSchema: GenerateCoverPageOutputSchema,
   },
-  async input => {
-    const teamDetailsLines = input.teamDetails.split('\n').filter(line => line.trim() !== '');
+  async (rawInput) => {
+    // Apply placeholders at the input processing stage if values are empty strings
+    const input = {
+      projectTitle: rawInput.projectTitle || "[Project Title Placeholder]",
+      teamDetails: rawInput.teamDetails || "[Team Member Names & Enrollment Numbers Placeholder]",
+      degree: rawInput.degree || "[Degree Placeholder]",
+      branch: rawInput.branch || "[Branch Placeholder]",
+      instituteName: rawInput.instituteName || "[Institute Name Placeholder]",
+      universityName: rawInput.universityName || undefined, // Keep undefined if truly optional and not to show placeholder unless template forces it
+      submissionDate: rawInput.submissionDate || "[Submission Date Placeholder]",
+      universityLogoUrl: rawInput.universityLogoUrl, // URLs are handled by #if in template
+      collegeLogoUrl: rawInput.collegeLogoUrl,
+    };
+    
+    const teamDetailsLines = input.teamDetails !== "[Team Member Names & Enrollment Numbers Placeholder]" ? input.teamDetails.split('\n').filter(line => line.trim() !== '') : [];
     
     const processedInput = {
       ...input,
-      teamDetailsLines: teamDetailsLines 
+      teamDetailsLines: teamDetailsLines.length > 0 ? teamDetailsLines : undefined, // Pass undefined if no lines to make #if teamDetailsLines work as expected
+      teamDetails: teamDetailsLines.length > 0 ? undefined : input.teamDetails, // Pass raw teamDetails only if no lines
     };
 
     const { output } = await prompt(processedInput);
     return output!;
   }
 );
-

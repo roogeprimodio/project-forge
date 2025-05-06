@@ -38,30 +38,41 @@ const prompt = ai.definePrompt({
   output: { schema: GenerateCertificateOutputSchema },
   prompt: `You are an AI assistant tasked with generating a project certificate in Markdown format, strictly adhering to the HTML structure for layout.
 
-  **Certificate Details:**
+  **Certificate Details (Use these to customize the template):**
   - Project Title: {{{projectTitle}}}
   - Student(s):
-    {{#if teamDetailsLines}}
+    {{#if teamDetailsLines.length}}
     {{#each teamDetailsLines}}
     - **{{this}}**
     {{/each}}
-    {{else}}
+    {{else if teamDetails}}
     **{{{teamDetails}}}**
+    {{else}}
+    **[Team Member Names & Enrollment Numbers Placeholder]**
     {{/if}}
   - Degree: {{{degree}}}
   - Branch: {{{branch}}}
   - Institute: {{{instituteName}}}
   - Project Guide: {{{guideName}}}
-  {{#if hodName}}- Head of Department: {{{hodName}}}{{/if}}
+  {{#if hodName}}- Head of Department: {{{hodName}}}{{else}}- Head of Department: [HOD Name Placeholder]{{/if}}
   - Year: {{{submissionYear}}}
-  {{#if collegeLogoUrl}}- College Logo: {{collegeLogoUrl}} {{/if}}
+  {{#if collegeLogoUrl}}- College Logo (use if provided): {{collegeLogoUrl}} {{/if}}
 
   **Instructions:**
   1.  Output ONLY the Markdown and HTML content as per the structure below. Do not include any other text, explanations, or conversational elements.
-  2.  Replace placeholders like \`{{{projectTitle}}}\` with the actual data.
-  3.  If a college logo URL is provided, embed it using Markdown image syntax (\`![Alt text](URL)\`) within a centered div.
-  4.  Ensure text alignment and formatting (bold, headings) match the provided HTML structure.
-  5.  Signature blocks should use \`div\`s with appropriate styling for alignment.
+  2.  Replace placeholders like \`{{{projectTitle}}}\` with the actual data provided.
+  3.  **Placeholder Usage:** If a piece of information is not provided or is an empty string, use the corresponding placeholder text from the list below within the generated HTML structure.
+      *   For Project Title: Use "[Project Title Placeholder]"
+      *   For Team Details (if {{{teamDetails}}} is empty and teamDetailsLines is empty/not provided): Use "[Team Member Names & Enrollment Numbers Placeholder]"
+      *   For Degree: Use "[Degree Placeholder]" (e.g., Bachelor of Engineering)
+      *   For Branch: Use "[Branch Placeholder]" (e.g., Computer Engineering)
+      *   For Institute Name: Use "[Institute Name Placeholder]"
+      *   For Project Guide: Use "[Guide Name Placeholder]"
+      *   For Head of Department (if not provided): Use "[HOD Name Placeholder]" (already handled in template logic)
+      *   For Submission Year: Use "[Submission Year Placeholder]"
+  4.  If a college logo URL is provided, embed it using Markdown image syntax (\`![Alt text](URL)\`) within a centered div. If not provided, omit the img tag.
+  5.  Ensure text alignment and formatting (bold, headings) match the provided HTML structure.
+  6.  Signature blocks should use \`div\`s with appropriate styling for alignment. For team members, list them from \`teamDetailsLines\`.
 
   **Required Output Structure (Markdown with embedded HTML for layout):**
 
@@ -89,9 +100,15 @@ const prompt = ai.definePrompt({
   </p>
 
   <div style="font-size: 12pt; font-weight: bold; margin-bottom: 20px; text-align: center;">
-  {{#each teamDetailsLines}}
-  {{this}}<br>
-  {{/each}}
+  {{#if teamDetailsLines.length}}
+    {{#each teamDetailsLines}}
+    {{this}}<br>
+    {{/each}}
+  {{else if teamDetails}}
+    {{{teamDetails}}}
+  {{else}}
+    [Team Member Names & Enrollment Numbers Placeholder]
+  {{/if}}
   </div>
   
   <p style="font-size: 12pt; line-height: 1.6; text-align: justify; margin-bottom: 30px;">
@@ -105,14 +122,12 @@ const prompt = ai.definePrompt({
       <strong>{{{guideName}}}</strong><br>
       (Project Guide)
     </div>
-    {{#if hodName}}
     <div style="text-align: right;">
       <div style="height: 30px;"> </div> <!-- Space for signature -->
       <hr style="border-top: 1px solid #000; width: 150px; margin-bottom: 5px;">
-      <strong>{{{hodName}}}</strong><br>
+      <strong>{{#if hodName}}{{{hodName}}}{{else}}[HOD Name Placeholder]{{/if}}</strong><br>
       (Head of Department)
     </div>
-    {{/if}}
   </div>
   </div>
   \`\`\`
@@ -127,14 +142,27 @@ const generateCertificateFlow = ai.defineFlow(
     inputSchema: GenerateCertificateInputSchema,
     outputSchema: GenerateCertificateOutputSchema,
   },
-  async input => {
-    const teamDetailsLines = input.teamDetails.split('\n').filter(line => line.trim() !== '');
+  async (rawInput) => {
+    const input = {
+      projectTitle: rawInput.projectTitle || "[Project Title Placeholder]",
+      teamDetails: rawInput.teamDetails || "[Team Member Names & Enrollment Numbers Placeholder]",
+      degree: rawInput.degree || "[Degree Placeholder]",
+      branch: rawInput.branch || "[Branch Placeholder]",
+      instituteName: rawInput.instituteName || "[Institute Name Placeholder]",
+      guideName: rawInput.guideName || "[Guide Name Placeholder]",
+      hodName: rawInput.hodName || undefined, // Let template handle placeholder if undefined
+      submissionYear: rawInput.submissionYear || "[Submission Year Placeholder]",
+      collegeLogoUrl: rawInput.collegeLogoUrl,
+    };
+
+    const teamDetailsLines = input.teamDetails !== "[Team Member Names & Enrollment Numbers Placeholder]" ? input.teamDetails.split('\n').filter(line => line.trim() !== '') : [];
+    
     const processedInput = {
       ...input,
-      teamDetailsLines: teamDetailsLines
+      teamDetailsLines: teamDetailsLines.length > 0 ? teamDetailsLines : undefined,
+      teamDetails: teamDetailsLines.length > 0 ? undefined : input.teamDetails,
     };
     const { output } = await prompt(processedInput);
     return output!;
   }
 );
-
