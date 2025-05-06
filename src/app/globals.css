@@ -138,6 +138,68 @@ body {
     button, a, input, textarea, select {
         @apply transition-all duration-200 ease-in-out;
     }
+
+  /* Basic prose styling for Markdown content */
+  .prose {
+    @apply text-foreground;
+  }
+  .prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
+    @apply text-primary;
+  }
+  .prose a {
+    @apply text-accent hover:text-accent/80;
+  }
+  .prose blockquote {
+    @apply border-l-4 border-primary/50 pl-4 italic text-muted-foreground;
+  }
+  .prose code {
+    @apply bg-muted text-muted-foreground px-1 py-0.5 rounded-sm text-sm;
+  }
+  .prose pre {
+    @apply bg-muted p-4 rounded-md overflow-x-auto;
+  }
+  .prose pre code {
+    @apply bg-transparent p-0;
+  }
+  .prose ul, .prose ol {
+    @apply ml-6;
+  }
+  .prose li > p {
+    @apply my-0; /* Remove default margins from paragraphs inside list items */
+  }
+  .prose table {
+    @apply w-full my-4 border-collapse border border-border;
+  }
+  .prose th, .prose td {
+    @apply border border-border p-2 text-left;
+  }
+  .prose th {
+    @apply bg-muted;
+  }
+
+  /* Dark mode prose styling */
+  .dark .prose {
+     @apply text-foreground; /* Ensure dark mode text color is readable */
+  }
+  .dark .prose h1, .dark .prose h2, .dark .prose h3, .dark .prose h4, .dark .prose h5, .dark .prose h6 {
+    @apply text-primary; /* Or a lighter primary variant for dark mode */
+  }
+  .dark .prose a {
+    @apply text-accent hover:text-accent/80; /* Or a lighter accent variant */
+  }
+   .dark .prose blockquote {
+    @apply border-l-4 border-primary/50 pl-4 italic text-muted-foreground;
+  }
+  .dark .prose code {
+    @apply bg-muted text-muted-foreground px-1 py-0.5 rounded-sm text-sm;
+  }
+  .dark .prose pre {
+    @apply bg-muted p-4 rounded-md overflow-x-auto;
+  }
+  .dark .prose th {
+    @apply bg-muted/80;
+  }
+
 }
 
 /* Add glowing text utility class */

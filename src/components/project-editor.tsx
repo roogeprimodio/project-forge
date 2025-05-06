@@ -9,10 +9,10 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, FileWarning, Eye, Projector, BrainCircuit, Plus, Minus, CheckCircle, Edit3, ChevronRight } from 'lucide-react'; // Added CheckCircle, Edit3 and ChevronRight
+import { Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, FileWarning, Eye, Projector, BrainCircuit, Plus, Minus, CheckCircle, Edit3, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import type { Project, HierarchicalProjectSection, GeneratedSectionOutline, SectionIdentifier, OutlineSection } from '@/types/project'; // Use hierarchical type
-import { findSectionById, updateSectionById, deleteSectionById, STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, TOC_SECTION_NAME, ensureDefaultSubSection, getSectionNumbering } from '@/lib/project-utils'; // Import functions and constants
+import { findSectionById, updateSectionById, deleteSectionById, STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, TOC_SECTION_NAME, ensureDefaultSubSection, getSectionNumbering } from '@/lib/project-utils';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { useToast } from '@/hooks/use-toast';
 import { generateSectionAction, summarizeSectionAction, generateOutlineAction, suggestImprovementsAction, generateDiagramAction } from '@/app/actions';
@@ -24,12 +24,13 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { marked } from 'marked';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { v4 as uuidv4 } from 'uuid';
-import AiDiagramGenerator from '@/components/ai-diagram-generator';
-import MermaidDiagram from '@/components/mermaid-diagram';
-import { ProjectSidebarContent } from '@/components/project-sidebar-content';
+import AiDiagramGenerator from './ai-diagram-generator';
+import MermaidDiagram from './mermaid-diagram';
+import { ProjectSidebarContent } from './project-sidebar-content';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { updateProject as updateProjectHelper } from '@/lib/project-utils';
-import MarkdownPreview from '@/components/markdown-preview';
+import MarkdownPreview from './markdown-preview';
+import { CombinedSectionPreview } from './combined-section-preview'; // Import the new component
 
 // Recursive component to render the preview outline
 const OutlinePreviewItem: React.FC<{ item: OutlineSection; level: number }> = ({ item, level }) => {
@@ -281,7 +282,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const dragOffset = useRef({ x: 0, y: 0 });
   const [isGeneratingDiagram, setIsGeneratingDiagram] = useState(false);
 
-  const [activeSubSectionId, setActiveSubSectionId] = useState<string | null>(null); // For managing which sub-section's editor is open
+  const [activeSubSectionId, setActiveSubSectionId] = useState<string | null>(null);
 
   useEffect(() => {
     setHasMounted(true);
@@ -322,7 +323,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
     const handleSetActiveSection = useCallback((idOrIndex: SectionIdentifier) => {
         const newActiveId = String(idOrIndex);
-        setActiveSubSectionId(null); // Reset active sub-section when main section changes
+        setActiveSubSectionId(null);
         if (activeSectionId !== newActiveId) {
             setActiveSectionId(newActiveId);
             if (newActiveId !== String(-1)) {
@@ -496,9 +497,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                      lastGenerated: undefined,
                      subSections: subSections,
                  };
-                  // If it's a leaf node (no AI-generated subSections or depth limit reached but AI provided some)
-                  // AND it's not a diagram, ensure it gets a default content-bearing sub-section.
-                  // Diagrams are handled differently; their content is the Mermaid code.
                  if (subSections.length === 0 && !isDiagram) {
                     baseSection = ensureDefaultSubSection(baseSection, currentNumber);
                  }
@@ -732,7 +730,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         toast({ title: "Section Deleted" });
         setSectionToDelete(null);
         if (activeSectionId === sectionToDelete || activeSubSectionId === sectionToDelete) {
-            setActiveSectionId(String(-1)); // Go to project details
+            setActiveSectionId(String(-1));
             setActiveSubSectionId(null);
         }
     };
@@ -748,11 +746,10 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
              id: uuidv4(),
              name: `New Section ${newSectionNumber}`,
              prompt: `Generate content for this new section.`,
-             content: '', // Main sections won't have direct content anymore
+             content: '',
              lastGenerated: undefined,
-             subSections: [], // Start with empty sub-sections
+             subSections: [],
          };
-         // Ensure the new main section gets its default sub-section
          const sectionWithDefaultSub = ensureDefaultSubSection(newSection, String(newSectionNumber));
 
          updateProject(prev => ({
@@ -761,7 +758,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
          }), true);
          toast({ title: "Section Added", description: `"${sectionWithDefaultSub.name}" added.` });
          setActiveSectionId(newSection.id);
-         setActiveSubSectionId(sectionWithDefaultSub.subSections[0]?.id || null); // Activate its default sub-section
+         setActiveSubSectionId(sectionWithDefaultSub.subSections[0]?.id || null);
          setPreviewedOutline(null);
      };
 
@@ -975,7 +972,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
               </CardFooter>
             </Card>
       );
-    } else if (currentActiveSubSection) { // If a sub-section is active, show its editor
+    } else if (currentActiveSubSection) {
         activeViewName = currentActiveSubSection.name;
         if (isDiagramSection) {
             activeViewContent = (
@@ -1056,51 +1053,11 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 </div>
             );
         }
-    } else if (currentActiveMainSection) { // If a main section is active, but no sub-section, show sub-section navigation
+    } else if (currentActiveMainSection) {
         activeViewName = currentActiveMainSection.name;
-        currentSectionForSubSectionView = currentActiveMainSection;
-         activeViewContent = (
-            <Card className="shadow-md">
-                <CardHeader>
-                    <CardTitle className="text-primary text-glow-primary text-lg md:text-xl">
-                        Sub-sections of: {currentActiveMainSection.name}
-                    </CardTitle>
-                    <CardDescription className="text-sm">
-                        Select a sub-section to view or edit its content.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                    {(currentActiveMainSection.subSections && currentActiveMainSection.subSections.length > 0) ? (
-                        currentActiveMainSection.subSections.map((subSection, idx) => {
-                             const subSectionNumber = `${getSectionNumbering(project.sections, currentActiveMainSection.id)}.${idx + 1}`;
-                             const isSubSectionDiagram = subSection.name.toLowerCase().startsWith("diagram:") || subSection.name.toLowerCase().startsWith("figure");
-                            return (
-                            <Card
-                                key={subSection.id}
-                                className="hover:shadow-lg transition-shadow cursor-pointer"
-                                onClick={() => {
-                                    setActiveSubSectionId(subSection.id);
-                                    // No need to change activeSectionId here, parent is still the active main section
-                                }}
-                            >
-                                <CardContent className="p-3 flex items-center justify-between">
-                                    <div className="flex items-center">
-                                        {isSubSectionDiagram ? <Projector className="w-4 h-4 mr-2 text-muted-foreground"/> : <FileText className="w-4 h-4 mr-2 text-muted-foreground" />}
-                                        <span className="font-medium text-sm">{subSectionNumber} {subSection.name}</span>
-                                    </div>
-                                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                                </CardContent>
-                            </Card>
-                        )})
-                    ) : (
-                        <p className="text-sm text-muted-foreground italic">
-                            This section currently has no sub-sections. New sub-sections can be added in 'Edit Sections' mode.
-                        </p>
-                    )}
-                </CardContent>
-            </Card>
+        activeViewContent = (
+            <CombinedSectionPreview section={currentActiveMainSection} projectTitle={project.title}/>
         );
-
     } else {
         const standardPageIndex = !isNaN(parseInt(activeSectionId ?? '', 10)) ? parseInt(activeSectionId!, 10) : NaN;
         if (!isNaN(standardPageIndex) && standardPageIndex < -1) {
@@ -1133,7 +1090,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   return (
     <Sheet open={isMobileSheetOpen} onOpenChange={setIsMobileSheetOpen}>
       <div className="flex h-full relative">
-        {/* Mobile Sheet Content */}
         <SheetContent side="left" className="p-0 w-72 sm:w-80 bg-card md:hidden">
           <SheetHeader className="p-4 border-b">
             <SheetTitle>Project Menu</SheetTitle>
@@ -1163,7 +1119,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
           />
         </SheetContent>
 
-        {/* Desktop Sidebar */}
         <div className={cn(
              "hidden md:flex md:flex-col transition-all duration-300 ease-in-out overflow-y-auto overflow-x-hidden",
              "w-72 lg:w-80 border-r bg-card"
@@ -1191,17 +1146,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             />
         </div>
 
-        {/* Main Content Area */}
         <div className="flex-1 flex flex-col overflow-hidden">
           <header className="sticky top-0 z-10 flex h-14 items-center gap-2 sm:gap-4 border-b bg-background/95 backdrop-blur-sm px-3 sm:px-4 lg:px-6 flex-shrink-0">
-            {/* Mobile Sheet Trigger (button) */}
-            {/* <SheetTrigger asChild className="md:hidden">
-                <Button variant="ghost" size="icon">
-                    <Menu className="h-5 w-5" />
-                    <span className="sr-only">Open Project Menu</span>
-                </Button>
-            </SheetTrigger> */}
-
             <h1 className="flex-1 text-base sm:text-lg font-semibold md:text-xl text-primary truncate text-glow-primary">
                {activeViewName}
             </h1>
@@ -1220,7 +1166,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
           <ScrollArea className="flex-1 p-3 sm:p-4 md:p-6">
               {activeViewContent}
-             {/* AI Suggestions Section */}
              <Card className="shadow-md mt-6">
                  <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-lg md:text-xl text-primary text-glow-primary"><Sparkles className="w-5 h-5" /> AI Suggestions</CardTitle>
@@ -1246,7 +1191,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
           </ScrollArea>
         </div>
 
-        {/* Floating Action Button (FAB) for Mobile Project Menu */}
          <SheetTrigger asChild>
              <Button
                  ref={fabRef}
@@ -1254,12 +1198,11 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                  size="icon"
                  className={cn(
                      "fixed z-20 rounded-full shadow-lg w-12 h-12 sm:w-14 sm:h-14 hover:glow-primary focus-visible:glow-primary cursor-grab active:cursor-grabbing",
-                     "md:hidden" // Hide on medium and larger screens
+                     "md:hidden"
                  )}
                  style={{ left: `${fabPosition.x}px`, top: `${fabPosition.y}px`, position: 'fixed' }}
                  onMouseDown={onFabMouseDown}
                  onClick={(e) => {
-                     // Prevent sheet from opening if user was dragging
                      if (!isDraggingFab) {
                         setIsMobileSheetOpen(true);
                      }
@@ -1271,7 +1214,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
              </Button>
          </SheetTrigger>
 
-        {/* Alert Dialog for Outline Context Warning */}
         <AlertDialog open={showOutlineContextAlert} onOpenChange={setShowOutlineContextAlert}>
           <AlertDialogContent>
             <AlertDialogHeader> <AlertDialogTitle>Project Context May Be Limited</AlertDialogTitle> <AlertDialogDescription> The project context is short ({project?.projectContext?.trim().split(/\s+/).filter(Boolean).length || 0} words). Generating an accurate outline might be difficult. Consider adding more details. Proceed anyway? </AlertDialogDescription> </AlertDialogHeader>
@@ -1279,7 +1221,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
           </AlertDialogContent>
         </AlertDialog>
 
-        {/* Alert Dialog for Delete Section Confirmation */}
          <AlertDialog open={!!sectionToDelete} onOpenChange={(open) => !open && setSectionToDelete(null)}>
            <AlertDialogContent>
              <AlertDialogHeader> <AlertDialogTitle>Delete Section?</AlertDialogTitle> <AlertDialogDescription> Are you sure you want to delete "{sectionToDelete ? findSectionById(project.sections, sectionToDelete)?.name : ''}" and its sub-sections? This cannot be undone. </AlertDialogDescription> </AlertDialogHeader>
@@ -1291,7 +1232,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   );
 }
 
-// Helper function to validate the outline structure
 const validateOutlineStructure = (sections: any[] | undefined): sections is OutlineSection[] => {
     if (!Array.isArray(sections)) {
         console.warn("Validation failed: Main sections property is not an array.");
@@ -1302,13 +1242,11 @@ const validateOutlineStructure = (sections: any[] | undefined): sections is Outl
             console.warn("Validation failed: Section missing name or is not an object:", section);
             return false;
         }
-        // Check 'subSections' property existence and type explicitly
         if (section.hasOwnProperty('subSections')) {
             if (!Array.isArray(section.subSections)) {
                 console.warn("Validation failed: subSections exists but is not an array:", section);
-                return false; // Fail if 'subSections' exists but isn't an array
+                return false;
             }
-            // Recursively validate only if subSections is a non-empty array
             if (section.subSections.length > 0 && !validateOutlineStructure(section.subSections)) {
                  console.warn("Validation failed: Invalid structure within subSections of:", section.name);
                  return false;
