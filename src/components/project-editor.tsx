@@ -25,7 +25,7 @@ import { marked } from 'marked';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { v4 as uuidv4 } from 'uuid';
 import AiDiagramGenerator from '@/components/ai-diagram-generator';
-import MermaidDiagram from './mermaid-diagram';
+import MermaidDiagram from '@/components/mermaid-diagram';
 import { ProjectSidebarContent } from '@/components/project-sidebar-content';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { updateProject as updateProjectHelper } from '@/lib/project-utils';
@@ -523,8 +523,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             const result = await generateOutlineAction({
                 projectTitle: project.title,
                 projectContext: project.projectContext || '',
-                minSections: project.minSections ?? 5, // Pass the user-defined or default value
-                maxSubSectionsPerSection: project.maxSubSectionsPerSection ?? 2, // Pass the user-defined or default value
+                minSections: project.minSections ?? 5,
+                maxSubSectionsPerSection: project.maxSubSectionsPerSection ?? 2,
             });
 
             if (result && typeof result === 'object' && 'error' in result) {
@@ -1139,7 +1139,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 isGeneratingOutline={isGeneratingOutline}
                 isGenerating={isGenerating}
                 isSummarizing={isSummarizing}
-                isSuggesting={isSuggesting}
+                isSuggesting={!!isSuggesting}
                 handleSaveOnline={handleSaveOnline}
                 canUndo={canUndo}
                 handleUndo={handleUndo}
@@ -1167,7 +1167,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 isGeneratingOutline={isGeneratingOutline}
                 isGenerating={isGenerating}
                 isSummarizing={isSummarizing}
-                isSuggesting={isSuggesting}
+                isSuggesting={!!isSuggesting}
                 handleSaveOnline={handleSaveOnline}
                 canUndo={canUndo}
                 handleUndo={handleUndo}
@@ -1201,6 +1201,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
           <ScrollArea className="flex-1 p-3 sm:p-4 md:p-6">
               {activeViewContent}
+             {/* AI Suggestions Section */}
              <Card className="shadow-md mt-6">
                  <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-lg md:text-xl text-primary text-glow-primary"><Sparkles className="w-5 h-5" /> AI Suggestions</CardTitle>

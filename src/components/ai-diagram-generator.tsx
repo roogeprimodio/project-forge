@@ -6,17 +6,18 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Wand2, BrainCircuit } from 'lucide-react'; // Added BrainCircuit
+import { Loader2, Wand2, BrainCircuit } from 'lucide-react'; 
 import { useToast } from '@/hooks/use-toast';
 import { generateDiagramAction } from '@/app/actions';
 import type { GenerateDiagramMermaidInput } from '@/ai/flows/generate-diagram-mermaid';
 import MermaidDiagram from './mermaid-diagram';
-import { ScrollArea } from '@/components/ui/scroll-area'; // Added ScrollArea
+import { ScrollArea } from '@/components/ui/scroll-area'; 
 
 interface AiDiagramGeneratorProps {
-  onDiagramGenerated?: (mermaidCode: string) => void; // Make optional if used in standalone page
+  onDiagramGenerated?: (mermaidCode: string) => void; 
   initialDescription?: string;
   initialType?: GenerateDiagramMermaidInput['diagramTypeHint'];
+  projectContext?: string; // Optional project context for more informed diagrams
 }
 
 const diagramTypes: GenerateDiagramMermaidInput['diagramTypeHint'][] = [
@@ -34,7 +35,8 @@ const diagramTypes: GenerateDiagramMermaidInput['diagramTypeHint'][] = [
 const AiDiagramGenerator: React.FC<AiDiagramGeneratorProps> = ({
   onDiagramGenerated,
   initialDescription = '',
-  initialType = 'flowchart'
+  initialType = 'flowchart',
+  projectContext = ''
 }) => {
   const [description, setDescription] = useState(initialDescription);
   const [diagramType, setDiagramType] = useState<GenerateDiagramMermaidInput['diagramTypeHint']>(initialType);
@@ -44,32 +46,46 @@ const AiDiagramGenerator: React.FC<AiDiagramGeneratorProps> = ({
 
   const handleGenerate = async () => {
     if (!description.trim()) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Please provide a description for the diagram.' });
+      toast({ variant: 'destructive', title: 'Description Missing', description: 'Please describe the diagram you want to generate.' });
       return;
     }
     setIsGenerating(true);
     setGeneratedCode(null);
 
+    // Enhance description with project context if available
+    const fullDescription = projectContext 
+      ? `${description}\n\nRelevant Project Context: ${projectContext}`
+      : description;
+
     try {
       const result = await generateDiagramAction({
-        description: description,
+        description: fullDescription,
         diagramTypeHint: diagramType,
       });
 
       if ('error' in result) {
-        throw new Error(result.error);
+        // If the error is a pre-defined error diagram, show it.
+        if (result.error.toLowerCase().includes("graph td") || result.error.toLowerCase().includes("flowchart")) {
+            setGeneratedCode(result.error); // Show the error diagram from the flow
+            toast({ variant: "destructive", title: 'Diagram Generation Partially Failed', description: "AI returned an error diagram. Please check the preview." });
+        } else {
+            throw new Error(result.error);
+        }
+      } else if (result.mermaidCode) {
+        setGeneratedCode(result.mermaidCode);
+        if (onDiagramGenerated) { 
+          onDiagramGenerated(result.mermaidCode);
+        }
+        toast({ title: 'Diagram Generated', description: 'Mermaid code created successfully.' });
+      } else {
+        throw new Error("AI did not return valid diagram code.");
       }
-
-      setGeneratedCode(result.mermaidCode);
-      if (onDiagramGenerated) { // Call callback only if provided
-        onDiagramGenerated(result.mermaidCode);
-      }
-      toast({ title: 'Diagram Generated', description: 'Mermaid code created successfully.' });
 
     } catch (error) {
       console.error("Diagram generation failed:", error);
-      toast({ variant: 'destructive', title: 'Generation Failed', description: error instanceof Error ? error.message : 'Could not generate diagram code.' });
-      setGeneratedCode(null);
+      const errorMessage = error instanceof Error ? error.message : 'Could not generate diagram code.';
+      toast({ variant: 'destructive', title: 'Generation Failed', description: errorMessage });
+      setGeneratedCode(`graph TD\nError["${errorMessage.replace(/"/g, "'").substring(0, 100)}..."]`); // Show an error diagram
     } finally {
       setIsGenerating(false);
     }
@@ -86,7 +102,7 @@ const AiDiagramGenerator: React.FC<AiDiagramGeneratorProps> = ({
             id="diagram-description-ai"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="e.g., 'Flowchart for user signup', 'Sequence diagram of API login', 'Class diagram for User and Order'. Be specific for better results."
+            placeholder="e.g., 'Flowchart for user signup with steps: enter email, set password, verify email, login.' Be specific for best results. You can also reference project context if provided."
             className="min-h-[100px] md:min-h-[120px] text-sm"
             rows={4}
           />
@@ -125,7 +141,7 @@ const AiDiagramGenerator: React.FC<AiDiagramGeneratorProps> = ({
             <MermaidDiagram chart={generatedCode} id="ai-diagram-preview" />
           </ScrollArea>
            <details className="mt-2 text-xs">
-             <summary className="cursor-pointer text-muted-foreground hover:text-primary">Show Mermaid Code</summary>
+             <summary className="cursor-pointer text-muted-foreground hover:text-foreground">Show Mermaid Code</summary>
              <ScrollArea className="max-h-32 mt-1">
                 <pre className="p-2 bg-muted rounded-md text-muted-foreground overflow-x-auto text-[10px]">
                     <code>{generatedCode}</code>
