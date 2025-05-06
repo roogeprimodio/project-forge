@@ -1,4 +1,3 @@
-
 // src/components/project-editor.tsx
 "use client";
 
@@ -670,9 +669,9 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             const result = await generateOutlineAction({
                 projectTitle: project.title,
                 projectContext: project.projectContext || '',
-                // Pass the limits to the AI flow (requires updating the flow's input schema)
-                // minSections: project.minSections || 5,
-                // maxSubSectionsPerSection: project.maxSubSectionsPerSection || 2,
+                // Pass the limits to the AI flow
+                minSections: project.minSections,
+                maxSubSectionsPerSection: project.maxSubSectionsPerSection,
             });
 
             if (result && typeof result === 'object' && 'error' in result) {
@@ -681,6 +680,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 return;
             }
 
+            // Enhanced Validation: Check if result.sections exists and is an array
             if (!result || !Array.isArray(result.sections) || !validateOutlineStructure(result.sections)) {
                  console.error("Invalid outline structure received:", result);
                  toast({ variant: "destructive", title: "Outline Generation Failed", description: "AI did not return the expected hierarchical section structure. Check console for details." });
@@ -743,7 +743,9 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
          projectContext: project.projectContext,
          allSectionsContent: allSectionsContent,
          focusArea: suggestionInput || undefined,
+         // ** NEW: Pass existing section names **
          existingSections: project.sections.map(s => s.name).join(', '),
+         // ** NEW: Pass project type **
          projectType: project.projectType,
        };
 
@@ -1329,4 +1331,3 @@ const validateOutlineStructure = (sections: any[] | undefined): sections is Outl
         return true;
     });
 };
-
