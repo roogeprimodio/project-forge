@@ -1,18 +1,20 @@
 // src/app/diagram-generator/page.tsx
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Wand2, GitGraph, BrainCircuit } from 'lucide-react';
+import { Loader2, Wand2, GitGraph, BrainCircuit, ZoomIn, ZoomOut, RotateCcw, Edit3, Save, Copy } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { generateDiagramAction } from '@/app/actions';
 import type { GenerateDiagramMermaidInput } from '@/ai/flows/generate-diagram-mermaid';
 import MermaidDiagram from '@/components/mermaid-diagram';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { Slider } from '@/components/ui/slider';
 
 const diagramTypes: GenerateDiagramMermaidInput['diagramTypeHint'][] = [
   'flowchart',
@@ -33,13 +35,25 @@ export default function DiagramGeneratorPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const { toast } = useToast();
 
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [isEditingCode, setIsEditingCode] = useState(false);
+  const [editableCode, setEditableCode] = useState('');
+
+  useEffect(() => {
+    if (generatedCode) {
+      setEditableCode(generatedCode);
+    }
+  }, [generatedCode]);
+
   const handleGenerateDiagram = async () => {
     if (!description.trim()) {
       toast({ variant: 'destructive', title: 'Error', description: 'Please provide a description for the diagram.' });
       return;
     }
     setIsGenerating(true);
-    setGeneratedCode(null);
+    setGeneratedCode(null); // Clear previous diagram
+    setEditableCode('');   // Clear editable code
+    setZoomLevel(1);       // Reset zoom
 
     try {
       const result = await generateDiagramAction({
@@ -52,12 +66,14 @@ export default function DiagramGeneratorPage() {
       }
 
       setGeneratedCode(result.mermaidCode);
+      setEditableCode(result.mermaidCode); // Initialize editable code
       toast({ title: 'Diagram Generated', description: 'Mermaid code created successfully.' });
 
     } catch (error) {
       console.error("Diagram generation failed:", error);
       toast({ variant: 'destructive', title: 'Generation Failed', description: error instanceof Error ? error.message : 'Could not generate diagram code.' });
       setGeneratedCode(null);
+      setEditableCode('');
     } finally {
       setIsGenerating(false);
     }
@@ -68,9 +84,27 @@ export default function DiagramGeneratorPage() {
         toast({ variant: 'destructive', title: 'Nothing to save', description: 'Generate a diagram first.' });
         return;
     }
-    // Placeholder for save functionality (e.g., save to local storage, project, or download)
+    // Placeholder for save functionality
     console.log("Saving diagram:", generatedCode);
     toast({ title: 'Diagram Saved (Placeholder)', description: 'Save functionality to be implemented.' });
+  };
+
+  const handleUpdateDiagramFromEdit = () => {
+    if (editableCode.trim()) {
+      setGeneratedCode(editableCode);
+      toast({ title: 'Diagram Updated', description: 'Diagram preview updated with your code.' });
+    } else {
+      toast({ variant: 'destructive', title: 'Empty Code', description: 'Cannot render an empty diagram.'});
+    }
+    setIsEditingCode(false);
+  };
+
+  const handleCopyCode = () => {
+    if (generatedCode) {
+      navigator.clipboard.writeText(generatedCode)
+        .then(() => toast({ title: 'Code Copied!', description: 'Mermaid code copied to clipboard.' }))
+        .catch(err => toast({ variant: 'destructive', title: 'Copy Failed', description: 'Could not copy code.' }));
+    }
   };
 
   return (
@@ -132,31 +166,74 @@ Or 'Class diagram for an e-commerce system with User, Product, and Order classes
 
           {generatedCode !== null && (
             <div className="mt-6 md:mt-8 pt-6 border-t">
-              <h3 className="text-xl md:text-2xl font-semibold mb-3 md:mb-4 text-primary">Generated Diagram Preview</h3>
-              <ScrollArea className="max-h-[500px] md:max-h-[600px] w-full border rounded-lg p-2 md:p-4 bg-card">
-                <MermaidDiagram chart={generatedCode} id="diagram-generator-preview" />
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 md:mb-4 gap-2">
+                <h3 className="text-xl md:text-2xl font-semibold text-primary">Generated Diagram Preview</h3>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Button variant="outline" size="sm" onClick={() => setZoomLevel(prev => Math.max(0.2, prev - 0.2))} title="Zoom Out"> <ZoomOut className="mr-1 h-4 w-4" /> <span className="hidden sm:inline">Out</span> </Button>
+                  <Slider
+                    value={[zoomLevel]}
+                    min={0.2}
+                    max={3}
+                    step={0.1}
+                    onValueChange={(value) => setZoomLevel(value[0])}
+                    className="w-24 sm:w-32"
+                    aria-label="Zoom slider"
+                  />
+                  <Button variant="outline" size="sm" onClick={() => setZoomLevel(prev => Math.min(3, prev + 0.2))} title="Zoom In"> <ZoomIn className="mr-1 h-4 w-4" /> <span className="hidden sm:inline">In</span> </Button>
+                  <Button variant="outline" size="sm" onClick={() => setZoomLevel(1)} title="Reset Zoom"> <RotateCcw className="mr-1 h-4 w-4" /> <span className="hidden sm:inline">Reset</span> </Button>
+                  <Button variant="outline" size="sm" onClick={() => setIsEditingCode(true)} title="Edit Code"> <Edit3 className="mr-1 h-4 w-4" /> <span className="hidden sm:inline">Edit</span> </Button>
+                  <Button variant="outline" size="sm" onClick={handleCopyCode} title="Copy Code"> <Copy className="mr-1 h-4 w-4" /> <span className="hidden sm:inline">Copy</span> </Button>
+                </div>
+              </div>
+              <ScrollArea className="h-[400px] sm:h-[500px] md:h-[600px] w-full border rounded-lg bg-card overflow-auto">
+                 {/* This inner div handles the zooming transformation */}
+                <div
+                  style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top left', width: `${100/zoomLevel}%`, height: `${100/zoomLevel}%` }}
+                  className="transition-transform duration-200 ease-in-out p-2 md:p-4" // Added padding to allow space for zoom
+                >
+                  <MermaidDiagram chart={generatedCode} id="diagram-generator-preview" />
+                </div>
               </ScrollArea>
-              <details className="mt-3 text-xs md:text-sm">
-                <summary className="cursor-pointer text-muted-foreground hover:text-primary">
-                  Show Mermaid Code
-                </summary>
-                <ScrollArea className="max-h-48 mt-1">
-                <pre className="mt-1 p-2 md:p-3 bg-muted rounded-md text-muted-foreground overflow-x-auto text-[10px] md:text-xs">
-                  <code>{generatedCode}</code>
-                </pre>
-                </ScrollArea>
-              </details>
+              <p className="text-xs text-muted-foreground mt-2">Use mouse wheel or trackpad to scroll within the preview area. Use zoom buttons for scaling.</p>
             </div>
           )}
         </CardContent>
         <CardFooter className="border-t pt-4 md:pt-6">
             {generatedCode && (
                  <Button variant="outline" onClick={handleSaveDiagram} className="text-sm md:text-base">
-                    Save Diagram (Placeholder)
+                    <Save className="mr-2 h-4 w-4" /> Save Diagram (Placeholder)
                  </Button>
             )}
         </CardFooter>
       </Card>
+
+      {/* Edit Code Dialog */}
+      <Dialog open={isEditingCode} onOpenChange={setIsEditingCode}>
+        <DialogContent className="sm:max-w-[700px] md:max-w-[800px] lg:max-w-[900px] h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Edit Mermaid Code</DialogTitle>
+            <DialogDescription>
+              Modify the Mermaid code below and click "Update Diagram" to see changes.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2 flex-grow">
+            <Textarea
+              value={editableCode}
+              onChange={(e) => setEditableCode(e.target.value)}
+              placeholder="Enter Mermaid diagram code here..."
+              className="w-full h-full min-h-[300px] font-mono text-xs sm:text-sm resize-none focus-visible:glow-primary"
+            />
+          </div>
+          <DialogFooter className="mt-auto pt-2">
+            <DialogClose asChild>
+              <Button type="button" variant="outline">Cancel</Button>
+            </DialogClose>
+            <Button type="button" onClick={handleUpdateDiagramFromEdit} className="hover:glow-primary focus-visible:glow-primary">
+              <Edit3 className="mr-2 h-4 w-4"/> Update Diagram
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
