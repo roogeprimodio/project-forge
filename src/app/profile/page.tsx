@@ -9,10 +9,10 @@ import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch'; // Import Switch
+import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { useLocalStorage } from '@/hooks/use-local-storage';
-import { User, Mail, Bell, Palette, ShieldCheck, Activity, Edit3, LogOut, Save, XCircle, Loader2, KeyRound } from 'lucide-react'; // Added KeyRound
+import { User, Mail, Bell, Palette, ShieldCheck, Activity, Edit3, LogOut, Save, XCircle, Loader2, KeyRound, Eye, EyeOff } from 'lucide-react'; // Added Eye, EyeOff
 import { cn } from '@/lib/utils';
 
 export default function ProfilePage() {
@@ -29,10 +29,11 @@ export default function ProfilePage() {
     const [geminiApiKey, setGeminiApiKey] = useLocalStorage<string>('geminiApiKey', '');
     const [openaiApiKey, setOpenaiApiKey] = useLocalStorage<string>('openaiApiKey', '');
     
-    // State for API key toggles
     const [isGeminiKeyEnabled, setIsGeminiKeyEnabled] = useLocalStorage<boolean>('isGeminiKeyEnabled', true);
     const [isOpenAiKeyEnabled, setIsOpenAiKeyEnabled] = useLocalStorage<boolean>('isOpenAiKeyEnabled', false);
 
+    const [showGeminiKey, setShowGeminiKey] = useState(false);
+    const [showOpenAiKey, setShowOpenAiKey] = useState(false);
 
     const [isEditing, setIsEditing] = useState(false);
     const [editForm, setEditForm] = useState({ name: '', email: '', username: '' });
@@ -64,7 +65,7 @@ export default function ProfilePage() {
         setIsSaving(true);
         console.log('Saving profile:', editForm);
         console.log('Saving API keys (local storage):', { geminiApiKey: '...', openaiApiKey: '...' });
-        console.log('API Key Enabled States:', { isGeminiKeyEnabled, isOpenAiKeyEnabled }); // Log toggle states
+        console.log('API Key Enabled States:', { isGeminiKeyEnabled, isOpenAiKeyEnabled });
         setTimeout(() => {
             setUser(prevUser => ({
                 ...prevUser,
@@ -201,16 +202,29 @@ export default function ProfilePage() {
                                         aria-label="Enable Google Gemini API Key"
                                     />
                                 </div>
-                                <Input
-                                    id="gemini-api-key"
-                                    type="password"
-                                    value={geminiApiKey}
-                                    onChange={(e) => setGeminiApiKey(e.target.value)}
-                                    placeholder="Enter Gemini API key"
-                                    className="mt-1 focus-visible:glow-primary h-9"
-                                    autoComplete="off"
-                                    disabled={!isGeminiKeyEnabled}
-                                />
+                                <div className="relative">
+                                    <Input
+                                        id="gemini-api-key"
+                                        type={showGeminiKey ? 'text' : 'password'}
+                                        value={geminiApiKey}
+                                        onChange={(e) => setGeminiApiKey(e.target.value)}
+                                        placeholder="Enter Gemini API key"
+                                        className="mt-1 focus-visible:glow-primary h-9 pr-10"
+                                        autoComplete="off"
+                                        disabled={!isGeminiKeyEnabled}
+                                    />
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7 text-muted-foreground hover:text-primary"
+                                        onClick={() => setShowGeminiKey(!showGeminiKey)}
+                                        aria-label={showGeminiKey ? "Hide Gemini API key" : "Show Gemini API key"}
+                                        disabled={!isGeminiKeyEnabled}
+                                    >
+                                        {showGeminiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                    </Button>
+                                </div>
                                 <p className="text-xs text-muted-foreground mt-1">Optional. Used for AI features if enabled.</p>
                             </div>
                             <div className="space-y-2">
@@ -223,16 +237,29 @@ export default function ProfilePage() {
                                         aria-label="Enable OpenAI API Key"
                                     />
                                 </div>
-                                <Input
-                                    id="openai-api-key"
-                                    type="password"
-                                    value={openaiApiKey}
-                                    onChange={(e) => setOpenaiApiKey(e.target.value)}
-                                    placeholder="Enter OpenAI API key"
-                                    className="mt-1 focus-visible:glow-primary h-9"
-                                    autoComplete="off"
-                                    disabled={!isOpenAiKeyEnabled}
-                                />
+                                <div className="relative">
+                                    <Input
+                                        id="openai-api-key"
+                                        type={showOpenAiKey ? 'text' : 'password'}
+                                        value={openaiApiKey}
+                                        onChange={(e) => setOpenaiApiKey(e.target.value)}
+                                        placeholder="Enter OpenAI API key"
+                                        className="mt-1 focus-visible:glow-primary h-9 pr-10"
+                                        autoComplete="off"
+                                        disabled={!isOpenAiKeyEnabled}
+                                    />
+                                     <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7 text-muted-foreground hover:text-primary"
+                                        onClick={() => setShowOpenAiKey(!showOpenAiKey)}
+                                        aria-label={showOpenAiKey ? "Hide OpenAI API key" : "Show OpenAI API key"}
+                                        disabled={!isOpenAiKeyEnabled}
+                                    >
+                                        {showOpenAiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                    </Button>
+                                </div>
                                 <p className="text-xs text-muted-foreground mt-1">Optional. Used for AI features if enabled.</p>
                             </div>
                              <p className="text-xs text-destructive">Note: Keys are stored locally in your browser. Do not use on shared computers.</p>
