@@ -18,7 +18,7 @@ const GenerateAbstractInputSchema = z.object({
 export type GenerateAbstractInput = z.infer<typeof GenerateAbstractInputSchema>;
 
 const GenerateAbstractOutputSchema = z.object({
-  abstractMarkdown: z.string().describe('The generated Markdown content for the abstract. Should be a concise summary of the project (typically 150-300 words).'),
+  abstractMarkdown: z.string().describe('The generated HTML content for the abstract. Should be a concise summary of the project (typically 150-300 words).'),
 });
 export type GenerateAbstractOutput = z.infer<typeof GenerateAbstractOutputSchema>;
 
@@ -30,7 +30,7 @@ const prompt = ai.definePrompt({
   name: 'generateAbstractPrompt',
   input: { schema: GenerateAbstractInputSchema },
   output: { schema: GenerateAbstractOutputSchema },
-  prompt: `You are an AI assistant tasked with writing a concise and informative abstract for a student project report. The output must be in Markdown format, adhering to the HTML structure provided for layout.
+  prompt: `You are an AI assistant tasked with writing a concise and informative abstract for a student project report. The output must be the HTML content for the abstract, ready to be rendered.
 
   **Project Information:**
   - Title: {{{projectTitle}}}
@@ -38,7 +38,7 @@ const prompt = ai.definePrompt({
   {{#if keyFindings}}- Key Findings (if provided): {{{keyFindings}}}{{/if}}
 
   **Instructions for Generating the Abstract:**
-  1.  The abstract should be a single block of text (Markdown paragraph form), wrapped in the provided HTML structure.
+  1.  The abstract should be a single block of text (HTML paragraph form), wrapped in the provided HTML structure.
   2.  It must be concise, typically between 150 and 300 words.
   3.  Summarize the main objectives and scope of the project.
   4.  Briefly describe the methodology or approach used.
@@ -51,15 +51,14 @@ const prompt = ai.definePrompt({
       *   If \`projectContext\` is the system-provided placeholder "[Abstract content cannot be generated due to insufficient project context. Please provide more details.]", then the main abstract content should be exactly that placeholder.
       *   If \`projectTitle\` is the system-provided placeholder "[Project Title Placeholder]", use it as is.
       *   Keywords suggestion should be "[Keywords placeholder - add 3-5 relevant keywords]" if the AI cannot reasonably infer them or if context is insufficient.
-  11. Output ONLY the Markdown and HTML. No extra text or explanations.
+  11. Output ONLY the HTML content. Do NOT wrap it in Markdown code fences like \`\`\`markdown ... \`\`\`. No extra text or explanations.
 
-  **Required Output Structure (Markdown with embedded HTML for layout):**
-  \`\`\`markdown
+  **Required Output Structure (HTML content):**
   <div style="font-family: 'Times New Roman', serif; padding: 20px; margin: 20px; page-break-after: always;">
   <h1 style="text-align: center; font-size: 20pt; font-weight: bold; margin-bottom: 30px; text-decoration: underline;">ABSTRACT</h1>
   <p style="font-size: 12pt; line-height: 1.8; text-align: justify; text-indent: 30px;">
   {{#if (isSufficientContext projectContext)}}
-    [Generated Abstract Paragraph(s) Here - This text should be replaced by the AI-generated abstract based on the instructions above. Ensure it's a continuous block of text formatted as Markdown paragraphs within this HTML paragraph tag.]
+    [Generated Abstract Paragraph(s) Here - This text should be replaced by the AI-generated abstract based on the instructions above. Ensure it's a continuous block of text formatted as HTML paragraphs within this HTML paragraph tag.]
   {{else}}
     {{{projectContext}}} <!-- This will output the insufficient context placeholder passed from the flow -->
   {{/if}}
@@ -67,7 +66,6 @@ const prompt = ai.definePrompt({
   <br><br>
   <p style="font-size: 12pt; font-weight: bold;">Keywords: <span style="font-weight: normal;">{{#if (isSufficientContext projectContext)}}[Suggest 3-5 relevant keywords based on the project context, separated by commas]{{else}}[Keywords placeholder - add 3-5 relevant keywords]{{/if}}</span></p>
   </div>
-  \`\`\`
 
   Generate the abstract now based on the title, context, and key findings (if any).
   Fill in the "[Generated Abstract Paragraph(s) Here]" and "[Suggest 3-5 relevant keywords...]" parts, or use placeholders as instructed.
@@ -104,4 +102,3 @@ const generateAbstractFlow = ai.defineFlow(
     return output!;
   }
 );
-

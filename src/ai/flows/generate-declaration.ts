@@ -22,7 +22,7 @@ const GenerateDeclarationInputSchema = z.object({
 export type GenerateDeclarationInput = z.infer<typeof GenerateDeclarationInputSchema>;
 
 const GenerateDeclarationOutputSchema = z.object({
-  declarationMarkdown: z.string().describe('The generated Markdown content for the declaration. Should be well-formatted and formal.'),
+  declarationMarkdown: z.string().describe('The generated HTML content for the declaration. Should be well-formatted and formal.'),
 });
 export type GenerateDeclarationOutput = z.infer<typeof GenerateDeclarationOutputSchema>;
 
@@ -34,7 +34,7 @@ const prompt = ai.definePrompt({
   name: 'generateDeclarationPrompt',
   input: { schema: GenerateDeclarationInputSchema.extend({ teamDetailsLines: z.array(z.string()).optional(), pronoun: z.string().optional() }) },
   output: { schema: GenerateDeclarationOutputSchema },
-  prompt: `You are an AI assistant tasked with generating a student project declaration in Markdown format, strictly adhering to the HTML structure for layout.
+  prompt: `You are an AI assistant tasked with generating a student project declaration. The output must be the HTML content for the declaration, ready to be rendered.
 
   **Declaration Details (Use these to customize the template):**
   - Project Title: {{{projectTitle}}}
@@ -55,7 +55,7 @@ const prompt = ai.definePrompt({
   - Date: {{{submissionDate}}}
 
   **Instructions:**
-  1.  Output ONLY the Markdown and HTML content as per the structure below. Do not include any other text, explanations, or conversational elements.
+  1.  Output ONLY the HTML content for the declaration. Do NOT wrap it in Markdown code fences like \`\`\`markdown ... \`\`\`. Do not include any other text, explanations, or conversational elements.
   2.  Replace placeholders like \`{{{projectTitle}}}\` with the actual data.
   3.  **Placeholder Usage:** If a piece of information is not provided or is an empty string, **the system will provide a specific placeholder string for that field. Your task is to output *this exact placeholder string* as provided in the input if no actual data is available. Do not replace these system-provided placeholders with "N/A" or try to invent information.**
       *   For Project Title: Use the value of \`{{{projectTitle}}}\`.
@@ -69,9 +69,7 @@ const prompt = ai.definePrompt({
   5.  Ensure text alignment and formatting (bold, headings) match the provided HTML structure.
   6.  Signature blocks should list student names and enrollment numbers as provided in \`teamDetailsLines\` if available, otherwise from \`teamDetails\`.
 
-  **Required Output Structure (Markdown with embedded HTML for layout):**
-
-  \`\`\`markdown
+  **Required Output Structure (HTML content):**
   <div style="font-family: 'Times New Roman', serif; padding: 20px; margin: 20px; page-break-after: always;">
 
   <h1 style="text-align: center; font-size: 20pt; font-weight: bold; margin-bottom: 40px; text-decoration: underline;">DECLARATION</h1>
@@ -114,9 +112,8 @@ const prompt = ai.definePrompt({
   <p style="font-size: 12pt; text-align: left;">Place: [City/Town Placeholder]</p>
 
   </div>
-  \`\`\`
 
-  Generate the Markdown content now.
+  Generate the HTML content now.
   `,
   helpers: {
     pronounHelper: (pluralForm: string, pronoun: string, singularForm: string) => {
@@ -156,4 +153,3 @@ const generateDeclarationFlow = ai.defineFlow(
     return output!;
   }
 );
-

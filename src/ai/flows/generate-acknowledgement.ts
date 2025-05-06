@@ -22,7 +22,7 @@ const GenerateAcknowledgementInputSchema = z.object({
 export type GenerateAcknowledgementInput = z.infer<typeof GenerateAcknowledgementInputSchema>;
 
 const GenerateAcknowledgementOutputSchema = z.object({
-  acknowledgementMarkdown: z.string().describe('The generated Markdown content for the acknowledgement section. Should be sincere and well-formatted.'),
+  acknowledgementMarkdown: z.string().describe('The generated HTML content for the acknowledgement section. Should be sincere and well-formatted.'),
 });
 export type GenerateAcknowledgementOutput = z.infer<typeof GenerateAcknowledgementOutputSchema>;
 
@@ -34,7 +34,7 @@ const prompt = ai.definePrompt({
   name: 'generateAcknowledgementPrompt',
   input: { schema: GenerateAcknowledgementInputSchema.extend({ teamDetailsLines: z.array(z.string()).optional(), pronoun: z.string().optional(), possessivePronoun: z.string().optional() }) },
   output: { schema: GenerateAcknowledgementOutputSchema },
-  prompt: `You are an AI assistant tasked with writing a heartfelt and professional acknowledgement section for a student project report. The output must be in Markdown format, strictly adhering to the HTML structure provided for layout.
+  prompt: `You are an AI assistant tasked with writing a heartfelt and professional acknowledgement section for a student project report. The output must be the HTML content for the acknowledgement, ready to be rendered.
 
   **Project & People Details (Use these to customize the template):**
   - Project Title: {{{projectTitle}}}
@@ -57,7 +57,7 @@ const prompt = ai.definePrompt({
   - Possessive Pronoun (my/our): {{{possessivePronoun}}}
 
   **Instructions for Generating the Acknowledgement:**
-  1.  Output ONLY the Markdown and HTML content as per the structure below. Do not include any other text, explanations, or conversational elements.
+  1.  Output ONLY the HTML content as per the structure below. Do NOT wrap it in Markdown code fences like \`\`\`markdown ... \`\`\`. Do not include any other text, explanations, or conversational elements.
   2.  Replace placeholders like \`{{{guideName}}}\` with the actual data.
   3.  **Placeholder Usage:** If a piece of information is not provided or is an empty string, **the system will provide a specific placeholder string for that field. Your task is to output *this exact placeholder string* as provided in the input if no actual data is available. Do not replace these system-provided placeholders with "N/A" or try to invent information.**
       *   For Project Guide: Use the value of \`{{{guideName}}}\`.
@@ -73,8 +73,7 @@ const prompt = ai.definePrompt({
   8.  If specific additional thanks ({{{additionalThanks}}}) are provided, incorporate them naturally.
   9.  Conclude with a closing and the names and enrollment numbers of all team members (from \`teamDetailsLines\` or \`teamDetails\`).
 
-  **Required Output Structure (Markdown with embedded HTML for layout):**
-  \`\`\`markdown
+  **Required Output Structure (HTML content):**
   <div style="font-family: 'Times New Roman', serif; padding: 20px; margin: 20px; page-break-after: always;">
   <h1 style="text-align: center; font-size: 20pt; font-weight: bold; margin-bottom: 30px; text-decoration: underline;">ACKNOWLEDGEMENT</h1>
 
@@ -117,9 +116,8 @@ const prompt = ai.definePrompt({
   </div>
 
   </div>
-  \`\`\`
 
-  Generate the acknowledgement now.
+  Generate the HTML content now.
   `,
   helpers: {
     pronounHelper: (verb: string, pronoun: string) => {
@@ -168,4 +166,3 @@ const generateAcknowledgementFlow = ai.defineFlow(
     return output!;
   }
 );
-

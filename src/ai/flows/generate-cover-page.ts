@@ -36,7 +36,7 @@ const prompt = ai.definePrompt({
   name: 'generateCoverPagePrompt',
   input: { schema: GenerateCoverPageInputSchema.extend({ teamDetailsLines: z.array(z.string()).optional() }) },
   output: { schema: GenerateCoverPageOutputSchema },
-  prompt: `You are an AI assistant tasked with generating a professional cover page for a student project report in Markdown format, strictly adhering to the HTML structure provided below for layout.
+  prompt: `You are an AI assistant tasked with generating a professional cover page for a student project report. The output must be the HTML content for the cover page, ready to be rendered.
 
   **Project Details (Use these to customize the template):**
   - Project Title: {{{projectTitle}}}
@@ -59,7 +59,7 @@ const prompt = ai.definePrompt({
   {{#if universityName}}- University: {{{universityName}}} (Affiliated to){{/if}}
 
   **Instructions:**
-  1.  Output ONLY the Markdown and HTML content as per the structure below. Do NOT include any other text, explanations, or conversational elements.
+  1.  Output ONLY the HTML content for the cover page. Do NOT wrap it in Markdown code fences like \`\`\`markdown ... \`\`\`. Do NOT include any other text, explanations, or conversational elements.
   2.  Replace dynamic placeholders like \`{{{projectTitle}}}\`, \`{{{teamDetails}}}\`, etc., with the actual data provided for those fields.
   3.  **Placeholder Usage for Dynamic Fields:** If a dynamic piece of information is not provided or is an empty string, **the system will provide a specific placeholder string for that field (e.g., \`[Team Member Names & Enrollment Numbers Placeholder]\`). Your task is to output *this exact placeholder string* as provided in the input if no actual data is available. Do not replace these system-provided placeholders with "N/A" or try to invent information.**
       *   For Project Title: Use "[Project Title Placeholder]" if input \`projectTitle\` is that value.
@@ -69,12 +69,10 @@ const prompt = ai.definePrompt({
       *   For Institute Name: Use "[Institute Name Placeholder]" if input \`instituteName\` is that value.
       *   For University Name (if applicable): Use "[University Name Placeholder]" if input \`universityName\` is that value.
       *   For Submission Date: Use "[Submission Date Placeholder]" if input \`submissionDate\` is that value.
-  4.  If a logo URL (universityLogoUrl or collegeLogoUrl) is provided, embed it using Markdown image syntax (\`![Alt text](URL)\`) within a centered div. If not provided, omit the img tag entirely.
+  4.  If a logo URL (universityLogoUrl or collegeLogoUrl) is provided, embed it using an \`<img>\` tag. If not provided, omit the img tag entirely.
   5.  Ensure all text is properly centered or aligned as indicated in the HTML structure.
 
-  **Required Output Structure (Markdown with embedded HTML for layout):**
-
-  \`\`\`markdown
+  **Required Output Structure (HTML content):**
   <div style="text-align: center; font-family: 'Times New Roman', serif; page-break-after: always; border: 1px solid #ccc; padding: 20px; min-height: 250mm; display: flex; flex-direction: column; justify-content: space-between;">
 
   <div>
@@ -120,9 +118,8 @@ const prompt = ai.definePrompt({
     <p style="font-size: 12pt;">{{{submissionDate}}}</p>
   </div>
   </div>
-  \`\`\`
 
-  Generate the Markdown content now.
+  Generate the HTML content now.
   `,
 });
 

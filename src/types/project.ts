@@ -36,6 +36,12 @@ export interface Project {
   branch?: string;
   guideName?: string;
   hodName?: string; // Head of Department Name
+  degree?: string; // Added for certificate/cover page
+  submissionDate?: string; // Added for cover page/declaration
+  submissionYear?: string; // Added for certificate
+  keyFindings?: string; // Added for abstract
+  additionalThanks?: string; // Added for acknowledgement
+  universityName?: string; // Added for cover page
   sections: HierarchicalProjectSection[]; // Use hierarchical structure
   createdAt: Date | string;
   updatedAt: Date | string;

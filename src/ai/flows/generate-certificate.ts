@@ -24,7 +24,7 @@ const GenerateCertificateInputSchema = z.object({
 export type GenerateCertificateInput = z.infer<typeof GenerateCertificateInputSchema>;
 
 const GenerateCertificateOutputSchema = z.object({
-  certificateMarkdown: z.string().describe('The generated Markdown content for the certificate. Should be well-formatted and official-looking.'),
+  certificateMarkdown: z.string().describe('The generated HTML content for the certificate. Should be well-formatted and official-looking.'),
 });
 export type GenerateCertificateOutput = z.infer<typeof GenerateCertificateOutputSchema>;
 
@@ -36,7 +36,7 @@ const prompt = ai.definePrompt({
   name: 'generateCertificatePrompt',
   input: { schema: GenerateCertificateInputSchema.extend({ teamDetailsLines: z.array(z.string()).optional() }) },
   output: { schema: GenerateCertificateOutputSchema },
-  prompt: `You are an AI assistant tasked with generating a project certificate in Markdown format, strictly adhering to the HTML structure for layout.
+  prompt: `You are an AI assistant tasked with generating a project certificate. The output must be the HTML content for the certificate, ready to be rendered.
 
   **Certificate Details (Use these to customize the template):**
   - Project Title: {{{projectTitle}}}
@@ -59,7 +59,7 @@ const prompt = ai.definePrompt({
   {{#if collegeLogoUrl}}- College Logo (use if provided): {{collegeLogoUrl}} {{/if}}
 
   **Instructions:**
-  1.  Output ONLY the Markdown and HTML content as per the structure below. Do not include any other text, explanations, or conversational elements.
+  1.  Output ONLY the HTML content for the certificate. Do NOT wrap it in Markdown code fences like \`\`\`markdown ... \`\`\`. Do not include any other text, explanations, or conversational elements.
   2.  Replace placeholders like \`{{{projectTitle}}}\` with the actual data provided.
   3.  **Placeholder Usage:** If a piece of information is not provided or is an empty string, **the system will provide a specific placeholder string for that field. Your task is to output *this exact placeholder string* as provided in the input if no actual data is available. Do not replace these system-provided placeholders with "N/A" or try to invent information.**
       *   For Project Title: Use the value of \`{{{projectTitle}}}\` (which will be "[Project Title Placeholder]" if empty).
@@ -70,13 +70,11 @@ const prompt = ai.definePrompt({
       *   For Project Guide: Use the value of \`{{{guideName}}}\`.
       *   For Head of Department: Use the value of \`{{{hodName}}}\` or "[HOD Name Placeholder]" if \`hodName\` is not provided.
       *   For Submission Year: Use the value of \`{{{submissionYear}}}\`.
-  4.  If a college logo URL is provided, embed it using Markdown image syntax (\`![Alt text](URL)\`) within a centered div. If not provided, omit the img tag.
+  4.  If a college logo URL is provided, embed it using an \`<img>\` tag. If not provided, omit the img tag.
   5.  Ensure text alignment and formatting (bold, headings) match the provided HTML structure.
   6.  Signature blocks should use \`div\`s with appropriate styling for alignment. For team members, list them from \`teamDetailsLines\` if available, otherwise from \`teamDetails\`.
 
-  **Required Output Structure (Markdown with embedded HTML for layout):**
-
-  \`\`\`markdown
+  **Required Output Structure (HTML content):**
   <div style="text-align: center; font-family: 'Times New Roman', serif; padding: 20px; border: 1px solid #ccc; margin: 20px; page-break-after: always;">
 
   {{#if collegeLogoUrl}}
@@ -130,9 +128,8 @@ const prompt = ai.definePrompt({
     </div>
   </div>
   </div>
-  \`\`\`
 
-  Generate the Markdown content now.
+  Generate the HTML content now.
   `,
 });
 
@@ -167,4 +164,3 @@ const generateCertificateFlow = ai.defineFlow(
     return output!;
   }
 );
-
