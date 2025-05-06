@@ -1,5 +1,5 @@
 // src/components/project-editor.tsx
-"use client";
+"use client"; // Keep this if ProjectEditor uses client hooks like useState, useEffect
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
@@ -25,14 +25,14 @@ import { marked } from 'marked';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { v4 as uuidv4 } from 'uuid';
 import AiDiagramGenerator from '@/components/ai-diagram-generator';
-import MermaidDiagram from '@/components/mermaid-diagram';
+import MermaidDiagram from './mermaid-diagram';
 import { ProjectSidebarContent } from '@/components/project-sidebar-content';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { updateProject as updateProjectHelper } from '@/lib/project-utils';
 import MarkdownPreview from '@/components/markdown-preview';
 import { CombinedSectionPreview } from '@/components/combined-section-preview';
 import { StandardPagePreview } from '@/components/standard-page-preview';
-import { MarkdownToolbar } from '@/components/markdown-toolbar'; // Import the new toolbar
+import { MarkdownToolbar } from '@/components/markdown-toolbar';
 
 
 // Recursive component to render the preview outline
@@ -259,8 +259,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const [isDraggingFab, setIsDraggingFab] = useState(false);
   const fabRef = useRef<HTMLButtonElement>(null);
   const dragOffset = useRef({ x: 0, y: 0 });
-  const [isGeneratingDiagram, setIsGeneratingDiagram] = useState(false);
-  const [sectionToDelete, setSectionToDelete] = useState<string | null>(null);
+    const [isGeneratingDiagram, setIsGeneratingDiagram] = useState(false);
+    const [sectionToDelete, setSectionToDelete] = useState<string | null>(null);
   const contentTextAreaRef = useRef<HTMLTextAreaElement>(null);
 
   const [activeSubSectionId, setActiveSubSectionId] = useState<string | null>(null);
@@ -523,8 +523,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             const result = await generateOutlineAction({
                 projectTitle: project.title,
                 projectContext: project.projectContext || '',
-                minSections: project.minSections ?? 5,
-                maxSubSectionsPerSection: project.maxSubSectionsPerSection ?? 2,
+                minSections: project.minSections ?? 5, // Pass the user-defined or default value
+                maxSubSectionsPerSection: project.maxSubSectionsPerSection ?? 2, // Pass the user-defined or default value
             });
 
             if (result && typeof result === 'object' && 'error' in result) {
@@ -573,144 +573,144 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
       const targetSection = project ? findSectionById(project.sections, sectionIdToGenerate) : null;
       if (!project || !targetSection || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting || isGeneratingDiagram) return;
 
-      const isDiagram = targetSection.name.toLowerCase().startsWith("diagram:") || targetSection.name.toLowerCase().startsWith("figure");
+        const isDiagram = targetSection.name.toLowerCase().startsWith("diagram:") || targetSection.name.toLowerCase().startsWith("figure");
 
-      if (isDiagram) {
-         setIsGeneratingDiagram(true);
-         try {
-            const diagramInput: GenerateDiagramMermaidInput = {
-                description: targetSection.prompt || `Diagram for ${targetSection.name}`,
-            };
-            const result = await generateDiagramAction(diagramInput);
-            if ('error' in result) {
-                 throw new Error(result.error);
+        if (isDiagram) {
+            setIsGeneratingDiagram(true);
+            try {
+                const diagramInput: GenerateDiagramMermaidInput = {
+                    description: targetSection.prompt || `Diagram for ${targetSection.name}`,
+                };
+                const result = await generateDiagramAction(diagramInput);
+                if ('error' in result) {
+                    throw new Error(result.error);
+                }
+                updateProject(prev => ({
+                    ...prev,
+                    sections: updateSectionById(prev.sections, sectionIdToGenerate, {
+                        content: result.mermaidCode,
+                        lastGenerated: new Date().toISOString(),
+                    }),
+                }), true);
+                toast({ title: "Diagram Generated", description: `Mermaid code for "${targetSection.name}" created.` });
+            } catch (error) {
+                console.error("Diagram generation failed:", error);
+                toast({ variant: "destructive", title: "Diagram Generation Failed", description: error instanceof Error ? error.message : "Could not generate diagram." });
+            } finally {
+                setIsGeneratingDiagram(false);
             }
-            updateProject(prev => ({
-                 ...prev,
-                 sections: updateSectionById(prev.sections, sectionIdToGenerate, {
-                    content: result.mermaidCode,
-                    lastGenerated: new Date().toISOString(),
-                 }),
-            }), true);
-            toast({ title: "Diagram Generated", description: `Mermaid code for "${targetSection.name}" created.` });
-         } catch (error) {
-             console.error("Diagram generation failed:", error);
-             toast({ variant: "destructive", title: "Diagram Generation Failed", description: error instanceof Error ? error.message : "Could not generate diagram." });
-         } finally {
-            setIsGeneratingDiagram(false);
-         }
-      } else {
-         setIsGenerating(true);
-         try {
-           const input = {
-             projectTitle: project.title || 'Untitled Project',
-             sectionName: targetSection.name,
-             prompt: targetSection.prompt,
-             teamDetails: project.teamDetails || '',
-             instituteName: project.instituteName || '',
-             teamId: project.teamId,
-             subject: project.subject,
-             semester: project.semester,
-             branch: project.branch,
-             guideName: project.guideName,
-           };
-           const result = await generateSectionAction(input);
-           if ('error' in result) {
-             throw new Error(result.error);
-           }
-           updateProject(prev => ({
-             ...prev,
-             sections: updateSectionById(prev.sections, sectionIdToGenerate, {
-               content: result.reportSectionContent,
-               lastGenerated: new Date().toISOString(),
-             }),
-           }), true);
-           toast({ title: "Section Generated", description: `"${targetSection.name}" content updated.` });
-         } catch (error) {
-           console.error("Generation failed:", error);
-           toast({ variant: "destructive", title: "Generation Failed", description: error instanceof Error ? error.message : "Could not generate content." });
-         } finally {
-           setIsGenerating(false);
-         }
-      }
+        } else {
+            setIsGenerating(true);
+            try {
+                const input = {
+                    projectTitle: project.title || 'Untitled Project',
+                    sectionName: targetSection.name,
+                    prompt: targetSection.prompt,
+                    teamDetails: project.teamDetails || '',
+                    instituteName: project.instituteName || '',
+                    teamId: project.teamId,
+                    subject: project.subject,
+                    semester: project.semester,
+                    branch: project.branch,
+                    guideName: project.guideName,
+                };
+                const result = await generateSectionAction(input);
+                if ('error' in result) {
+                    throw new Error(result.error);
+                }
+                updateProject(prev => ({
+                    ...prev,
+                    sections: updateSectionById(prev.sections, sectionIdToGenerate, {
+                        content: result.reportSectionContent,
+                        lastGenerated: new Date().toISOString(),
+                    }),
+                }), true);
+                toast({ title: "Section Generated", description: `"${targetSection.name}" content updated.` });
+            } catch (error) {
+                console.error("Generation failed:", error);
+                toast({ variant: "destructive", title: "Generation Failed", description: error instanceof Error ? error.message : "Could not generate content." });
+            } finally {
+                setIsGenerating(false);
+            }
+        }
     };
 
     const handleSummarizeSection = async (sectionIdToSummarize: string) => {
-      const targetSection = project ? findSectionById(project.sections, sectionIdToSummarize) : null;
-      if (!project || !targetSection || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting) return;
+        const targetSection = project ? findSectionById(project.sections, sectionIdToSummarize) : null;
+        if (!project || !targetSection || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting) return;
 
-       const isDiagram = targetSection.name.toLowerCase().startsWith("diagram:") || targetSection.name.toLowerCase().startsWith("figure");
-       if (isDiagram) {
+        const isDiagram = targetSection.name.toLowerCase().startsWith("diagram:") || targetSection.name.toLowerCase().startsWith("figure");
+        if (isDiagram) {
             toast({ variant: "destructive", title: "Cannot Summarize", description: "Diagram sections cannot be summarized." });
-           return;
-       }
-
-      if (!targetSection.content?.trim()) {
-        toast({ variant: "destructive", title: "Summarization Failed", description: "Section content is empty." });
-        return;
-      }
-      setIsSummarizing(true);
-      try {
-        const result = await summarizeSectionAction({
-          projectTitle: project.title,
-          sectionText: targetSection.content,
-        });
-        if ('error' in result) {
-          throw new Error(result.error);
+            return;
         }
-        toast({
-          title: `Summary for "${targetSection.name}"`,
-          description: (
-            <ScrollArea className="h-32 w-full">
-              <p className="text-sm">{result.summary}</p>
-            </ScrollArea>
-          ),
-          duration: 9000,
-        });
-      } catch (error) {
-        console.error("Summarization failed:", error);
-        toast({ variant: "destructive", title: "Summarization Failed", description: error instanceof Error ? error.message : "Could not summarize." });
-      } finally {
-        setIsSummarizing(false);
-      }
+
+        if (!targetSection.content?.trim()) {
+            toast({ variant: "destructive", title: "Summarization Failed", description: "Section content is empty." });
+            return;
+        }
+        setIsSummarizing(true);
+        try {
+            const result = await summarizeSectionAction({
+                projectTitle: project.title,
+                sectionText: targetSection.content,
+            });
+            if ('error' in result) {
+                throw new Error(result.error);
+            }
+            toast({
+                title: `Summary for "${targetSection.name}"`,
+                description: (
+                    <ScrollArea className="h-32 w-full">
+                        <p className="text-sm">{result.summary}</p>
+                    </ScrollArea>
+                ),
+                duration: 9000,
+            });
+        } catch (error) {
+            console.error("Summarization failed:", error);
+            toast({ variant: "destructive", title: "Summarization Failed", description: error instanceof Error ? error.message : "Could not summarize." });
+        } finally {
+            setIsSummarizing(false);
+        }
     };
 
     const handleGetSuggestions = async () => {
-     if (!project || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting) return;
-     setIsSuggesting(true);
-     setSuggestions(null);
-     try {
-        const flattenSections = (sections: HierarchicalProjectSection[], level = 0): string => {
-            return sections.map(s =>
-                `${'#'.repeat(level + 2)} ${s.name}\n\n${s.content || '[Empty Section]'}\n\n` +
-                (s.subSections ? flattenSections(s.subSections, level + 1) : '')
-            ).join('---\n\n');
-        };
+        if (!project || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting) return;
+        setIsSuggesting(true);
+        setSuggestions(null);
+        try {
+            const flattenSections = (sections: HierarchicalProjectSection[], level = 0): string => {
+                return sections.map(s =>
+                    `${'#'.repeat(level + 2)} ${s.name}\n\n${s.content || '[Empty Section]'}\n\n` +
+                    (s.subSections ? flattenSections(s.subSections, level + 1) : '')
+                ).join('---\n\n');
+            };
 
-       const currentSectionsContent = project.sections ? flattenSections(project.sections) : '';
+            const currentSectionsContent = project.sections ? flattenSections(project.sections) : '';
 
-       const suggestionActionInput = {
-         projectTitle: project.title,
-         projectContext: project.projectContext,
-         allSectionsContent: currentSectionsContent,
-         focusArea: suggestionInput || undefined,
-         existingSections: project.sections.map(s => s.name).join(', '),
-         projectType: project.projectType,
-       };
+            const suggestionActionInput = {
+                projectTitle: project.title,
+                projectContext: project.projectContext,
+                allSectionsContent: currentSectionsContent,
+                focusArea: suggestionInput || undefined,
+                existingSections: project.sections.map(s => s.name).join(', '),
+                projectType: project.projectType,
+            };
 
-       const result = await suggestImprovementsAction(suggestionActionInput);
-       if ('error' in result) {
-         throw new Error(result.error);
-       }
-       setSuggestions(result.suggestions);
-       toast({ title: "AI Suggestions Ready", description: "Suggestions for improvement generated." });
-     } catch (error) {
-       console.error("Suggestion generation failed:", error);
-       toast({ variant: "destructive", title: "Suggestion Failed", description: error instanceof Error ? error.message : "Could not generate suggestions." });
-     } finally {
-       setIsSuggesting(false);
-     }
-   };
+            const result = await suggestImprovementsAction(suggestionActionInput);
+            if ('error' in result) {
+                throw new Error(result.error);
+            }
+            setSuggestions(result.suggestions);
+            toast({ title: "AI Suggestions Ready", description: "Suggestions for improvement generated." });
+        } catch (error) {
+            console.error("Suggestion generation failed:", error);
+            toast({ variant: "destructive", title: "Suggestion Failed", description: error instanceof Error ? error.message : "Could not generate suggestions." });
+        } finally {
+            setIsSuggesting(false);
+        }
+    };
 
      const handleEditSectionName = (id: string, newName: string) => {
          if (!project) return;
@@ -826,29 +826,29 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
   const onFabMouseMove = useCallback((e: MouseEvent) => {
     if (!isDraggingFab || !fabRef.current) return;
-     const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
-     const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
-    let newX = e.clientX - dragOffset.current.x;
-    let newY = e.clientY - dragOffset.current.y;
-    const fabWidth = fabRef.current.offsetWidth;
-    const fabHeight = fabRef.current.offsetHeight;
-    const margin = 16;
+        const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+        const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
+        let newX = e.clientX - dragOffset.current.x;
+        let newY = e.clientY - dragOffset.current.y;
+        const fabWidth = fabRef.current.offsetWidth;
+        const fabHeight = fabRef.current.offsetHeight;
+        const margin = 16;
 
-    newX = Math.max(margin, Math.min(newX, vw - fabWidth - margin));
-    newY = Math.max(margin, Math.min(newY, vh - fabHeight - margin));
+        newX = Math.max(margin, Math.min(newX, vw - fabWidth - margin));
+        newY = Math.max(margin, Math.min(newY, vh - fabHeight - margin));
 
-    setFabPosition({ x: newX, y: newY });
-  }, [isDraggingFab]);
+        setFabPosition({ x: newX, y: newY });
+    }, [isDraggingFab]);
 
-  const onFabMouseUp = useCallback(() => {
-    if (isDraggingFab) {
-      setIsDraggingFab(false);
-      if (fabRef.current) {
-        fabRef.current.style.cursor = 'grab';
-      }
-      document.body.style.userSelect = '';
-    }
-  }, [isDraggingFab]);
+    const onFabMouseUp = useCallback(() => {
+        if (isDraggingFab) {
+            setIsDraggingFab(false);
+            if (fabRef.current) {
+                fabRef.current.style.cursor = 'grab';
+            }
+            document.body.style.userSelect = '';
+        }
+    }, [isDraggingFab]);
 
   useEffect(() => {
     if (isDraggingFab) {
@@ -863,7 +863,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
       window.removeEventListener('mouseup', onFabMouseUp);
       document.body.style.userSelect = '';
     };
-  }, [isDraggingFab, onFabMouseMove, onFabMouseUp]);
+  }, [onFabMouseMove, onFabMouseUp, isDraggingFab]);
 
   if (!hasMounted || isProjectFound === null) {
     return (
@@ -875,128 +875,128 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   }
 
   if (isProjectFound === false || !project) {
-      return (
-          <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,60px))] text-center p-4">
-            <CloudOff className="h-16 w-16 text-destructive mb-4" />
-            <h2 className="text-2xl font-semibold text-destructive mb-2">Project Not Found</h2>
-            <p className="text-muted-foreground mb-6">The project with ID <code className="bg-muted px-1 rounded">{projectId}</code> could not be found.</p>
-            <Button onClick={() => router.push('/')}><Home className="mr-2 h-4 w-4" /> Go to Dashboard</Button>
-          </div>
-       );
-  }
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,60px))] text-center p-4">
+                <CloudOff className="h-16 w-16 text-destructive mb-4" />
+                <h2 className="text-2xl font-semibold text-destructive mb-2">Project Not Found</h2>
+                <p className="text-muted-foreground mb-6">The project with ID <code className="bg-muted px-1 rounded">{projectId}</code> could not be found.</p>
+                <Button onClick={() => router.push('/')}><Home className="mr-2 h-4 w-4" /> Go to Dashboard</Button>
+            </div>
+        );
+    }
 
   let activeViewContent: React.ReactNode = null;
-  let activeViewName = project.title ?? 'Project';
-  let isStandardPage = false;
+    let activeViewName = project.title ?? 'Project';
+    let isStandardPage = false;
 
-  const currentActiveMainSection = activeSectionId ? findSectionById(project.sections, activeSectionId) : null;
-  const currentActiveSubSection = activeSubSectionId ? findSectionById(project.sections, activeSubSectionId) : null;
-  const isDiagramSection = currentActiveSubSection?.name.toLowerCase().startsWith("diagram:") || currentActiveSubSection?.name.toLowerCase().startsWith("figure:");
+    const currentActiveMainSection = activeSectionId ? findSectionById(project.sections, activeSectionId) : null;
+    const currentActiveSubSection = activeSubSectionId ? findSectionById(project.sections, activeSubSectionId) : null;
+    const isDiagramSection = currentActiveSubSection?.name.toLowerCase().startsWith("diagram:") || currentActiveSubSection?.name.toLowerCase().startsWith("figure:");
 
     if (activeSectionId === String(-1)) {
-      activeViewName = 'Project Details';
-      activeViewContent = (
+        activeViewName = 'Project Details';
+        activeViewContent = (
             <Card className="shadow-md mb-6">
-              <CardHeader>
-                <CardTitle className="text-glow-primary text-xl md:text-2xl">Project Details</CardTitle>
-                <CardDescription>Edit general information. Context helps AI generate relevant sections.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div>
-                  <Label htmlFor="projectTitleMain">Project Title *</Label>
-                  <Input id="projectTitleMain" value={project.title} onChange={(e) => handleProjectDetailChange('title', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="Enter Project Title" className="mt-1 focus-visible:glow-primary" required />
-                </div>
-                <div className="space-y-2">
-                    <Label>Project Type</Label>
-                    <RadioGroup value={project.projectType} onValueChange={(value: 'mini-project' | 'internship') => handleProjectTypeChange(value)} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-                      <div className="flex items-center space-x-2"> <RadioGroupItem value="mini-project" id="type-mini" /> <Label htmlFor="type-mini" className="cursor-pointer">Mini Project</Label> </div>
-                      <div className="flex items-center space-x-2"> <RadioGroupItem value="internship" id="type-internship" /> <Label htmlFor="type-internship" className="cursor-pointer">Internship</Label> </div>
-                    </RadioGroup>
-                </div>
-                <div>
-                  <Label htmlFor="projectContext">Project Context *</Label>
-                  <Textarea id="projectContext" value={project.projectContext} onChange={(e) => handleProjectDetailChange('projectContext', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="Briefly describe your project, its goals, scope, and key features or technologies involved." className="mt-1 min-h-[120px] focus-visible:glow-primary" required />
-                  <p className="text-xs text-muted-foreground mt-1">Crucial for AI section generation ({MIN_CONTEXT_WORDS}+ words, {MIN_CONTEXT_LENGTH}+ chars recommended).</p>
-                </div>
-                 <div className="grid grid-cols-2 gap-4">
-                     <CounterInput
-                         label="Min Sections (Outline)"
-                         value={project.minSections ?? 5}
-                         onChange={(val) => handleProjectDetailChange('minSections', val)}
-                         onBlur={handleProjectDetailBlur}
-                         min={1}
-                         inputId="min-sections-counter"
-                     />
-                     <CounterInput
-                         label="Max Sub-Section Depth"
-                         value={project.maxSubSectionsPerSection ?? 2}
-                         onChange={(val) => handleProjectDetailChange('maxSubSectionsPerSection', val)}
-                         onBlur={handleProjectDetailBlur}
-                         min={0}
-                         inputId="max-subsection-depth-counter"
-                     />
-                 </div>
-                 <p className="text-xs text-muted-foreground -mt-4">Control AI outline generation limits. Min sections aims for at least this many top-level sections. Max depth limits sub-section nesting (0=none, 1=1.1, 2=1.1.1).</p>
-
-                <div className="grid grid-cols-2 gap-4 md:gap-6">
-                    <LogoUpload label="University Logo" logoUrl={project.universityLogoUrl} field="universityLogoUrl" onUpload={handleLogoUpload} onRemove={handleRemoveLogo} isUploading={isUploadingLogo.universityLogoUrl} />
-                    <LogoUpload label="College Logo" logoUrl={project.collegeLogoUrl} field="collegeLogoUrl" onUpload={handleLogoUpload} onRemove={handleRemoveLogo} isUploading={isUploadingLogo.collegeLogoUrl} />
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div> <Label htmlFor="instituteName">Institute Name</Label> <Input id="instituteName" value={project.instituteName || ''} onChange={(e) => handleProjectDetailChange('instituteName', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="e.g., L. D. College of Engineering" className="mt-1"/> </div>
-                  <div> <Label htmlFor="branch">Branch</Label> <Input id="branch" value={project.branch || ''} onChange={(e) => handleProjectDetailChange('branch', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="e.g., Computer Engineering" className="mt-1"/> </div>
-                  <div> <Label htmlFor="semester">Semester</Label> <Input id="semester" value={project.semester || ''} onChange={(e) => handleProjectDetailChange('semester', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="e.g., 5" type="number" className="mt-1"/> </div>
-                  <div> <Label htmlFor="subject">Subject</Label> <Input id="subject" value={project.subject || ''} onChange={(e) => handleProjectDetailChange('subject', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="e.g., Design Engineering - 1A" className="mt-1"/> </div>
-                  <div> <Label htmlFor="hodName">HOD Name</Label> <Input id="hodName" value={project.hodName || ''} onChange={(e) => handleProjectDetailChange('hodName', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="Enter Head of Department's Name" className="mt-1"/> </div>
-                </div>
-                <Separator />
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div> <Label htmlFor="teamId">Team ID</Label> <Input id="teamId" value={project.teamId || ''} onChange={(e) => handleProjectDetailChange('teamId', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="Enter Team ID" className="mt-1"/> </div>
-                  <div> <Label htmlFor="guideName">Faculty Guide Name</Label> <Input id="guideName" value={project.guideName || ''} onChange={(e) => handleProjectDetailChange('guideName', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="Enter Guide's Name" className="mt-1"/> </div>
-                </div>
-                <div>
-                  <Label htmlFor="teamDetails">Team Details (Members & Enrollment)</Label>
-                  <Textarea id="teamDetails" value={project.teamDetails} onChange={(e) => handleProjectDetailChange('teamDetails', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="John Doe - 123456789&#10;Jane Smith - 987654321" className="mt-1 min-h-[120px] focus-visible:glow-primary"/>
-                  <p className="text-xs text-muted-foreground mt-1">One member per line.</p>
-                </div>
-              </CardContent>
-              <CardFooter className="flex flex-col items-start gap-4">
-                 <Button variant="default" size="sm" onClick={handleGenerateTocClick} disabled={isGeneratingOutline || isGenerating || isSummarizing || isSuggesting || !project.projectContext?.trim()} className="hover:glow-primary focus-visible:glow-primary">
-                    {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
-                    {isGeneratingOutline ? 'Generating Outline...' : 'Generate Outline Preview'}
-                 </Button>
-                 {previewedOutline && (
-                     <div className="w-full p-4 border rounded-md bg-muted/30 space-y-3">
-                         <h4 className="font-semibold text-foreground">Generated Outline Preview:</h4>
-                         <ScrollArea className="max-h-60">
-                            {previewedOutline.sections.map((item, index) => (
-                                <OutlinePreviewItem key={`preview-${index}`} item={item} level={0} />
-                            ))}
-                         </ScrollArea>
-                         <div className="flex gap-2">
-                             <Button
-                                 variant="default"
-                                 size="sm"
-                                 onClick={applyGeneratedOutline}
-                                 disabled={isGeneratingOutline}
-                                 className="hover:glow-accent focus-visible:glow-accent"
-                             >
-                                 <CheckCircle className="mr-2 h-4 w-4" /> Apply Outline
-                             </Button>
-                              <Button
-                                 variant="outline"
-                                 size="sm"
-                                 onClick={() => setPreviewedOutline(null)}
-                                 disabled={isGeneratingOutline}
-                              >
-                                  Discard Preview
-                              </Button>
-                         </div>
+                <CardHeader>
+                    <CardTitle className="text-glow-primary text-xl md:text-2xl">Project Details</CardTitle>
+                    <CardDescription>Edit general information. Context helps AI generate relevant sections.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    <div>
+                        <Label htmlFor="projectTitleMain">Project Title *</Label>
+                        <Input id="projectTitleMain" value={project.title} onChange={(e) => handleProjectDetailChange('title', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="Enter Project Title" className="mt-1 focus-visible:glow-primary" required />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Project Type</Label>
+                        <RadioGroup value={project.projectType} onValueChange={(value: 'mini-project' | 'internship') => handleProjectTypeChange(value)} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                            <div className="flex items-center space-x-2"> <RadioGroupItem value="mini-project" id="type-mini" /> <Label htmlFor="type-mini" className="cursor-pointer">Mini Project</Label> </div>
+                            <div className="flex items-center space-x-2"> <RadioGroupItem value="internship" id="type-internship" /> <Label htmlFor="type-internship" className="cursor-pointer">Internship</Label> </div>
+                        </RadioGroup>
+                    </div>
+                    <div>
+                        <Label htmlFor="projectContext">Project Context *</Label>
+                        <Textarea id="projectContext" value={project.projectContext} onChange={(e) => handleProjectDetailChange('projectContext', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="Briefly describe your project, its goals, scope, and key features or technologies involved." className="mt-1 min-h-[120px] focus-visible:glow-primary" required />
+                        <p className="text-xs text-muted-foreground mt-1">Crucial for AI section generation ({MIN_CONTEXT_WORDS}+ words, {MIN_CONTEXT_LENGTH}+ chars recommended).</p>
+                    </div>
+                     <div className="grid grid-cols-2 gap-4">
+                         <CounterInput
+                             label="Min Sections (Outline)"
+                             value={project.minSections ?? 5}
+                             onChange={(val) => handleProjectDetailChange('minSections', val)}
+                             onBlur={handleProjectDetailBlur}
+                             min={1}
+                             inputId="min-sections-counter"
+                         />
+                         <CounterInput
+                             label="Max Sub-Section Depth"
+                             value={project.maxSubSectionsPerSection ?? 2}
+                             onChange={(val) => handleProjectDetailChange('maxSubSectionsPerSection', val)}
+                             onBlur={handleProjectDetailBlur}
+                             min={0}
+                             inputId="max-subsection-depth-counter"
+                         />
                      </div>
-                 )}
-              </CardFooter>
+                     <p className="text-xs text-muted-foreground -mt-4">Control AI outline generation limits. Min sections aims for at least this many top-level sections. Max depth limits sub-section nesting (0=none, 1=1.1, 2=1.1.1).</p>
+
+                    <div className="grid grid-cols-2 gap-4 md:gap-6">
+                        <LogoUpload label="University Logo" logoUrl={project.universityLogoUrl} field="universityLogoUrl" onUpload={handleLogoUpload} onRemove={handleRemoveLogo} isUploading={isUploadingLogo.universityLogoUrl} />
+                        <LogoUpload label="College Logo" logoUrl={project.collegeLogoUrl} field="collegeLogoUrl" onUpload={handleLogoUpload} onRemove={handleRemoveLogo} isUploading={isUploadingLogo.collegeLogoUrl} />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div> <Label htmlFor="instituteName">Institute Name</Label> <Input id="instituteName" value={project.instituteName || ''} onChange={(e) => handleProjectDetailChange('instituteName', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="e.g., L. D. College of Engineering" className="mt-1"/> </div>
+                        <div> <Label htmlFor="branch">Branch</Label> <Input id="branch" value={project.branch || ''} onChange={(e) => handleProjectDetailChange('branch', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="e.g., Computer Engineering" className="mt-1"/> </div>
+                        <div> <Label htmlFor="semester">Semester</Label> <Input id="semester" value={project.semester || ''} onChange={(e) => handleProjectDetailChange('semester', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="e.g., 5" type="number" className="mt-1"/> </div>
+                        <div> <Label htmlFor="subject">Subject</Label> <Input id="subject" value={project.subject || ''} onChange={(e) => handleProjectDetailChange('subject', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="e.g., Design Engineering - 1A" className="mt-1"/> </div>
+                        <div> <Label htmlFor="hodName">HOD Name</Label> <Input id="hodName" value={project.hodName || ''} onChange={(e) => handleProjectDetailChange('hodName', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="Enter Head of Department's Name" className="mt-1"/> </div>
+                    </div>
+                    <Separator />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div> <Label htmlFor="teamId">Team ID</Label> <Input id="teamId" value={project.teamId || ''} onChange={(e) => handleProjectDetailChange('teamId', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="Enter Team ID" className="mt-1"/> </div>
+                        <div> <Label htmlFor="guideName">Faculty Guide Name</Label> <Input id="guideName" value={project.guideName || ''} onChange={(e) => handleProjectDetailChange('guideName', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="Enter Guide's Name" className="mt-1"/> </div>
+                    </div>
+                    <div>
+                        <Label htmlFor="teamDetails">Team Details (Members & Enrollment)</Label>
+                        <Textarea id="teamDetails" value={project.teamDetails} onChange={(e) => handleProjectDetailChange('teamDetails', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="John Doe - 123456789&#10;Jane Smith - 987654321" className="mt-1 min-h-[120px] focus-visible:glow-primary"/>
+                        <p className="text-xs text-muted-foreground mt-1">One member per line.</p>
+                    </div>
+                </CardContent>
+                <CardFooter className="flex flex-col items-start gap-4">
+                     <Button variant="default" size="sm" onClick={handleGenerateTocClick} disabled={isGeneratingOutline || isGenerating || isSummarizing || isSuggesting || !project.projectContext?.trim()} className="hover:glow-primary focus-visible:glow-primary">
+                        {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
+                        {isGeneratingOutline ? 'Generating Outline...' : 'Generate Outline Preview'}
+                     </Button>
+                     {previewedOutline && (
+                         <div className="w-full p-4 border rounded-md bg-muted/30 space-y-3">
+                             <h4 className="font-semibold text-foreground">Generated Outline Preview:</h4>
+                             <ScrollArea className="max-h-60">
+                                {previewedOutline.sections.map((item, index) => (
+                                    <OutlinePreviewItem key={`preview-${index}`} item={item} level={0} />
+                                ))}
+                             </ScrollArea>
+                             <div className="flex gap-2">
+                                 <Button
+                                     variant="default"
+                                     size="sm"
+                                     onClick={applyGeneratedOutline}
+                                     disabled={isGeneratingOutline}
+                                     className="hover:glow-accent focus-visible:glow-accent"
+                                 >
+                                     <CheckCircle className="mr-2 h-4 w-4" /> Apply Outline
+                                 </Button>
+                                  <Button
+                                     variant="outline"
+                                     size="sm"
+                                     onClick={() => setPreviewedOutline(null)}
+                                     disabled={isGeneratingOutline}
+                                  >
+                                      Discard Preview
+                                  </Button>
+                             </div>
+                         </div>
+                     )}
+                </CardFooter>
             </Card>
-      );
+        );
     } else if (currentActiveSubSection) {
         activeViewName = currentActiveSubSection.name;
         if (isDiagramSection) {
@@ -1004,7 +1004,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                <div className="space-y-6">
                    <Card className="shadow-md">
                      <CardHeader>
-                       <CardTitle className="text-primary text-glow-primary flex items-center gap-2 text-lg md:text-xl"> <Projector className="w-5 h-5"/> {currentActiveSubSection.name} - Diagram</CardTitle>
+                       <CardTitle className="flex items-center gap-2 text-lg md:text-xl text-primary text-glow-primary"> <Projector className="w-5 h-5"/> {currentActiveSubSection.name} - Diagram</CardTitle>
                        {currentActiveSubSection.lastGenerated && ( <CardDescription className="text-xs md:text-sm">Last generated: {new Date(currentActiveSubSection.lastGenerated).toLocaleString()}</CardDescription> )}
                      </CardHeader>
                      <CardContent className="space-y-4">
@@ -1182,7 +1182,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
 
         <div className="flex-1 flex flex-col overflow-hidden">
-          <header className="sticky top-0 z-10 flex h-14 items-center gap-2 sm:gap-4 border-b bg-background/95 backdrop-blur-sm px-3 sm:px-4 lg:px-6 flex-shrink-0">
+          <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/95 backdrop-blur-sm px-4 lg:px-6 flex-shrink-0">
             <h1 className="flex-1 text-base sm:text-lg font-semibold md:text-xl text-primary truncate text-glow-primary">
                {activeViewName}
             </h1>
@@ -1194,9 +1194,9 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
               <Download className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
               <span className="hidden sm:inline">Export</span> Report
             </Button>
-             <Button variant="ghost" size="sm" onClick={() => router.push('/')} className="text-xs px-2 sm:px-3 py-1 h-auto">
+              <Button variant="ghost" size="sm" onClick={() => router.push('/')} className="text-xs px-2 sm:px-3 py-1 h-auto">
                 <Home className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4"/> Dashboard
-             </Button>
+              </Button>
           </header>
 
           <ScrollArea className="flex-1 p-3 sm:p-4 md:p-6">
@@ -1239,7 +1239,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                  onMouseDown={onFabMouseDown}
                  onClick={(e) => {
                      if (!isDraggingFab) {
-                        setIsMobileSheetOpen(true);
+                         setIsMobileSheetOpen(true);
                      }
                  }}
                  title="Open project menu"
