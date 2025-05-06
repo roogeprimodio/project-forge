@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -47,7 +46,7 @@ export default function DashboardPage() {
             <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-primary text-glow-primary">Your Projects</h1>
             <CreateProjectDialog onCreateProject={handleCreateProject}>
                 {/* Adjusted button size for mobile */}
-                <Button size="default" className="hover:glow-primary focus-visible:glow-primary text-sm sm:text-base w-full sm:w-auto">
+                <Button size="default" className="hover:glow-primary focus-visible:glow-primary text-sm sm:text-base w-full sm:w-auto h-9 sm:h-10">
                   <PlusCircle className="mr-2 h-4 w-4 sm:h-5 sm:w-5" /> Create New Project
                 </Button>
             </CreateProjectDialog>
