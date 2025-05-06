@@ -31,7 +31,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { updateProject as updateProjectHelper } from '@/lib/project-utils';
 import MarkdownPreview from './markdown-preview';
 import { CombinedSectionPreview } from './combined-section-preview';
-import { StandardPagePreview } from './standard-page-preview'; // Import the new component
+import { StandardPagePreview } from './standard-page-preview';
 
 // Recursive component to render the preview outline
 const OutlinePreviewItem: React.FC<{ item: OutlineSection; level: number }> = ({ item, level }) => {
@@ -173,12 +173,13 @@ const LogoUpload = ({
     );
 };
 
-const CounterInput = ({ label, value, onChange, onBlur, min = 0 }: {
+const CounterInput = ({ label, value, onChange, onBlur, min = 0, inputId }: {
     label: string;
     value: number;
     onChange: (value: number) => void;
     onBlur?: () => void;
     min?: number;
+    inputId: string;
 }) => {
     const handleIncrement = () => onChange(value + 1);
     const handleDecrement = () => onChange(Math.max(min, value - 1));
@@ -188,13 +189,14 @@ const CounterInput = ({ label, value, onChange, onBlur, min = 0 }: {
         if (!isNaN(numValue)) {
             onChange(Math.max(min, numValue));
         } else if (e.target.value === '') {
+            // If input is cleared, reset to min or a sensible default, e.g., 0 or props.min
             onChange(min);
         }
     };
 
     return (
         <div>
-            <Label htmlFor={`counter-${label.toLowerCase().replace(/\s+/g, '-')}`}>{label}</Label>
+            <Label htmlFor={inputId}>{label}</Label>
             <div className="flex items-center gap-1 mt-1">
                 <Button
                     type="button"
@@ -207,7 +209,7 @@ const CounterInput = ({ label, value, onChange, onBlur, min = 0 }: {
                     <Minus className="h-4 w-4" />
                 </Button>
                 <Input
-                    id={`counter-${label.toLowerCase().replace(/\s+/g, '-')}`}
+                    id={inputId}
                     type="number"
                     value={value}
                     onChange={handleInputChange}
@@ -257,6 +259,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const fabRef = useRef<HTMLButtonElement>(null);
   const dragOffset = useRef({ x: 0, y: 0 });
   const [isGeneratingDiagram, setIsGeneratingDiagram] = useState(false);
+  const [sectionToDelete, setSectionToDelete] = useState<string | null>(null); // Initialize state
 
   const [activeSubSectionId, setActiveSubSectionId] = useState<string | null>(null);
 
@@ -396,7 +399,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         if (!isNaN(numValue)) {
              updateProject({ [field]: Math.max(0, numValue) }, false);
         } else if (value === '') {
-             updateProject({ [field]: 0 }, false);
+             updateProject({ [field]: 0 }, false); // Or keep as is, or set to min
         }
     } else {
         console.warn(`Attempted to update field ${String(field)} with incompatible value type: ${typeof value}`);
@@ -452,13 +455,13 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             return;
         }
          const convertOutlineToSections = (outlineSections: OutlineSection[], level = 0, parentNumbering = ''): HierarchicalProjectSection[] => {
-            const limitedTopLevel = level === 0 ? outlineSections.slice(0, project.minSections || 5) : outlineSections;
+            const limitedTopLevel = level === 0 ? outlineSections.slice(0, project.minSections ?? 5) : outlineSections;
              return limitedTopLevel.map((outlineSection, index) => {
                  const currentNumber = parentNumbering ? `${parentNumbering}.${index + 1}` : `${index + 1}`;
                  const newId = uuidv4();
                  const isDiagram = outlineSection.name.toLowerCase().startsWith("diagram:") || outlineSection.name.toLowerCase().startsWith("figure");
                  let subSections: HierarchicalProjectSection[] = [];
-                 if (outlineSection.subSections && level < (project.maxSubSectionsPerSection || 2)) {
+                 if (outlineSection.subSections && level < (project.maxSubSectionsPerSection ?? 2)) {
                      subSections = convertOutlineToSections(outlineSection.subSections, level + 1, currentNumber);
                  } else if (outlineSection.subSections) {
                      console.warn(`Subsections for "${outlineSection.name}" ignored due to depth limit.`);
@@ -505,8 +508,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             const result = await generateOutlineAction({
                 projectTitle: project.title,
                 projectContext: project.projectContext || '',
-                minSections: project.minSections,
-                maxSubSectionsPerSection: project.maxSubSectionsPerSection,
+                minSections: project.minSections ?? 5,
+                maxSubSectionsPerSection: project.maxSubSectionsPerSection ?? 2,
             });
             if (result && typeof result === 'object' && 'error' in result) {
                 toast({ variant: "destructive", title: "Outline Generation Failed", description: result.error || "An unknown error occurred from the AI." });
@@ -879,6 +882,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                          onChange={(val) => handleProjectDetailChange('minSections', val)}
                          onBlur={handleProjectDetailBlur}
                          min={1}
+                         inputId="min-sections-counter"
                      />
                      <CounterInput
                          label="Max Sub-Section Depth"
@@ -886,6 +890,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                          onChange={(val) => handleProjectDetailChange('maxSubSectionsPerSection', val)}
                          onBlur={handleProjectDetailBlur}
                          min={0}
+                         inputId="max-subsection-depth-counter"
                      />
                  </div>
                  <p className="text-xs text-muted-foreground -mt-4">Control AI outline generation limits. Min sections aims for at least this many top-level sections. Max depth limits sub-section nesting (0=none, 1=1.1, 2=1.1.1).</p>
@@ -1065,38 +1070,10 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   return (
     <Sheet open={isMobileSheetOpen} onOpenChange={setIsMobileSheetOpen}>
       <div className="flex h-full relative">
-        <SheetContent side="left" className="p-0 w-72 sm:w-80 bg-card md:hidden">
-          <SheetHeader className="p-4 border-b">
-            <SheetTitle>Project Menu</SheetTitle>
-            <SheetDescription>Navigate and manage your project.</SheetDescription>
-          </SheetHeader>
-          <ProjectSidebarContent
-            project={project}
-            updateProject={updateProject}
-            activeSectionId={activeSectionId}
-            setActiveSectionId={handleSetActiveSection}
-            handleGenerateTocClick={handleGenerateTocClick}
-            isGeneratingOutline={isGeneratingOutline}
-            isGenerating={isGenerating}
-            isSummarizing={isSummarizing}
-            isSuggesting={isSuggesting}
-            handleSaveOnline={handleSaveOnline}
-            canUndo={canUndo}
-            handleUndo={handleUndo}
-            onCloseSheet={() => setIsMobileSheetOpen(false)}
-            isEditingSections={isEditingSections}
-            setIsEditingSections={setIsEditingSections}
-            onEditSectionName={handleEditSectionName}
-            onDeleteSection={handleDeleteSection}
-            handleAddNewSection={handleAddNewSection}
-            activeSubSectionId={activeSubSectionId}
-            setActiveSubSectionId={setActiveSubSectionId}
-          />
-        </SheetContent>
-
+        {/* Desktop Sidebar - Always visible */}
         <div className={cn(
              "hidden md:flex md:flex-col transition-all duration-300 ease-in-out overflow-y-auto overflow-x-hidden",
-             "w-72 lg:w-80 border-r bg-card"
+             "w-72 lg:w-80 border-r bg-card" // Standard width for desktop
          )}>
             <ProjectSidebarContent
                 project={project}
@@ -1121,6 +1098,37 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             />
         </div>
 
+        {/* Mobile Sidebar - Sheet */}
+        <SheetContent side="left" className="p-0 w-72 sm:w-80 bg-card md:hidden">
+           <SheetHeader className="p-4 border-b">
+             <SheetTitle>Project Menu</SheetTitle>
+             <SheetDescription>Navigate and manage your project sections.</SheetDescription>
+           </SheetHeader>
+            <ProjectSidebarContent
+                project={project}
+                updateProject={updateProject}
+                activeSectionId={activeSectionId}
+                setActiveSectionId={handleSetActiveSection}
+                handleGenerateTocClick={handleGenerateTocClick}
+                isGeneratingOutline={isGeneratingOutline}
+                isGenerating={isGenerating}
+                isSummarizing={isSummarizing}
+                isSuggesting={isSuggesting}
+                handleSaveOnline={handleSaveOnline}
+                canUndo={canUndo}
+                handleUndo={handleUndo}
+                onCloseSheet={() => setIsMobileSheetOpen(false)}
+                isEditingSections={isEditingSections}
+                setIsEditingSections={setIsEditingSections}
+                onEditSectionName={handleEditSectionName}
+                onDeleteSection={handleDeleteSection}
+                handleAddNewSection={handleAddNewSection}
+                activeSubSectionId={activeSubSectionId}
+                setActiveSubSectionId={setActiveSubSectionId}
+            />
+        </SheetContent>
+
+
         <div className="flex-1 flex flex-col overflow-hidden">
           <header className="sticky top-0 z-10 flex h-14 items-center gap-2 sm:gap-4 border-b bg-background/95 backdrop-blur-sm px-3 sm:px-4 lg:px-6 flex-shrink-0">
             <h1 className="flex-1 text-base sm:text-lg font-semibold md:text-xl text-primary truncate text-glow-primary">
@@ -1141,6 +1149,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
           <ScrollArea className="flex-1 p-3 sm:p-4 md:p-6">
               {activeViewContent}
+             {/* AI Suggestions Section - Moved outside conditional content rendering */}
              <Card className="shadow-md mt-6">
                  <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-lg md:text-xl text-primary text-glow-primary"><Sparkles className="w-5 h-5" /> AI Suggestions</CardTitle>
@@ -1166,6 +1175,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
           </ScrollArea>
         </div>
 
+         {/* FAB for Mobile Sheet Trigger */}
          <SheetTrigger asChild>
              <Button
                  ref={fabRef}
@@ -1173,12 +1183,12 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                  size="icon"
                  className={cn(
                      "fixed z-20 rounded-full shadow-lg w-12 h-12 sm:w-14 sm:h-14 hover:glow-primary focus-visible:glow-primary cursor-grab active:cursor-grabbing",
-                     "md:hidden"
+                     "md:hidden" // Hide on medium and larger screens
                  )}
                  style={{ left: `${fabPosition.x}px`, top: `${fabPosition.y}px`, position: 'fixed' }}
                  onMouseDown={onFabMouseDown}
                  onClick={(e) => {
-                     if (!isDraggingFab) {
+                     if (!isDraggingFab) { // Prevent sheet opening while dragging
                         setIsMobileSheetOpen(true);
                      }
                  }}
@@ -1189,6 +1199,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
              </Button>
          </SheetTrigger>
 
+        {/* Alert Dialog for Outline Context Warning */}
         <AlertDialog open={showOutlineContextAlert} onOpenChange={setShowOutlineContextAlert}>
           <AlertDialogContent>
             <AlertDialogHeader> <AlertDialogTitle>Project Context May Be Limited</AlertDialogTitle> <AlertDialogDescription> The project context is short ({project?.projectContext?.trim().split(/\s+/).filter(Boolean).length || 0} words). Generating an accurate outline might be difficult. Consider adding more details. Proceed anyway? </AlertDialogDescription> </AlertDialogHeader>
@@ -1196,6 +1207,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
           </AlertDialogContent>
         </AlertDialog>
 
+         {/* Alert Dialog for Deleting a Section */}
          <AlertDialog open={!!sectionToDelete} onOpenChange={(open) => !open && setSectionToDelete(null)}>
            <AlertDialogContent>
              <AlertDialogHeader> <AlertDialogTitle>Delete Section?</AlertDialogTitle> <AlertDialogDescription> Are you sure you want to delete "{sectionToDelete ? findSectionById(project.sections, sectionToDelete)?.name : ''}" and its sub-sections? This cannot be undone. </AlertDialogDescription> </AlertDialogHeader>
