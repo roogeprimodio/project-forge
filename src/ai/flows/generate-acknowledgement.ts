@@ -16,8 +16,8 @@ const GenerateAcknowledgementInputSchema = z.object({
   instituteName: z.string().describe('The name of the institute or college.'),
   branch: z.string().describe('The branch or department.'),
   hodName: z.string().optional().describe('The name of the Head of Department (optional).'),
-  teamDetails: z.string().describe('Team member names (e.g., "John Doe\\nJane Smith"). Each member on a new line. Used to determine if "I" or "We" should be used.'),
-  additionalThanks: z.string().optional().describe('Any specific individuals, groups, or resources the student(s) want to thank additionally (e.g., "librarian for resources", "lab assistant for technical help", "parents for support").'),
+  teamDetails: z.string().describe('Team member names and enrollment numbers (e.g., "John Doe - 12345\\nJane Smith - 67890"). Each member on a new line. Used to determine if "I" or "We" should be used and for the signature.'),
+  additionalThanks: z.string().optional().describe('Any specific individuals, groups, or resources the student(s) want to thank additionally (e.g., "librarian for resources", "lab assistant for technical help", "parents for support", "friend Amit Sharma for constant supervision").'),
 });
 export type GenerateAcknowledgementInput = z.infer<typeof GenerateAcknowledgementInputSchema>;
 
@@ -32,49 +32,42 @@ export async function generateAcknowledgement(input: GenerateAcknowledgementInpu
 
 const prompt = ai.definePrompt({
   name: 'generateAcknowledgementPrompt',
-  input: { schema: GenerateAcknowledgementInputSchema },
+  input: { schema: GenerateAcknowledgementInputSchema.extend({ teamDetailsLines: z.array(z.string()).optional() }) },
   output: { schema: GenerateAcknowledgementOutputSchema },
-  prompt: `You are an AI assistant tasked with writing a heartfelt and professional acknowledgement section for a student project report in Markdown format.
+  prompt: `You are an AI assistant tasked with writing a heartfelt and professional acknowledgement section for a student project report in Markdown format, similar to the provided example.
 
-  **Project & People Details:**
+  **Example Content (for tone and structure reference):**
+  "This project has taken a lot of time and work on my part. However, it would not have been possible without the kind support and cooperation of many individuals and organizations. I'd like to take this opportunity to thank each of you personally.
+
+  I owe a lot to Ms. Kinjal and my friend Amit Sharma for their guidance and constant supervision, as well as for providing important project specifics. As a way of expressing my gratitude for their steadfast support and assistance throughout our project's preparation, all my friends and colleagues who started the conversation as well as those who contributed critical review input are being recognized here. Our college's Prof. Kinjal Bagariya provided me with all the resources I needed and a welcoming work environment, and for that I am grateful.
+
+  To the Head of the Department, Prof. Ajay Bariya I would like to express my gratitude for his cordial collaboration and support in my Endeavor.
+
+  With sincere regards,
+
+  Jagadish Odedara (210640107001)"
+
+  **Project & People Details (Use these to customize):**
   - Project Title: {{{projectTitle}}}
   - Project Guide: {{{guideName}}}
   - Institute: {{{instituteName}}}
   - Branch/Department: {{{branch}}}
   {{#if hodName}}- Head of Department: {{{hodName}}}{{/if}}
-  - Team Members (to determine "I" vs "We"):
+  - Team Members & Enrollment (for signature and "I" vs "We" pronoun):
     {{{teamDetails}}}
   {{#if additionalThanks}}- Specific people/groups to thank: {{{additionalThanks}}}{{/if}}
 
   **Instructions for Generating the Acknowledgement:**
-  1.  Use a sincere and appreciative tone.
-  2.  Start by expressing gratitude to the project guide, **{{{guideName}}}**, for their guidance, support, and mentorship.
-  3.  Thank the **{{{instituteName}}}** and the Department of **{{{branch}}}** (and the Head of Department, **{{#if hodName}}{{{hodName}}}{{else}}[HOD Name]{{/if}}**, if provided) for providing the necessary facilities and environment.
-  4.  If specific additional thanks ({{{additionalThanks}}}) are provided, incorporate them naturally (e.g., thanking family, friends, specific faculty, or staff).
-  5.  Use "I" or "We" appropriately based on the number of team members implied by \`teamDetails\` (if multiple lines/names, use "We"; otherwise, use "I").
-  6.  Conclude with a general expression of gratitude.
-  7.  The output should be well-formatted Markdown.
-  8.  Do NOT include a heading like "# Acknowledgement" in the output; only provide the acknowledgement text itself.
-  9.  Output ONLY the Markdown paragraph(s) for the acknowledgement. No extra text or explanations.
-
-  **Example (if "We" is appropriate):**
-  "We would like to express our sincere gratitude to our project guide, {{{guideName}}}, for their invaluable guidance, constant encouragement, and insightful feedback throughout the duration of this project. His/Her expertise and support were instrumental in navigating the complexities of '{{{projectTitle}}}'.
-  
-  We extend our heartfelt thanks to the Department of {{{branch}}} and {{{instituteName}}} for providing us with the necessary resources and a conducive academic environment. {{#if hodName}}We are also grateful to Prof. {{{hodName}}}, Head of the Department, for their support.{{/if}}
-  
-  {{#if additionalThanks}}We would also like to thank {{{additionalThanks}}}.{{/if}}
-  
-  Finally, we are immensely grateful to our parents, friends, and well-wishers for their unwavering support and understanding during this endeavor."
-
-  **Example (if "I" is appropriate):**
-  "I would like to express my sincere gratitude to my project guide, {{{guideName}}}, for their invaluable guidance, constant encouragement, and insightful feedback throughout the duration of this project. His/Her expertise and support were instrumental in navigating the complexities of '{{{projectTitle}}}'.
-  
-  I extend my heartfelt thanks to the Department of {{{branch}}} and {{{instituteName}}} for providing me with the necessary resources and a conducive academic environment. {{#if hodName}}I am also grateful to Prof. {{{hodName}}}, Head of the Department, for their support.{{/if}}
-  
-  {{#if additionalThanks}}I would also like tothank {{{additionalThanks}}}.{{/if}}
-  
-  Finally, I am immensely grateful to my parents, friends, and well-wishers for their unwavering support and understanding during this endeavor."
-
+  1.  Use a sincere, appreciative, and formal tone.
+  2.  The output should be well-formatted Markdown.
+  3.  Start with a general statement about the effort and support received.
+  4.  Specifically thank the project guide, **{{{guideName}}}**, for their guidance, support, and mentorship.
+  5.  Thank the **{{{instituteName}}}** and the Department of **{{{branch}}}**. If a Head of Department (HOD) name ({{{hodName}}}) is provided, thank them explicitly.
+  6.  If specific additional thanks ({{{additionalThanks}}}) are provided, incorporate them naturally. This could include friends, family, specific faculty, or staff.
+  7.  Use "I" or "We" (and corresponding possessives like "my"/"our") appropriately based on the number of team members implied by \`teamDetails\` (if multiple lines/names, use "We"; otherwise, use "I").
+  8.  Conclude with a closing like "With sincere regards," or similar, followed by the names and enrollment numbers of all team members (from \`teamDetailsLines\`). Each member on a new line.
+  9.  Do NOT include a heading like "# Acknowledgement" in the output; only provide the acknowledgement text itself.
+  10. Output ONLY the Markdown content for the acknowledgement. No extra text or explanations.
 
   Generate the acknowledgement now.
   `,
@@ -87,17 +80,16 @@ const generateAcknowledgementFlow = ai.defineFlow(
     outputSchema: GenerateAcknowledgementOutputSchema,
   },
   async input => {
-     // Simple logic to determine "I" vs "We" based on teamDetails
-    const isPlural = input.teamDetails.split('\n').filter(line => line.trim() !== '').length > 1;
-    const pronoun = isPlural ? "We" : "I";
-    const possessivePronoun = isPlural ? "our" : "my";
+    // Pre-process teamDetails into an array of lines for easier use in Handlebars
+    const teamDetailsLines = input.teamDetails.split('\n').filter(line => line.trim() !== '');
     
-    // Pass these to the prompt, though the prompt itself is also trying to infer.
-    // This explicit passing can be used if Handlebars helpers were more advanced.
-    // For now, the prompt uses conditional logic based on teamDetails structure.
-    const processedInput = { ...input, pronoun, possessivePronoun };
+    const processedInput = {
+      ...input,
+      teamDetailsLines: teamDetailsLines
+    };
 
     const { output } = await prompt(processedInput);
     return output!;
   }
 );
+
