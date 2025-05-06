@@ -24,8 +24,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { marked } from 'marked';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { v4 as uuidv4 } from 'uuid';
-import AiDiagramGenerator from './ai-diagram-generator';
-import MermaidDiagram from './mermaid-diagram';
+import AiDiagramGenerator from '@/components/ai-diagram-generator';
+import MermaidDiagram from '@/components/mermaid-diagram';
 import { ProjectSidebarContent } from '@/components/project-sidebar-content'; // Correct import path
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // Import Tabs
 import { updateProject as updateProjectHelper } from '@/lib/project-utils'; // Import the helper function
