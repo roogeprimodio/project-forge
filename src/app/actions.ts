@@ -11,6 +11,13 @@ import type { SuggestImprovementsOutput } from '@/ai/flows/suggest-improvements'
 import { generateDiagramMermaid, GenerateDiagramMermaidInput } from '@/ai/flows/generate-diagram-mermaid'; // Import diagram flow
 import type { GenerateDiagramMermaidOutput } from '@/ai/flows/generate-diagram-mermaid'; // Import diagram flow types
 
+// Import new flows for standard pages
+import { generateCoverPage, GenerateCoverPageInput, GenerateCoverPageOutput } from '@/ai/flows/generate-cover-page';
+import { generateCertificate, GenerateCertificateInput, GenerateCertificateOutput } from '@/ai/flows/generate-certificate';
+import { generateDeclaration, GenerateDeclarationInput, GenerateDeclarationOutput } from '@/ai/flows/generate-declaration';
+import { generateAbstract, GenerateAbstractInput, GenerateAbstractOutput } from '@/ai/flows/generate-abstract';
+import { generateAcknowledgement, GenerateAcknowledgementInput, GenerateAcknowledgementOutput } from '@/ai/flows/generate-acknowledgement';
+
 
 /**
  * Server action to generate a report section using the AI flow.
@@ -120,4 +127,56 @@ export async function generateDiagramAction(input: GenerateDiagramMermaidInput):
     const errorMessage = error instanceof Error ? error.message : "An unknown error occurred during diagram generation.";
     return { error: errorMessage };
   }
+}
+
+// New Server Actions for Standard Pages
+
+export async function generateCoverPageAction(input: GenerateCoverPageInput): Promise<GenerateCoverPageOutput | { error: string }> {
+    try {
+        const result = await generateCoverPage(input);
+        return result;
+    } catch (error) {
+        console.error("Error generating cover page:", error);
+        return { error: error instanceof Error ? error.message : "Failed to generate cover page." };
+    }
+}
+
+export async function generateCertificateAction(input: GenerateCertificateInput): Promise<GenerateCertificateOutput | { error: string }> {
+    try {
+        const result = await generateCertificate(input);
+        return result;
+    } catch (error) {
+        console.error("Error generating certificate:", error);
+        return { error: error instanceof Error ? error.message : "Failed to generate certificate." };
+    }
+}
+
+export async function generateDeclarationAction(input: GenerateDeclarationInput): Promise<GenerateDeclarationOutput | { error: string }> {
+    try {
+        const result = await generateDeclaration(input);
+        return result;
+    } catch (error) {
+        console.error("Error generating declaration:", error);
+        return { error: error instanceof Error ? error.message : "Failed to generate declaration." };
+    }
+}
+
+export async function generateAbstractAction(input: GenerateAbstractInput): Promise<GenerateAbstractOutput | { error: string }> {
+    try {
+        const result = await generateAbstract(input);
+        return result;
+    } catch (error) {
+        console.error("Error generating abstract:", error);
+        return { error: error instanceof Error ? error.message : "Failed to generate abstract." };
+    }
+}
+
+export async function generateAcknowledgementAction(input: GenerateAcknowledgementInput): Promise<GenerateAcknowledgementOutput | { error: string }> {
+    try {
+        const result = await generateAcknowledgement(input);
+        return result;
+    } catch (error) {
+        console.error("Error generating acknowledgement:", error);
+        return { error: error instanceof Error ? error.message : "Failed to generate acknowledgement." };
+    }
 }

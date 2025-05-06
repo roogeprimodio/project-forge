@@ -35,6 +35,7 @@ export interface Project {
   semester?: string;
   branch?: string;
   guideName?: string;
+  hodName?: string; // Head of Department Name
   sections: HierarchicalProjectSection[]; // Use hierarchical structure
   createdAt: Date | string;
   updatedAt: Date | string;

@@ -24,19 +24,20 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { marked } from 'marked';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { v4 as uuidv4 } from 'uuid';
-import AiDiagramGenerator from './ai-diagram-generator';
-import MermaidDiagram from './mermaid-diagram';
-import { ProjectSidebarContent } from './project-sidebar-content';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { updateProject as updateProjectHelper } from '@/lib/project-utils';
+import AiDiagramGenerator from './ai-diagram-generator'; // Import the new component
+import MermaidDiagram from './mermaid-diagram'; // Import diagram renderer
+import { ProjectSidebarContent } from './project-sidebar-content'; // Correct import path
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // Import Tabs
+import { updateProject as updateProjectHelper } from '@/lib/project-utils'; // Import the helper function
 import MarkdownPreview from './markdown-preview';
 import { CombinedSectionPreview } from './combined-section-preview';
 import { StandardPagePreview } from './standard-page-preview';
 
+
 // Recursive component to render the preview outline
 const OutlinePreviewItem: React.FC<{ item: OutlineSection; level: number }> = ({ item, level }) => {
   const hasSubSections = item.subSections && item.subSections.length > 0;
-  const isDiagram = item.name.toLowerCase().startsWith("diagram:") || item.name.toLowerCase().startsWith("figure");
+  const isDiagram = item.name.toLowerCase().startsWith("diagram:") || item.name.toLowerCase().startsWith("figure:");
 
   return (
     <div className="text-sm">
@@ -387,7 +388,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
   const handleProjectDetailChange = (field: keyof Project, value: string | number) => {
     if (!project) return;
-    const validStringFields: (keyof Project)[] = ['title', 'projectContext', 'teamDetails', 'instituteName', 'collegeInfo', 'teamId', 'subject', 'semester', 'branch', 'guideName'];
+    const validStringFields: (keyof Project)[] = ['title', 'projectContext', 'teamDetails', 'instituteName', 'collegeInfo', 'teamId', 'subject', 'semester', 'branch', 'guideName', 'hodName'];
     const validNumberFields: (keyof Project)[] = ['minSections', 'maxSubSectionsPerSection'];
 
     if (validStringFields.includes(field) && typeof value === 'string') {
@@ -903,6 +904,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                   <div> <Label htmlFor="branch">Branch</Label> <Input id="branch" value={project.branch || ''} onChange={(e) => handleProjectDetailChange('branch', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="e.g., Computer Engineering" className="mt-1"/> </div>
                   <div> <Label htmlFor="semester">Semester</Label> <Input id="semester" value={project.semester || ''} onChange={(e) => handleProjectDetailChange('semester', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="e.g., 5" type="number" className="mt-1"/> </div>
                   <div> <Label htmlFor="subject">Subject</Label> <Input id="subject" value={project.subject || ''} onChange={(e) => handleProjectDetailChange('subject', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="e.g., Design Engineering - 1A" className="mt-1"/> </div>
+                  <div> <Label htmlFor="hodName">HOD Name</Label> <Input id="hodName" value={project.hodName || ''} onChange={(e) => handleProjectDetailChange('hodName', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="Enter Head of Department's Name" className="mt-1"/> </div>
                 </div>
                 <Separator />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
