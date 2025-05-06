@@ -36,7 +36,7 @@ const prompt = ai.definePrompt({
   name: 'generateCertificatePrompt',
   input: { schema: GenerateCertificateInputSchema.extend({ teamDetailsLines: z.array(z.string()).optional() }) },
   output: { schema: GenerateCertificateOutputSchema },
-  prompt: `You are an AI assistant tasked with generating a project certificate in Markdown format.
+  prompt: `You are an AI assistant tasked with generating a project certificate in Markdown format, strictly adhering to the HTML structure for layout.
 
   **Certificate Details:**
   - Project Title: {{{projectTitle}}}
@@ -54,60 +54,66 @@ const prompt = ai.definePrompt({
   - Project Guide: {{{guideName}}}
   {{#if hodName}}- Head of Department: {{{hodName}}}{{/if}}
   - Year: {{{submissionYear}}}
-  {{#if collegeLogoUrl}}- College Logo: {{collegeLogoUrl}} (Include as Markdown image: ![College Logo]({{{collegeLogoUrl}}})){{/if}}
+  {{#if collegeLogoUrl}}- College Logo: {{collegeLogoUrl}} {{/if}}
 
   **Instructions:**
-  1.  Create a formal certificate layout using Markdown.
-  2.  The institute name and "CERTIFICATE" should be prominent headings.
-  3.  State that the project titled "{{{projectTitle}}}" is a bonafide record of work carried out by the listed student(s).
-  4.  Mention it's in partial fulfillment of the requirements for the award of the {{{degree}}} in {{{branch}}}.
-  5.  Include placeholders for signatures of the Project Guide and Head of Department (if HOD name is provided).
-  6.  Add the submission year.
-  7.  If a college logo URL is provided, embed it at the top center.
-  8.  Use Markdown for professional formatting (bold, headings, horizontal lines for signature spaces). Use HTML for layout if necessary (e.g., centering logo, signature layout).
-  9.  Output ONLY the Markdown content. No extra text or explanations.
+  1.  Output ONLY the Markdown and HTML content as per the structure below. Do not include any other text, explanations, or conversational elements.
+  2.  Replace placeholders like \`{{{projectTitle}}}\` with the actual data.
+  3.  If a college logo URL is provided, embed it using Markdown image syntax (\`![Alt text](URL)\`) within a centered div.
+  4.  Ensure text alignment and formatting (bold, headings) match the provided HTML structure.
+  5.  Signature blocks should use \`div\`s with appropriate styling for alignment.
 
-  **Example Structure (Conceptual):**
+  **Required Output Structure (Markdown with embedded HTML for layout):**
 
   \`\`\`markdown
+  <div style="text-align: center; font-family: 'Times New Roman', serif; padding: 20px; border: 1px solid #ccc; margin: 20px; page-break-after: always;">
+
   {{#if collegeLogoUrl}}
-  <div style="text-align: center;">
-    <img src="{{{collegeLogoUrl}}}" alt="College Logo" style="height: 70px; margin-bottom: 15px;">
-  </div>
+  <img src="{{{collegeLogoUrl}}}" alt="College Logo" style="height: 70px; margin-bottom: 15px; margin-top: 10px;">
+  <br>
   {{/if}}
 
-  ## {{{instituteName}}}
-  ### Department of {{{branch}}}
+  <h2 style="font-size: 18pt; font-weight: bold; margin-top: 20px; margin-bottom: 5px;">{{{instituteName}}}</h2>
+  <h3 style="font-size: 14pt; margin-bottom: 25px;">Department of {{{branch}}}</h3>
 
-  # CERTIFICATE
+  <h1 style="font-size: 22pt; font-weight: bold; margin-bottom: 30px; text-decoration: underline;">CERTIFICATE</h1>
 
+  <p style="font-size: 12pt; line-height: 1.6; text-align: justify; margin-bottom: 15px;">
   This is to certify that the project report entitled
-  
-  **"{{{projectTitle}}}"**
-  
+  </p>
+  <p style="font-size: 14pt; font-weight: bold; margin-bottom: 15px;">
+  "{{{projectTitle}}}"
+  </p>
+  <p style="font-size: 12pt; line-height: 1.6; text-align: justify; margin-bottom: 15px;">
   is a bonafide record of the work carried out by:
-  
+  </p>
+
+  <div style="font-size: 12pt; font-weight: bold; margin-bottom: 20px; text-align: center;">
   {{#each teamDetailsLines}}
-  - **{{this}}**
+  {{this}}<br>
   {{/each}}
+  </div>
   
-  in partial fulfillment of the requirements for the award of the degree of **{{{degree}}}** in **{{{branch}}}** during the academic year {{{submissionYear}}}.
+  <p style="font-size: 12pt; line-height: 1.6; text-align: justify; margin-bottom: 30px;">
+  in partial fulfillment of the requirements for the award of the degree of <strong>{{{degree}}}</strong> in <strong>{{{branch}}}</strong> during the academic year {{{submissionYear}}}.
+  </p>
 
-  <br><br><br> 
-
-  <div style="display: flex; justify-content: space-between; margin-top: 50px;">
+  <div style="display: flex; justify-content: space-between; margin-top: 70px; font-size: 12pt;">
     <div style="text-align: left;">
-      _________________________<br>
-      **{{{guideName}}}**<br>
-      Project Guide
+      <div style="height: 30px;"> </div> <!-- Space for signature -->
+      <hr style="border-top: 1px solid #000; width: 150px; margin-bottom: 5px;">
+      <strong>{{{guideName}}}</strong><br>
+      (Project Guide)
     </div>
     {{#if hodName}}
     <div style="text-align: right;">
-      _________________________<br>
-      **{{{hodName}}}**<br>
-      Head of Department
+      <div style="height: 30px;"> </div> <!-- Space for signature -->
+      <hr style="border-top: 1px solid #000; width: 150px; margin-bottom: 5px;">
+      <strong>{{{hodName}}}</strong><br>
+      (Head of Department)
     </div>
     {{/if}}
+  </div>
   </div>
   \`\`\`
 
@@ -131,3 +137,4 @@ const generateCertificateFlow = ai.defineFlow(
     return output!;
   }
 );
+

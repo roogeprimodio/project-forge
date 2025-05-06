@@ -32,20 +32,9 @@ export async function generateAcknowledgement(input: GenerateAcknowledgementInpu
 
 const prompt = ai.definePrompt({
   name: 'generateAcknowledgementPrompt',
-  input: { schema: GenerateAcknowledgementInputSchema.extend({ teamDetailsLines: z.array(z.string()).optional() }) },
+  input: { schema: GenerateAcknowledgementInputSchema.extend({ teamDetailsLines: z.array(z.string()).optional(), pronoun: z.string().optional(), possessivePronoun: z.string().optional() }) },
   output: { schema: GenerateAcknowledgementOutputSchema },
-  prompt: `You are an AI assistant tasked with writing a heartfelt and professional acknowledgement section for a student project report in Markdown format, similar to the provided example.
-
-  **Example Content (for tone and structure reference):**
-  "This project has taken a lot of time and work on my part. However, it would not have been possible without the kind support and cooperation of many individuals and organizations. I'd like to take this opportunity to thank each of you personally.
-
-  I owe a lot to Ms. Kinjal and my friend Amit Sharma for their guidance and constant supervision, as well as for providing important project specifics. As a way of expressing my gratitude for their steadfast support and assistance throughout our project's preparation, all my friends and colleagues who started the conversation as well as those who contributed critical review input are being recognized here. Our college's Prof. Kinjal Bagariya provided me with all the resources I needed and a welcoming work environment, and for that I am grateful.
-
-  To the Head of the Department, Prof. Ajay Bariya I would like to express my gratitude for his cordial collaboration and support in my Endeavor.
-
-  With sincere regards,
-
-  Jagadish Odedara (210640107001)"
+  prompt: `You are an AI assistant tasked with writing a heartfelt and professional acknowledgement section for a student project report. The output must be in Markdown format, strictly adhering to the HTML structure provided for layout.
 
   **Project & People Details (Use these to customize):**
   - Project Title: {{{projectTitle}}}
@@ -53,30 +42,78 @@ const prompt = ai.definePrompt({
   - Institute: {{{instituteName}}}
   - Branch/Department: {{{branch}}}
   {{#if hodName}}- Head of Department: {{{hodName}}}{{/if}}
-  - Team Members & Enrollment (for signature and "I" vs "We" pronoun):
-    {{#if teamDetailsLines}}
+  - Team Members & Enrollment (for signature and pronoun):
     {{#each teamDetailsLines}}
-    {{this}}
+    - {{this}}
     {{/each}}
-    {{else}}
-    {{{teamDetails}}}
-    {{/if}}
   {{#if additionalThanks}}- Specific people/groups to thank: {{{additionalThanks}}}{{/if}}
+  - Pronoun to use (I/We): {{{pronoun}}}
+  - Possessive Pronoun (my/our): {{{possessivePronoun}}}
 
   **Instructions for Generating the Acknowledgement:**
-  1.  Use a sincere, appreciative, and formal tone.
-  2.  The output should be well-formatted Markdown.
-  3.  Start with a general statement about the effort and support received.
-  4.  Specifically thank the project guide, **{{{guideName}}}**, for their guidance, support, and mentorship.
-  5.  Thank the **{{{instituteName}}}** and the Department of **{{{branch}}}**. If a Head of Department (HOD) name ({{{hodName}}}) is provided, thank them explicitly.
-  6.  If specific additional thanks ({{{additionalThanks}}}) are provided, incorporate them naturally. This could include friends, family, specific faculty, or staff.
-  7.  Use "I" or "We" (and corresponding possessives like "my"/"our") appropriately based on the number of team members implied by \`teamDetailsLines\` (if multiple entries, use "We"; otherwise, use "I").
-  8.  Conclude with a closing like "With sincere regards," or similar, followed by the names and enrollment numbers of all team members (from \`teamDetailsLines\`). Each member on a new line.
-  9.  Do NOT include a heading like "# Acknowledgement" in the output; only provide the acknowledgement text itself.
-  10. Output ONLY the Markdown content for the acknowledgement. No extra text or explanations.
+  1.  Output ONLY the Markdown and HTML content as per the structure below. Do not include any other text, explanations, or conversational elements.
+  2.  Replace placeholders like \`{{{guideName}}}\` with the actual data.
+  3.  Use a sincere, appreciative, and formal tone.
+  4.  Start with a general statement about the effort and support received, using {{{pronoun}}} and {{{possessivePronoun}}} appropriately.
+  5.  Specifically thank the project guide, **{{{guideName}}}**, for their guidance, support, and mentorship.
+  6.  Thank the **{{{instituteName}}}** and the Department of **{{{branch}}}**. If a Head of Department (HOD) name ({{{hodName}}}) is provided, thank them explicitly.
+  7.  If specific additional thanks ({{{additionalThanks}}}) are provided, incorporate them naturally.
+  8.  Conclude with a closing and the names and enrollment numbers of all team members (from \`teamDetailsLines\`).
+
+  **Required Output Structure (Markdown with embedded HTML for layout):**
+  \`\`\`markdown
+  <div style="font-family: 'Times New Roman', serif; padding: 20px; margin: 20px; page-break-after: always;">
+  <h1 style="text-align: center; font-size: 20pt; font-weight: bold; margin-bottom: 30px; text-decoration: underline;">ACKNOWLEDGEMENT</h1>
+
+  <p style="font-size: 12pt; line-height: 1.8; text-align: justify; text-indent: 30px; margin-bottom: 15px;">
+  {{{pronoun}}} would like to express {{{possessivePronoun}}} sincere gratitude to all those who have helped {{{pronoun}}} in the successful completion of this project. This project has taken a lot of time and work on {{{possessivePronoun}}} part. However, it would not have been possible without the kind support and cooperation of many individuals and organizations.
+  </p>
+
+  <p style="font-size: 12pt; line-height: 1.8; text-align: justify; text-indent: 30px; margin-bottom: 15px;">
+  {{{pronoun}}} {{{pronounHelper 'owe' ../pronoun}}} a lot to {{{guideName}}} for {{{possessivePronoun}}} guidance and constant supervision, as well as for providing important project specifics and invaluable support throughout the course of this project.
+  </p>
+
+  <p style="font-size: 12pt; line-height: 1.8; text-align: justify; text-indent: 30px; margin-bottom: 15px;">
+  {{{pronoun}}} {{{pronounHelper 'am' ../pronoun}}} thankful to the <strong>{{{instituteName}}}</strong> and the Department of <strong>{{{branch}}}</strong> for providing all the necessary facilities and a conducive environment for the project work.
+  {{#if hodName}}
+  To the Head of the Department, Prof. {{{hodName}}}, {{{pronoun}}} would like to express {{{possessivePronoun}}} gratitude for his/her cordial collaboration and support in {{{possessivePronoun}}} endeavor.
+  {{/if}}
+  </p>
+
+  {{#if additionalThanks}}
+  <p style="font-size: 12pt; line-height: 1.8; text-align: justify; text-indent: 30px; margin-bottom: 15px;">
+  {{{pronoun}}} would also like to extend {{{possessivePronoun}}} thanks to {{{additionalThanks}}}.
+  </p>
+  {{/if}}
+
+  <p style="font-size: 12pt; line-height: 1.8; text-align: justify; text-indent: 30px; margin-bottom: 15px;">
+  Finally, {{{pronoun}}} {{{pronounHelper 'wish' ../pronoun}}} to thank {{{possessivePronoun}}} friends and family for their encouragement and support.
+  </p>
+
+  <br><br>
+  <div style="font-size: 12pt; margin-top: 40px; text-align: right;">
+  {{#each teamDetailsLines}}
+  <div style="margin-bottom: 5px;"><strong>{{this}}</strong></div>
+  {{/each}}
+  </div>
+
+  </div>
+  \`\`\`
 
   Generate the acknowledgement now.
   `,
+  helpers: {
+    pronounHelper: (verb: string, pronoun: string) => {
+        if (pronoun === "We") {
+            return verb; // e.g. "We owe"
+        }
+        // Adjust verb for "I" if necessary, simple cases for now
+        if (verb === "am") return "am";
+        if (verb === "owe") return "owe"; // "I owe"
+        if (verb === "wish") return "wish"; // "I wish"
+        return verb + "s"; // Default for most verbs e.g. "I expresses" - this is a simplistic approach
+    }
+  }
 });
 
 const generateAcknowledgementFlow = ai.defineFlow(
@@ -86,15 +123,18 @@ const generateAcknowledgementFlow = ai.defineFlow(
     outputSchema: GenerateAcknowledgementOutputSchema,
   },
   async input => {
-    // Pre-process teamDetails into an array of lines for easier use in Handlebars
     const teamDetailsLines = input.teamDetails.split('\n').filter(line => line.trim() !== '');
+    const isPlural = teamDetailsLines.length > 1;
     
     const processedInput = {
       ...input,
-      teamDetailsLines: teamDetailsLines
+      teamDetailsLines: teamDetailsLines,
+      pronoun: isPlural ? "We" : "I",
+      possessivePronoun: isPlural ? "our" : "my",
     };
 
     const { output } = await prompt(processedInput);
     return output!;
   }
 );
+

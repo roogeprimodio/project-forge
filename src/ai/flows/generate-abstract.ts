@@ -13,8 +13,7 @@ import { z } from 'genkit';
 const GenerateAbstractInputSchema = z.object({
   projectTitle: z.string().describe('The full title of the project.'),
   projectContext: z.string().describe('A detailed description of the project, its goals, scope, target audience, key features, technologies used, and methodology. This is crucial for a good abstract.'),
-  // Optional: You might want to add fields for key findings/results if available later
-  // keyFindings: z.string().optional().describe('Brief summary of the main results or findings of the project.'),
+  keyFindings: z.string().optional().describe('Brief summary of the main results or findings of the project. If not provided, AI should infer from context.'),
 });
 export type GenerateAbstractInput = z.infer<typeof GenerateAbstractInputSchema>;
 
@@ -31,7 +30,7 @@ const prompt = ai.definePrompt({
   name: 'generateAbstractPrompt',
   input: { schema: GenerateAbstractInputSchema },
   output: { schema: GenerateAbstractOutputSchema },
-  prompt: `You are an AI assistant tasked with writing a concise and informative abstract for a student project report in Markdown format.
+  prompt: `You are an AI assistant tasked with writing a concise and informative abstract for a student project report. The output must be in Markdown format, adhering to the HTML structure provided for layout.
 
   **Project Information:**
   - Title: {{{projectTitle}}}
@@ -39,19 +38,31 @@ const prompt = ai.definePrompt({
   {{#if keyFindings}}- Key Findings (if provided): {{{keyFindings}}}{{/if}}
 
   **Instructions for Generating the Abstract:**
-  1.  The abstract should be a single block of text (Markdown paragraph form).
+  1.  The abstract should be a single block of text (Markdown paragraph form), wrapped in the provided HTML structure.
   2.  It must be concise, typically between 150 and 300 words.
   3.  Summarize the main objectives and scope of the project.
   4.  Briefly describe the methodology or approach used.
-  5.  Highlight the key outcomes, results, or contributions of the project based on the provided context. If key findings are explicitly given, incorporate them.
+  5.  Highlight the key outcomes, results, or contributions of the project based on the provided context. If key findings are explicitly given, incorporate them. If not, infer from the project context.
   6.  Conclude with the significance or potential implications of the project.
   7.  The language should be formal and academic.
   8.  Avoid jargon where possible, or explain it briefly if necessary.
   9.  Ensure the abstract is self-contained and accurately reflects the project context.
-  10. Do NOT include a heading like "# Abstract" in the output; only provide the abstract text itself.
-  11. Output ONLY the Markdown paragraph(s) for the abstract. No extra text or explanations.
+  10. Output ONLY the Markdown and HTML. No extra text or explanations.
 
-  Generate the abstract now based on the title and context.
+  **Required Output Structure (Markdown with embedded HTML for layout):**
+  \`\`\`markdown
+  <div style="font-family: 'Times New Roman', serif; padding: 20px; margin: 20px; page-break-after: always;">
+  <h1 style="text-align: center; font-size: 20pt; font-weight: bold; margin-bottom: 30px; text-decoration: underline;">ABSTRACT</h1>
+  <p style="font-size: 12pt; line-height: 1.8; text-align: justify; text-indent: 30px;">
+  [Generated Abstract Paragraph(s) Here - This text should be replaced by the AI-generated abstract based on the instructions above. Ensure it's a continuous block of text formatted as Markdown paragraphs within this HTML paragraph tag.]
+  </p>
+  <br><br>
+  <p style="font-size: 12pt; font-weight: bold;">Keywords: <span style="font-weight: normal;">[Suggest 3-5 relevant keywords based on the project context, separated by commas]</span></p>
+  </div>
+  \`\`\`
+
+  Generate the abstract now based on the title, context, and key findings (if any).
+  Fill in the "[Generated Abstract Paragraph(s) Here]" and "[Suggest 3-5 relevant keywords...]" parts.
   `,
 });
 
@@ -69,3 +80,4 @@ const generateAbstractFlow = ai.defineFlow(
     return output!;
   }
 );
+

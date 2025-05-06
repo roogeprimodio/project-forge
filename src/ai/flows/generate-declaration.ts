@@ -16,7 +16,7 @@ const GenerateDeclarationInputSchema = z.object({
   degree: z.string().optional().default('Bachelor of Engineering').describe('The degree for which the project is submitted.'),
   branch: z.string().describe('The branch or department.'),
   instituteName: z.string().describe('The name of the institute or college.'),
-  guideName: z.string().describe('The name of the project guide.'),
+  guideName: z.string().describe('The name of the project guide.'), // Although guide name might not be directly in declaration text, it can be context for AI.
   submissionDate: z.string().optional().default(new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })).describe('The date of submission. Defaults to current date.'),
 });
 export type GenerateDeclarationInput = z.infer<typeof GenerateDeclarationInputSchema>;
@@ -34,7 +34,7 @@ const prompt = ai.definePrompt({
   name: 'generateDeclarationPrompt',
   input: { schema: GenerateDeclarationInputSchema.extend({ teamDetailsLines: z.array(z.string()).optional() }) },
   output: { schema: GenerateDeclarationOutputSchema },
-  prompt: `You are an AI assistant tasked with generating a student project declaration in Markdown format.
+  prompt: `You are an AI assistant tasked with generating a student project declaration in Markdown format, strictly adhering to the HTML structure for layout.
 
   **Declaration Details:**
   - Project Title: {{{projectTitle}}}
@@ -49,43 +49,48 @@ const prompt = ai.definePrompt({
   - Degree: {{{degree}}}
   - Branch: {{{branch}}}
   - Institute: {{{instituteName}}}
-  - Project Guide: {{{guideName}}}
   - Date: {{{submissionDate}}}
 
   **Instructions:**
-  1.  Create a formal declaration layout using Markdown.
-  2.  The heading should be "DECLARATION".
-  3.  The text should state that the student(s) declare the project report titled "{{{projectTitle}}}" is their own original work, carried out under the guidance of {{{guideName}}}.
-  4.  Specify that the work has not been submitted in part or full for any other degree or diploma.
-  5.  Include placeholders for the signatures of all team members, along with their names and enrollment numbers as provided in teamDetailsLines. Use HTML for multi-line signature blocks if needed.
-  6.  Include the submission date.
-  7.  Use Markdown for professional formatting.
-  8.  Output ONLY the Markdown content. No extra text or explanations.
+  1.  Output ONLY the Markdown and HTML content as per the structure below. Do not include any other text, explanations, or conversational elements.
+  2.  Replace placeholders like \`{{{projectTitle}}}\` with the actual data.
+  3.  The text should be formal and state that the student(s) declare the project is their original work.
+  4.  Ensure text alignment and formatting (bold, headings) match the provided HTML structure.
+  5.  Signature blocks should list student names and enrollment numbers as provided in \`teamDetailsLines\`.
 
-  **Example Structure (Conceptual):**
+  **Required Output Structure (Markdown with embedded HTML for layout):**
 
   \`\`\`markdown
-  # DECLARATION
+  <div style="font-family: 'Times New Roman', serif; padding: 20px; margin: 20px; page-break-after: always;">
 
+  <h1 style="text-align: center; font-size: 20pt; font-weight: bold; margin-bottom: 40px; text-decoration: underline;">DECLARATION</h1>
+
+  <p style="font-size: 12pt; line-height: 1.8; text-align: justify; margin-bottom: 20px;">
   We, the undersigned, hereby declare that the project report entitled
-  
-  **"{{{projectTitle}}}"**
-  
-  submitted for the degree of **{{{degree}}}** in **{{{branch}}}** at **{{{instituteName}}}**, is a record of original work done by us under the guidance of **{{{guideName}}}**.
-  
-  This work has not been submitted in part or full for any other degree or diploma of any university or institution.
+  </p>
+  <p style="font-size: 14pt; font-weight: bold; text-align: center; margin-bottom: 20px;">
+  "{{{projectTitle}}}"
+  </p>
+  <p style="font-size: 12pt; line-height: 1.8; text-align: justify; margin-bottom: 20px;">
+  submitted for the degree of <strong>{{{degree}}}</strong> in <strong>{{{branch}}}</strong> at <strong>{{{instituteName}}}</strong>, is a record of original work done by us. This work has not been submitted in part or full for any other degree or diploma of any university or institution.
+  </p>
 
   <br><br><br>
 
+  <div style="font-size: 12pt; margin-top: 50px;">
   {{#each teamDetailsLines}}
-  <div style="margin-top: 20px; text-align: left;">
-    _________________________<br>
-    **{{this}}**
+  <div style="margin-bottom: 30px; display: flex; justify-content: space-between;">
+    <span style="min-width: 250px;">{{this}}</span>
+    <span style="border-bottom: 1px solid #000; width: 200px; text-align: right;">(Signature)</span>
   </div>
   {{/each}}
+  </div>
 
   <br>
-  Date: {{{submissionDate}}}
+  <p style="font-size: 12pt; margin-top: 30px; text-align: left;">Date: {{{submissionDate}}}</p>
+  <p style="font-size: 12pt; text-align: left;">Place: [Your City/Town]</p>
+
+  </div>
   \`\`\`
 
   Generate the Markdown content now.
@@ -108,3 +113,4 @@ const generateDeclarationFlow = ai.defineFlow(
     return output!;
   }
 );
+

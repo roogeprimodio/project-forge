@@ -36,7 +36,7 @@ const prompt = ai.definePrompt({
   name: 'generateCoverPagePrompt',
   input: { schema: GenerateCoverPageInputSchema.extend({ teamDetailsLines: z.array(z.string()).optional() }) },
   output: { schema: GenerateCoverPageOutputSchema },
-  prompt: `You are an AI assistant tasked with generating a professional cover page for a student project report in Markdown format.
+  prompt: `You are an AI assistant tasked with generating a professional cover page for a student project report in Markdown format, strictly adhering to the HTML structure provided below for layout.
 
   **Project Details:**
   - Project Title: {{{projectTitle}}}
@@ -51,63 +51,56 @@ const prompt = ai.definePrompt({
   - In partial fulfillment for the award of the degree of: {{{degree}}}
   - In: {{{branch}}}
   - Institute: {{{instituteName}}}
-  {{#if universityName}}- University: {{{universityName}}}{{/if}}
+  {{#if universityName}}- University: {{{universityName}}} (Affiliated to){{/if}}
   - Submission Date: {{{submissionDate}}}
-  {{#if universityLogoUrl}}- University Logo: {{universityLogoUrl}} (Include as Markdown image: ![University Logo]({{{universityLogoUrl}}})){{/if}}
-  {{#if collegeLogoUrl}}- College Logo: {{collegeLogoUrl}} (Include as Markdown image: ![College Logo]({{{collegeLogoUrl}}})){{/if}}
+  {{#if universityLogoUrl}}- University Logo: {{universityLogoUrl}} {{/if}}
+  {{#if collegeLogoUrl}}- College Logo: {{collegeLogoUrl}} {{/if}}
 
   **Instructions:**
-  1.  Create a well-structured cover page using Markdown.
-  2.  The Project Title should be the main heading (e.g., using '#').
-  3.  Clearly list the team members and their enrollment numbers using the pre-processed 'teamDetailsLines'.
-  4.  Include the degree, branch, institute, and university (if provided).
-  5.  Include the submission date.
-  6.  If logo URLs are provided, embed them using Markdown image syntax (e.g., \`![Alt text](URL)\`). Place logos appropriately, perhaps at the top or centered.
-  7.  Use appropriate Markdown formatting for headings, bold text, lists, etc., to make the page look professional and readable.
-  8.  Ensure all provided information is accurately reflected.
-  9.  The output should be ONLY the Markdown content for the cover page. Do not include any other text, explanations, or conversational elements.
-  10. Use HTML for centering logos if provided, like <div style="text-align: center;">...</div>.
+  1.  Output ONLY the Markdown and HTML content as per the structure below. Do NOT include any other text, explanations, or conversational elements.
+  2.  Replace placeholders like \`{{{projectTitle}}}\` with the actual data provided.
+  3.  If a logo URL is provided, embed it using Markdown image syntax (\`![Alt text](URL)\`) within a centered div.
+  4.  Ensure all text is properly centered or aligned as indicated in the HTML structure.
+  5.  Team members should be listed one per line, bolded.
 
-  **Example Structure (Conceptual):**
+  **Required Output Structure (Markdown with embedded HTML for layout):**
 
   \`\`\`markdown
+  <div style="text-align: center; font-family: Times New Roman, serif; page-break-after: always;">
   {{#if universityLogoUrl}}
-  <div style="text-align: center;">
-    <img src="{{{universityLogoUrl}}}" alt="University Logo" style="height: 80px; margin-bottom: 10px;">
-  </div>
+  <img src="{{{universityLogoUrl}}}" alt="University Logo" style="height: 80px; margin-bottom: 15px; margin-top: 30px;">
+  <br>
   {{/if}}
   {{#if collegeLogoUrl}}
-  <div style="text-align: center;">
-    <img src="{{{collegeLogoUrl}}}" alt="College Logo" style="height: 60px; margin-bottom: 20px;">
-  </div>
+  <img src="{{{collegeLogoUrl}}}" alt="College Logo" style="height: 70px; margin-bottom: 25px;">
+  <br>
   {{/if}}
 
-  # {{{projectTitle}}}
+  <h1 style="font-size: 24pt; font-weight: bold; margin-top: 50px; margin-bottom: 30px;">{{{projectTitle}}}</h1>
 
-  A Project Report Submitted
-  
-  By
-  
+  <p style="font-size: 12pt; margin-bottom: 5px;"><em>A Project Report Submitted By</em></p>
+
+  <div style="font-size: 14pt; font-weight: bold; margin-bottom: 20px;">
   {{#each teamDetailsLines}}
-  **{{this}}**
+  {{this}}<br>
   {{/each}}
-  
-  In partial fulfillment for the award of the degree of
-  
-  **{{{degree}}}**
-  
-  In
-  
-  **{{{branch}}}**
-  
-  At
-  
-  **{{{instituteName}}}**
+  </div>
+
+  <p style="font-size: 12pt; margin-bottom: 5px;"><em>In partial fulfillment for the award of the degree of</em></p>
+  <p style="font-size: 16pt; font-weight: bold; margin-bottom: 5px;">{{{degree}}}</p>
+  <p style="font-size: 12pt; margin-bottom: 5px;"><em>In</em></p>
+  <p style="font-size: 14pt; font-weight: bold; margin-bottom: 20px;">{{{branch}}}</p>
+
+  <p style="font-size: 12pt; margin-bottom: 5px;"><em>At</em></p>
+  <p style="font-size: 14pt; font-weight: bold;">{{{instituteName}}}</p>
   {{#if universityName}}
-  ({{{universityName}}})
+  <p style="font-size: 12pt; margin-bottom: 50px;">(Affiliated to {{{universityName}}})</p>
+  {{else}}
+  <div style="margin-bottom: 50px;"></div>
   {{/if}}
-  
-  {{{submissionDate}}}
+
+  <p style="font-size: 12pt; margin-top: auto;">{{{submissionDate}}}</p>
+  </div>
   \`\`\`
 
   Generate the Markdown content now.
@@ -121,15 +114,15 @@ const generateCoverPageFlow = ai.defineFlow(
     outputSchema: GenerateCoverPageOutputSchema,
   },
   async input => {
-    // Pre-process teamDetails into an array of lines
     const teamDetailsLines = input.teamDetails.split('\n').filter(line => line.trim() !== '');
     
     const processedInput = {
       ...input,
-      teamDetailsLines: teamDetailsLines // Pass the array to the prompt
+      teamDetailsLines: teamDetailsLines 
     };
 
     const { output } = await prompt(processedInput);
     return output!;
   }
 );
+
