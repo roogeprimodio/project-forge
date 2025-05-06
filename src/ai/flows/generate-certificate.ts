@@ -34,14 +34,20 @@ export async function generateCertificate(input: GenerateCertificateInput): Prom
 
 const prompt = ai.definePrompt({
   name: 'generateCertificatePrompt',
-  input: { schema: GenerateCertificateInputSchema },
+  input: { schema: GenerateCertificateInputSchema.extend({ teamDetailsLines: z.array(z.string()).optional() }) },
   output: { schema: GenerateCertificateOutputSchema },
   prompt: `You are an AI assistant tasked with generating a project certificate in Markdown format.
 
   **Certificate Details:**
   - Project Title: {{{projectTitle}}}
   - Student(s):
+    {{#if teamDetailsLines}}
+    {{#each teamDetailsLines}}
+    - **{{this}}**
+    {{/each}}
+    {{else}}
     {{{teamDetails}}}
+    {{/if}}
   - Degree: {{{degree}}}
   - Branch: {{{branch}}}
   - Institute: {{{instituteName}}}
@@ -81,7 +87,7 @@ const prompt = ai.definePrompt({
   
   is a bonafide record of the work carried out by:
   
-  {{#each (split teamDetails '\n')}}
+  {{#each teamDetailsLines}}
   - **{{this}}**
   {{/each}}
   
@@ -116,11 +122,13 @@ const generateCertificateFlow = ai.defineFlow(
     outputSchema: GenerateCertificateOutputSchema,
   },
   async input => {
+    const teamDetailsLines = input.teamDetails.split('\n').filter(line => line.trim() !== '');
     const processedInput = {
       ...input,
-      teamDetailsLines: input.teamDetails.split('\n').filter(line => line.trim() !== '')
+      teamDetailsLines: teamDetailsLines
     };
     const { output } = await prompt(processedInput);
     return output!;
   }
 );
+

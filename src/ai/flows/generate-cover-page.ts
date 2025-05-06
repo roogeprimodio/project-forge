@@ -34,14 +34,20 @@ export async function generateCoverPage(input: GenerateCoverPageInput): Promise<
 
 const prompt = ai.definePrompt({
   name: 'generateCoverPagePrompt',
-  input: { schema: GenerateCoverPageInputSchema },
+  input: { schema: GenerateCoverPageInputSchema.extend({ teamDetailsLines: z.array(z.string()).optional() }) }, // Add teamDetailsLines to schema for prompt
   output: { schema: GenerateCoverPageOutputSchema },
   prompt: `You are an AI assistant tasked with generating a professional cover page for a student project report in Markdown format.
 
   **Project Details:**
   - Project Title: {{{projectTitle}}}
   - Submitted by:
+    {{#if teamDetailsLines}}
+    {{#each teamDetailsLines}}
+    **{{this}}**
+    {{/each}}
+    {{else}}
     {{{teamDetails}}}
+    {{/if}}
   - In partial fulfillment for the award of the degree of: {{{degree}}}
   - In: {{{branch}}}
   - Institute: {{{instituteName}}}
@@ -53,7 +59,7 @@ const prompt = ai.definePrompt({
   **Instructions:**
   1.  Create a well-structured cover page using Markdown.
   2.  The Project Title should be the main heading (e.g., using '#').
-  3.  Clearly list the team members and their enrollment numbers.
+  3.  Clearly list the team members and their enrollment numbers using the pre-processed 'teamDetailsLines'.
   4.  Include the degree, branch, institute, and university (if provided).
   5.  Include the submission date.
   6.  If logo URLs are provided, embed them using Markdown image syntax (e.g., \`![Alt text](URL)\`). Place logos appropriately, perhaps at the top or centered.
@@ -81,7 +87,7 @@ const prompt = ai.definePrompt({
   
   By
   
-  {{#each (split teamDetails '\n')}}
+  {{#each teamDetailsLines}}
   **{{this}}**
   {{/each}}
   
@@ -114,13 +120,16 @@ const generateCoverPageFlow = ai.defineFlow(
     outputSchema: GenerateCoverPageOutputSchema,
   },
   async input => {
-    // Helper to split teamDetails for the prompt, Handlebars can't do complex logic
+    // Pre-process teamDetails into an array of lines
+    const teamDetailsLines = input.teamDetails.split('\n').filter(line => line.trim() !== '');
+    
     const processedInput = {
       ...input,
-      teamDetailsLines: input.teamDetails.split('\n').filter(line => line.trim() !== '')
+      teamDetailsLines: teamDetailsLines // Pass the array to the prompt
     };
 
     const { output } = await prompt(processedInput);
     return output!;
   }
 );
+

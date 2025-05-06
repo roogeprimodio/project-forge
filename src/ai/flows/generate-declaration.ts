@@ -32,14 +32,20 @@ export async function generateDeclaration(input: GenerateDeclarationInput): Prom
 
 const prompt = ai.definePrompt({
   name: 'generateDeclarationPrompt',
-  input: { schema: GenerateDeclarationInputSchema },
+  input: { schema: GenerateDeclarationInputSchema.extend({ teamDetailsLines: z.array(z.string()).optional() }) },
   output: { schema: GenerateDeclarationOutputSchema },
   prompt: `You are an AI assistant tasked with generating a student project declaration in Markdown format.
 
   **Declaration Details:**
   - Project Title: {{{projectTitle}}}
   - Student(s) & Enrollment:
+    {{#if teamDetailsLines}}
+    {{#each teamDetailsLines}}
+    - {{this}}
+    {{/each}}
+    {{else}}
     {{{teamDetails}}}
+    {{/if}}
   - Degree: {{{degree}}}
   - Branch: {{{branch}}}
   - Institute: {{{instituteName}}}
@@ -51,7 +57,7 @@ const prompt = ai.definePrompt({
   2.  The heading should be "DECLARATION".
   3.  The text should state that the student(s) declare the project report titled "{{{projectTitle}}}" is their own original work, carried out under the guidance of {{{guideName}}}.
   4.  Specify that the work has not been submitted in part or full for any other degree or diploma.
-  5.  Include placeholders for the signatures of all team members, along with their names and enrollment numbers as provided in teamDetails.
+  5.  Include placeholders for the signatures of all team members, along with their names and enrollment numbers as provided in teamDetailsLines.
   6.  Include the submission date.
   7.  Use Markdown for professional formatting.
   8.  Output ONLY the Markdown content. No extra text or explanations.
@@ -71,7 +77,7 @@ const prompt = ai.definePrompt({
 
   <br><br><br>
 
-  {{#each (split teamDetails '\n')}}
+  {{#each teamDetailsLines}}
   <div style="margin-top: 20px; text-align: left;">
     _________________________<br>
     **{{this}}**
@@ -93,11 +99,13 @@ const generateDeclarationFlow = ai.defineFlow(
     outputSchema: GenerateDeclarationOutputSchema,
   },
   async input => {
+    const teamDetailsLines = input.teamDetails.split('\n').filter(line => line.trim() !== '');
     const processedInput = {
       ...input,
-      teamDetailsLines: input.teamDetails.split('\n').filter(line => line.trim() !== '')
+      teamDetailsLines: teamDetailsLines
     };
     const { output } = await prompt(processedInput);
     return output!;
   }
 );
+
