@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState } from 'react';
@@ -93,7 +94,7 @@ export const StandardPagePreview: React.FC<StandardPagePreviewProps> = ({ pageNa
   useEffect(() => {
     setGeneratedContent(null);
     setError(null);
-  }, [pageName, project.title, project.projectContext, project.teamDetails, project.instituteName, project.branch, project.guideName, project.hodName]);
+  }, [pageName, project.title, project.projectContext, project.teamDetails, project.instituteName, project.branch, project.guideName, project.hodName, project.universityLogoUrl, project.collegeLogoUrl]);
 
   const aiGeneratablePages = ["Cover Page", "Certificate", "Declaration", "Abstract", "Acknowledgement"];
   const canAiGenerate = aiGeneratablePages.includes(pageName);
@@ -102,45 +103,46 @@ export const StandardPagePreview: React.FC<StandardPagePreviewProps> = ({ pageNa
     if (!project) return;
     setIsLoading(true);
     setError(null);
-    setGeneratedContent(null);
+    // Do not clear generatedContent here, so users can see previous if new generation fails
+    // setGeneratedContent(null);
 
     try {
-      let result;
+      let result: any; // Use 'any' for result type from server actions or define a common error/success type
       switch (pageName) {
         case "Cover Page":
           result = await generateCoverPageAction({
             projectTitle: project.title,
-            teamDetails: project.teamDetails,
+            teamDetails: project.teamDetails || "N/A", // Ensure defaults if undefined
             branch: project.branch || "N/A",
             instituteName: project.instituteName || "N/A",
             universityLogoUrl: project.universityLogoUrl,
             collegeLogoUrl: project.collegeLogoUrl,
-            degree: "Bachelor of Engineering", // Default or from project type
+            degree: "Bachelor of Engineering",
             submissionDate: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
           });
-          if ('coverPageMarkdown' in result) setGeneratedContent(result.coverPageMarkdown);
+          if (result && result.coverPageMarkdown) setGeneratedContent(result.coverPageMarkdown);
           break;
         case "Certificate":
           result = await generateCertificateAction({
             projectTitle: project.title,
-            teamDetails: project.teamDetails,
+            teamDetails: project.teamDetails || "N/A",
             branch: project.branch || "N/A",
             instituteName: project.instituteName || "N/A",
             guideName: project.guideName || "[Guide Name]",
             hodName: project.hodName || "[HOD Name]",
             collegeLogoUrl: project.collegeLogoUrl,
           });
-          if ('certificateMarkdown' in result) setGeneratedContent(result.certificateMarkdown);
+          if (result && result.certificateMarkdown) setGeneratedContent(result.certificateMarkdown);
           break;
         case "Declaration":
           result = await generateDeclarationAction({
             projectTitle: project.title,
-            teamDetails: project.teamDetails,
+            teamDetails: project.teamDetails || "N/A",
             branch: project.branch || "N/A",
             instituteName: project.instituteName || "N/A",
             guideName: project.guideName || "[Guide Name]",
           });
-          if ('declarationMarkdown' in result) setGeneratedContent(result.declarationMarkdown);
+          if (result && result.declarationMarkdown) setGeneratedContent(result.declarationMarkdown);
           break;
         case "Abstract":
           if (!project.projectContext?.trim()) {
@@ -150,7 +152,7 @@ export const StandardPagePreview: React.FC<StandardPagePreviewProps> = ({ pageNa
             projectTitle: project.title,
             projectContext: project.projectContext,
           });
-          if ('abstractMarkdown' in result) setGeneratedContent(result.abstractMarkdown);
+          if (result && result.abstractMarkdown) setGeneratedContent(result.abstractMarkdown);
           break;
         case "Acknowledgement":
           result = await generateAcknowledgementAction({
@@ -159,24 +161,23 @@ export const StandardPagePreview: React.FC<StandardPagePreviewProps> = ({ pageNa
             instituteName: project.instituteName || "N/A",
             branch: project.branch || "N/A",
             hodName: project.hodName,
-            teamDetails: project.teamDetails,
+            teamDetails: project.teamDetails || "N/A",
           });
-          if ('acknowledgementMarkdown' in result) setGeneratedContent(result.acknowledgementMarkdown);
+          if (result && result.acknowledgementMarkdown) setGeneratedContent(result.acknowledgementMarkdown);
           break;
         default:
           throw new Error(`AI generation not configured for ${pageName}`);
       }
 
-      if (result && 'error' in result && result.error) {
-          // Use a more specific error message
-          throw new Error(`AI generation failed for ${pageName}: ${result.error}`);
+      if (result && result.error) {
+          throw new Error(result.error); // Throw the error message from the server action
       }
       toast({ title: `${pageName} Content Generated`, description: "AI has generated the content for this page." });
 
     } catch (err: any) {
-      const errorMessage = err instanceof Error ? err.message : "An unknown error occurred.";
-      setError(errorMessage);
-      toast({ variant: "destructive", title: `Failed to Generate ${pageName}`, description: errorMessage });
+      const errorMessage = err instanceof Error ? err.message : "An unknown error occurred during generation.";
+      setError(errorMessage); // Set the error state to display in UI
+      toast({ variant: "destructive", title: `Failed to Generate ${pageName}`, description: errorMessage, duration: 7000 });
       console.error(`Error generating ${pageName}:`, err);
     } finally {
       setIsLoading(false);
@@ -210,7 +211,7 @@ export const StandardPagePreview: React.FC<StandardPagePreviewProps> = ({ pageNa
       </CardHeader>
       <CardContent className="flex-grow overflow-hidden">
         <ScrollArea className="h-full pr-1">
-          {error && (
+          {error && !isLoading && ( // Display error only when not loading, to avoid flicker
             <div className="my-4 p-3 bg-destructive/10 border border-destructive text-destructive rounded-md text-sm">
               <p className="font-semibold">Error Generating Content:</p>
               <p>{error}</p>
@@ -242,4 +243,3 @@ export const StandardPagePreview: React.FC<StandardPagePreviewProps> = ({ pageNa
     </Card>
   );
 };
-""

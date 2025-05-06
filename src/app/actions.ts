@@ -26,13 +26,16 @@ import { generateAcknowledgement, GenerateAcknowledgementInput, GenerateAcknowle
 export async function generateSectionAction(input: GenerateReportSectionInput): Promise<GenerateReportSectionOutput | { error: string }> {
   try {
     console.log("Generating section with input:", input);
+    if (!input.projectTitle || !input.sectionName || !input.prompt) {
+      return { error: "Project title, section name, and prompt are required for generation." };
+    }
     const result = await generateReportSection(input);
     console.log("Generation result:", result);
     return result;
   } catch (error) {
-    console.error("Error generating report section:", error);
+    console.error("Error in generateSectionAction:", error);
     const errorMessage = error instanceof Error ? error.message : "An unknown error occurred during section generation.";
-    return { error: errorMessage };
+    return { error: `AI Section Generation Failed: ${errorMessage}` };
   }
 }
 
@@ -50,9 +53,9 @@ export async function summarizeSectionAction(input: SummarizeReportSectionInput)
     console.log("Summarization result:", { summaryLength: result.summary.length });
     return result;
   } catch (error) {
-    console.error("Error summarizing report section:", error);
+    console.error("Error in summarizeSectionAction:", error);
     const errorMessage = error instanceof Error ? error.message : "An unknown error occurred during section summarization.";
-    return { error: errorMessage };
+    return { error: `AI Summarization Failed: ${errorMessage}` };
   }
 }
 
@@ -69,17 +72,15 @@ export async function generateOutlineAction(input: GenerateProjectOutlineInput):
     const result = await generateProjectOutline(input);
     console.log("Outline generation result:", result);
 
-    // Check if the result itself is an error object (from the flow's fallback)
-    // or if the structure is invalid.
     if (!result || typeof result !== 'object' || !Array.isArray(result.sections)) {
         console.warn("AI outline generation returned unexpected format or fallback. Result:", result);
         return { error: "AI failed to generate a valid outline structure. Please try again or adjust the project context." };
     }
-    return result; // Should have the 'sections' key now
+    return result;
   } catch (error) {
-    console.error("Error generating project outline:", error);
+    console.error("Error in generateOutlineAction:", error);
     const errorMessage = error instanceof Error ? error.message : "An unknown error occurred during outline generation.";
-    return { error: errorMessage };
+    return { error: `AI Outline Generation Failed: ${errorMessage}` };
   }
 }
 
@@ -87,10 +88,8 @@ export async function generateOutlineAction(input: GenerateProjectOutlineInput):
  * Server action to suggest improvements for the project report using the AI flow.
  * Handles potential errors during the AI call.
  */
- // Ensure this function accepts the updated SuggestImprovementsInput type
 export async function suggestImprovementsAction(input: SuggestImprovementsInput): Promise<SuggestImprovementsOutput | { error: string }> {
   try {
-    // Log the enhanced input
     console.log("Suggesting improvements with input:", {
         projectTitle: input.projectTitle,
         projectContextLength: input.projectContext?.length,
@@ -99,13 +98,16 @@ export async function suggestImprovementsAction(input: SuggestImprovementsInput)
         existingSections: input.existingSections,
         projectType: input.projectType,
     });
+    if (!input.allSectionsContent?.trim() && !input.projectContext?.trim()) {
+        return { error: "Please provide project context or some section content to get suggestions." };
+    }
     const result = await suggestImprovements(input);
     console.log("Suggestion result:", result);
     return result;
   } catch (error) {
-    console.error("Error suggesting improvements:", error);
+    console.error("Error in suggestImprovementsAction:", error);
     const errorMessage = error instanceof Error ? error.message : "An unknown error occurred while suggesting improvements.";
-    return { error: errorMessage };
+    return { error: `AI Suggestion Failed: ${errorMessage}` };
   }
 }
 
@@ -123,9 +125,9 @@ export async function generateDiagramAction(input: GenerateDiagramMermaidInput):
     console.log("Diagram generation result:", result);
     return result;
   } catch (error) {
-    console.error("Error generating diagram:", error);
+    console.error("Error in generateDiagramAction:", error);
     const errorMessage = error instanceof Error ? error.message : "An unknown error occurred during diagram generation.";
-    return { error: errorMessage };
+    return { error: `AI Diagram Generation Failed: ${errorMessage}` };
   }
 }
 
@@ -133,50 +135,58 @@ export async function generateDiagramAction(input: GenerateDiagramMermaidInput):
 
 export async function generateCoverPageAction(input: GenerateCoverPageInput): Promise<GenerateCoverPageOutput | { error: string }> {
     try {
+        console.log("Generating Cover Page with input:", input);
         const result = await generateCoverPage(input);
         return result;
     } catch (error) {
-        console.error("Error generating cover page:", error);
-        return { error: error instanceof Error ? error.message : "Failed to generate cover page." };
+        console.error("Error in generateCoverPageAction:", error);
+        return { error: `Failed to generate Cover Page: ${error instanceof Error ? error.message : "Unknown AI error."}` };
     }
 }
 
 export async function generateCertificateAction(input: GenerateCertificateInput): Promise<GenerateCertificateOutput | { error: string }> {
     try {
+        console.log("Generating Certificate with input:", input);
         const result = await generateCertificate(input);
         return result;
     } catch (error) {
-        console.error("Error generating certificate:", error);
-        return { error: error instanceof Error ? error.message : "Failed to generate certificate." };
+        console.error("Error in generateCertificateAction:", error);
+        return { error: `Failed to generate Certificate: ${error instanceof Error ? error.message : "Unknown AI error."}` };
     }
 }
 
 export async function generateDeclarationAction(input: GenerateDeclarationInput): Promise<GenerateDeclarationOutput | { error: string }> {
     try {
+        console.log("Generating Declaration with input:", input);
         const result = await generateDeclaration(input);
         return result;
     } catch (error) {
-        console.error("Error generating declaration:", error);
-        return { error: error instanceof Error ? error.message : "Failed to generate declaration." };
+        console.error("Error in generateDeclarationAction:", error);
+        return { error: `Failed to generate Declaration: ${error instanceof Error ? error.message : "Unknown AI error."}` };
     }
 }
 
 export async function generateAbstractAction(input: GenerateAbstractInput): Promise<GenerateAbstractOutput | { error: string }> {
     try {
+        console.log("Generating Abstract with input:", input);
+         if (!input.projectContext || input.projectContext.trim().length < 50) { // Check from flow
+            return { error: "Project context is too short to generate a meaningful abstract. Please provide more details about the project."};
+        }
         const result = await generateAbstract(input);
         return result;
     } catch (error) {
-        console.error("Error generating abstract:", error);
-        return { error: error instanceof Error ? error.message : "Failed to generate abstract." };
+        console.error("Error in generateAbstractAction:", error);
+        return { error: `Failed to generate Abstract: ${error instanceof Error ? error.message : "Unknown AI error."}` };
     }
 }
 
 export async function generateAcknowledgementAction(input: GenerateAcknowledgementInput): Promise<GenerateAcknowledgementOutput | { error: string }> {
     try {
+        console.log("Generating Acknowledgement with input:", input);
         const result = await generateAcknowledgement(input);
         return result;
     } catch (error) {
-        console.error("Error generating acknowledgement:", error);
-        return { error: error instanceof Error ? error.message : "Failed to generate acknowledgement." };
+        console.error("Error in generateAcknowledgementAction:", error);
+        return { error: `Failed to generate Acknowledgement: ${error instanceof Error ? error.message : "Unknown AI error."}` };
     }
 }
