@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, FileWarning, Eye, Projector, BrainCircuit, Plus, Minus, CheckCircle, Edit3, ChevronRight } from 'lucide-react';
+import { Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, Eye, Projector, BrainCircuit, Plus, Minus, CheckCircle, Edit3, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import type { Project, HierarchicalProjectSection, GeneratedSectionOutline, SectionIdentifier, OutlineSection } from '@/types/project'; // Use hierarchical type
 import { findSectionById, updateSectionById, deleteSectionById, STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, TOC_SECTION_NAME, ensureDefaultSubSection, getSectionNumbering } from '@/lib/project-utils';
@@ -30,7 +30,8 @@ import { ProjectSidebarContent } from './project-sidebar-content';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { updateProject as updateProjectHelper } from '@/lib/project-utils';
 import MarkdownPreview from './markdown-preview';
-import { CombinedSectionPreview } from './combined-section-preview'; // Import the new component
+import { CombinedSectionPreview } from './combined-section-preview';
+import { StandardPagePreview } from './standard-page-preview'; // Import the new component
 
 // Recursive component to render the preview outline
 const OutlinePreviewItem: React.FC<{ item: OutlineSection; level: number }> = ({ item, level }) => {
@@ -172,30 +173,6 @@ const LogoUpload = ({
     );
 };
 
-const StandardPagePlaceholder = ({ pageName }: { pageName: string }) => (
-    <Card className="shadow-md mb-6">
-        <CardHeader>
-            <CardTitle className="text-primary text-glow-primary flex items-center gap-2 text-lg md:text-xl">
-                <FileWarning className="w-5 h-5 text-amber-500" /> {pageName}
-            </CardTitle>
-            <CardDescription className="text-sm">
-                This is a standard report page. Content is typically generated automatically during export.
-            </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4 min-h-[200px] flex flex-col items-center justify-center text-center text-sm text-muted-foreground p-4">
-            <ShieldAlert className="w-10 h-10 md:w-12 md:h-12 opacity-50 mb-3" />
-            <p>
-                Content for the "{pageName}" is usually auto-generated or requires manual creation following specific guidelines. Direct editing is not available here.
-            </p>
-             {pageName === TOC_SECTION_NAME && (
-                <p className="text-xs mt-2">
-                    The Table of Contents is based on the sections defined in the sidebar.
-                </p>
-             )}
-        </CardContent>
-    </Card>
-);
-
 const CounterInput = ({ label, value, onChange, onBlur, min = 0 }: {
     label: string;
     value: number;
@@ -271,7 +248,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const [isUploadingLogo, setIsUploadingLogo] = useState<Record<'universityLogoUrl' | 'collegeLogoUrl', boolean>>({ universityLogoUrl: false, collegeLogoUrl: false });
   const router = useRouter();
   const [isEditingSections, setIsEditingSections] = useState(false);
-  const [sectionToDelete, setSectionToDelete] = useState<string | null>(null);
   const [history, setHistory] = useState<Project[]>([]);
   const [historyIndex, setHistoryIndex] = useState<number>(-1);
   const isUpdatingHistory = useRef(false);
@@ -866,7 +842,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   let activeViewContent: React.ReactNode = null;
   let activeViewName = project.title ?? 'Project';
   let isStandardPage = false;
-  let currentSectionForSubSectionView: HierarchicalProjectSection | null = null;
 
   const currentActiveMainSection = activeSectionId ? findSectionById(project.sections, activeSectionId) : null;
   const currentActiveSubSection = activeSubSectionId ? findSectionById(project.sections, activeSubSectionId) : null;
@@ -1064,7 +1039,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
              const standardPageEntry = Object.entries(STANDARD_PAGE_INDICES).find(([, index]) => index === standardPageIndex);
              activeViewName = standardPageEntry ? standardPageEntry[0] : 'Standard Page';
              isStandardPage = true;
-             activeViewContent = <StandardPagePlaceholder pageName={activeViewName} />;
+             activeViewContent = <StandardPagePreview pageName={activeViewName} project={project} />;
         } else {
             activeViewContent = (
                 <div className="flex items-center justify-center h-full p-4">

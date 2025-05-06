@@ -71,19 +71,24 @@ export const CombinedSectionPreview: React.FC<CombinedSectionPreviewProps> = ({ 
   // A more accurate numbering would require passing the section's index or full path.
 
   return (
-    <Card className="shadow-lg w-full">
-      <CardHeader>
+    <Card className="shadow-lg w-full h-full flex flex-col">
+      <CardHeader className="flex-shrink-0">
         <CardTitle className="text-xl md:text-2xl text-primary text-glow-primary">
           Preview: {section.name}
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <ScrollArea className="h-[calc(100vh-250px)] pr-4"> {/* Adjust height as needed */}
+      <CardContent className="flex-grow overflow-hidden"> {/* Ensure CardContent can grow and handle overflow */}
+        <ScrollArea className="h-full pr-1"> {/* Make ScrollArea take full height of CardContent */}
           <div
-            className="bg-white dark:bg-neutral-900 p-8 sm:p-12 md:p-16 shadow-2xl rounded-sm mx-auto"
+            className={cn(
+              "bg-white dark:bg-neutral-900 shadow-2xl rounded-sm mx-auto",
+              "p-4 sm:p-8 md:p-12", // Responsive padding
+              "w-full max-w-[210mm] min-h-[297mm] md:min-h-[calc(var(--a4-height-multiplier,1.414)*var(--a4-width,210mm))]", // A4 aspect ratio for larger screens
+              "aspect-[210/297]" // Maintain A4 aspect ratio
+            )}
             style={{
-              width: '210mm', // A4 width
-              minHeight: '297mm', // A4 height, content will make it grow
+              // For smaller screens, allow width to be 100% of parent and height to auto-adjust based on aspect ratio
+              // On larger screens, max-width will cap it.
               boxSizing: 'border-box',
             }}
           >
