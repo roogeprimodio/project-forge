@@ -1,3 +1,4 @@
+
 // src/app/project/[projectId]/export/page.tsx
 "use client";
 
@@ -12,16 +13,15 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Loader2, ChevronLeft, Download, CloudOff, Home, FileWarning, Eye } from 'lucide-react';
 import { jsPDF } from "jspdf";
-import 'jspdf-autotable'; // Ensure autotable plugin is imported for advanced features if needed
-import { marked } from 'marked'; // For converting Markdown to HTML (used as intermediate for PDF)
+import 'jspdf-autotable';
+import { marked } from 'marked';
 import { useToast } from '@/hooks/use-toast';
 
 
-// Extend jsPDF type definitions if necessary
 declare module 'jspdf' {
     interface jsPDF {
         autoTable: (options: any) => jsPDF;
-        lastAutoTable: { finalY?: number }; // Add properties used by autoTable if needed
+        lastAutoTable: { finalY?: number };
     }
 }
 
@@ -33,12 +33,12 @@ export default function ExportPage() {
   const projectId = params.projectId as string;
   const [projects] = useLocalStorage<Project[]>('projects', []);
   const [isProjectFound, setIsProjectFound] = useState<boolean | null>(null);
-  const [format, setFormat] = useState<'markdown' | 'pdf'>('pdf'); // Default to PDF
+  const [format, setFormat] = useState<'markdown' | 'pdf'>('pdf');
   const [includeTitlePage, setIncludeTitlePage] = useState(true);
   const [includeToc, setIncludeToc] = useState(true);
-  const [addHeadersFooters, setAddHeadersFooters] = useState(true); // New option for PDF
+  const [addHeadersFooters, setAddHeadersFooters] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
-  const [isPreviewing, setIsPreviewing] = useState(false); // State for preview loading
+  const [isPreviewing, setIsPreviewing] = useState(false);
 
   const project = useMemo(() => {
     return Array.isArray(projects) ? projects.find(p => p.id === projectId) : undefined;
@@ -53,9 +53,7 @@ export default function ExportPage() {
 
   const generateMarkdown = () => {
     if (!project) return '';
-
     let markdown = '';
-
     if (includeTitlePage) {
         markdown += `# ${project.title}\n\n`;
         if (project.instituteName) markdown += `**Institute:** ${project.instituteName}\n`;
@@ -67,22 +65,15 @@ export default function ExportPage() {
         if (project.guideName) markdown += `**Guide:** ${project.guideName}\n\n`;
         markdown += '---\n\n';
     }
-
     project.sections.forEach(section => {
         if (!includeToc && section.name === 'Table of Contents') return;
         markdown += `## ${section.name}\n\n${section.content || '[Content not generated]'}\n\n---\n\n`;
     });
-
     return markdown;
   };
 
-  // --- Common PDF Generation Logic ---
   const createPdfDocument = async (project: Project): Promise<jsPDF> => {
-    const doc = new jsPDF({
-      orientation: 'p',
-      unit: 'mm',
-      format: 'a4'
-    });
+    const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
     const pageHeight = doc.internal.pageSize.getHeight();
     const pageWidth = doc.internal.pageSize.getWidth();
     const margin = 15;
@@ -93,26 +84,18 @@ export default function ExportPage() {
         if (!addHeadersFooters) return;
         const headerText = `${project.title} ${sectionName ? `- ${sectionName}` : ''}`;
         const footerText = `Page ${currentPageNum} of ${totalPagesNum}`;
-
         doc.setFontSize(8);
-        doc.setTextColor(150); // Light gray color
-
-        // Header - Limited length
+        doc.setTextColor(150);
         const maxHeaderWidth = pageWidth - 2 * margin;
-        const truncatedHeaderText = doc.splitTextToSize(headerText, maxHeaderWidth)[0]; // Take only the first line if it exceeds width
+        const truncatedHeaderText = doc.splitTextToSize(headerText, maxHeaderWidth)[0];
         doc.text(truncatedHeaderText, margin, margin / 2, { align: 'left' });
-
-        // Footer
         doc.text(footerText, pageWidth / 2, pageHeight - margin / 2, { align: 'center' });
-
-        doc.setTextColor(0); // Reset color
-        doc.setFontSize(12); // Reset font size for main content
+        doc.setTextColor(0);
+        doc.setFontSize(12);
     };
-
 
     const checkAndAddPage = (requiredHeight: number = 10) => {
       if (yPos + requiredHeight > pageHeight - margin) {
-        // Don't add header/footer here, do it after content is placed or during final loop
         doc.addPage();
         currentPage++;
         yPos = margin;
@@ -128,62 +111,32 @@ export default function ExportPage() {
         const maxWidth = pageWidth - 2 * margin;
         doc.setFontSize(size);
         doc.setFont('helvetica', style);
-
         let textToAdd = text;
         if (options.isHtml) {
-            // Basic HTML cleanup for jsPDF's limited support
             textToAdd = textToAdd
-                .replace(/<\/?(div|p|br)[^>]*>/gi, '\n') // Replace divs, p, br with newlines
-                .replace(/<\/?b[^>]*>|<\/?strong[^>]*>/gi, '**') // Placeholder for bold (jsPDF doesn't directly support complex HTML)
-                .replace(/<\/?i[^>]*>|<\/?em[^>]*>/gi, '_')     // Placeholder for italic
-                .replace(/<[^>]+>/g, '')              // Remove remaining HTML tags
-                .replace(/&nbsp;/g, ' ')              // Replace non-breaking spaces
-                .replace(/\n{3,}/g, '\n\n')          // Collapse multiple newlines
+                .replace(/<\/?(div|p|br)[^>]*>/gi, '\n')
+                .replace(/<\/?b[^>]*>|<\/?strong[^>]*>/gi, '**')
+                .replace(/<\/?i[^>]*>|<\/?em[^>]*>/gi, '_')
+                .replace(/<[^>]+>/g, '')
+                .replace(/&nbsp;/g, ' ')
+                .replace(/\n{3,}/g, '\n\n')
                 .trim();
-
-             // For actual HTML rendering (more complex, less reliable with pagination)
-             /*
-             try {
-               await doc.html(text, {
-                 callback: (docInstance) => {
-                   yPos = docInstance.internal.pageSize.height - margin; // Needs refinement
-                 },
-                 x: margin,
-                 y: yPos,
-                 width: maxWidth,
-                 windowWidth: maxWidth, // Important for scaling
-                 autoPaging: 'text', // 'text' or 'slice'
-                 margin: [0, margin, margin, margin] // T, R, B, L - Adjust as needed
-               });
-               yPos = doc.internal.pageSize.getHeight() - margin; // Update yPos after html rendering
-               return; // Exit early as html function handles text placement
-             } catch (htmlError) {
-               console.warn("PDF HTML rendering may have issues, falling back to text:", htmlError);
-               // Fallback logic below will handle it as plain text
-               textToAdd = text.replace(/<[^>]+>/g, ''); // Basic strip tags for fallback
-             }
-             */
         }
-
-
         const lines = doc.splitTextToSize(textToAdd, maxWidth);
         lines.forEach((line: string) => {
-            // Estimate line height based on font size
-            const lineHeight = size * 0.35 * 1.2; // size * ptToMm * lineSpacingFactor
+            const lineHeight = size * 0.35 * 1.2;
             checkAndAddPage(lineHeight);
             doc.text(line, options.align === 'center' ? pageWidth / 2 : margin, yPos, { align: options.align || 'left' });
             yPos += lineHeight;
         });
-        checkAndAddPage(5); // Add space after the block
-        yPos += 5; // Small gap after text block
+        checkAndAddPage(5);
+        yPos += 5;
     };
 
-    // --- PDF Content Generation ---
     if (includeTitlePage) {
-      checkAndAddPage(40); // Estimate space needed
+      checkAndAddPage(40);
       await addFormattedText(project.title, 22, 'bold', { align: 'center' });
-      yPos += 10; // Extra space
-
+      yPos += 10;
       if (project.instituteName) await addFormattedText(`Institute: ${project.instituteName}`, 12);
       if (project.branch) await addFormattedText(`Branch: ${project.branch}`, 12);
       if (project.semester) await addFormattedText(`Semester: ${project.semester}`, 12);
@@ -191,56 +144,41 @@ export default function ExportPage() {
       if (project.teamId) await addFormattedText(`Team ID: ${project.teamId}`, 12);
       if (project.teamDetails) await addFormattedText(`Team Members:\n${project.teamDetails.split('\n').filter(Boolean).join('\n')}`, 12);
       if (project.guideName) await addFormattedText(`Faculty Guide: ${project.guideName}`, 12);
-
-      doc.addPage(); // Start sections on a new page after the title page
+      doc.addPage();
       currentPage++;
       yPos = margin;
     }
 
     for (const section of project.sections) {
       if (!includeToc && section.name === 'Table of Contents') continue;
-
-      checkAndAddPage(20); // Space for section title
-      await addFormattedText(section.name, 16, 'bold'); // Section Title
-      yPos += 2; // Small gap after title
-
-      // Convert Markdown to basic text/HTML before passing to addFormattedText
-      // jsPDF has very limited HTML support, so we pass isHtml: true to do basic cleanup.
-      // For better fidelity, consider a server-side solution or a more robust client-side library.
+      checkAndAddPage(20);
+      await addFormattedText(section.name, 16, 'bold');
+      yPos += 2;
       const content = section.content || '[Content not generated]';
-      const parsedHtmlAttempt = await marked.parse(content); // Convert markdown
-
-      checkAndAddPage(10); // Minimum space before content
-      await addFormattedText(parsedHtmlAttempt, 12, 'normal', { isHtml: true }); // Pass as HTML
-
-      checkAndAddPage(5); // Ensure space before potential next section title
+      const parsedHtmlAttempt = await marked.parse(content);
+      checkAndAddPage(10);
+      await addFormattedText(parsedHtmlAttempt, 12, 'normal', { isHtml: true });
+      checkAndAddPage(5);
       yPos += 5;
     }
 
-     // --- Add Headers and Footers in a final pass ---
      if (addHeadersFooters) {
-        const totalPages = doc.internal.pages.length - 1; // Get total number of pages
+        const totalPages = doc.internal.pages.length - 1;
         for (let i = 1; i <= totalPages; i++) {
             doc.setPage(i);
-            // Ideally, determine the section name for the header based on page content start
-            // For simplicity, we'll use a generic header or omit section name
             addHeaderFooter(i, totalPages);
         }
-        doc.setPage(totalPages); // Go back to the last page
+        doc.setPage(totalPages);
      }
-
-
     return doc;
   };
 
-  // Enhanced PDF generation with Headers and Footers for Export
   const generatePdfForExport = async () => {
     if (!project) return;
     const doc = await createPdfDocument(project);
     doc.save(`${project.title.replace(/ /g, '_')}_report.pdf`);
   };
 
-  // PDF Preview Function using direct browser rendering
   const handlePreview = async () => {
      if (!project || format !== 'pdf') {
         toast({ variant: "destructive", title: "Preview Unavailable", description: "Preview is only available for PDF format." });
@@ -250,31 +188,13 @@ export default function ExportPage() {
      toast({ title: "Generating Preview...", description: "Opening PDF in a new tab..." });
      try {
        const doc = await createPdfDocument(project);
-
-       // Open in new tab using data URL.
-       // Note: Google Drive Viewer (gview) cannot access client-side generated
-       // data URIs or blob URLs directly because they are not publicly hosted.
-       // Opening directly in the browser is the standard client-side approach.
        doc.output('dataurlnewwindow');
-
-       // No explicit success toast needed, as the new tab opening serves as confirmation.
      } catch (error) {
        console.error("Preview generation failed:", error);
-       toast({ variant: "destructive", title: "Preview Failed", description: error instanceof Error ? error.message : "An unknown error occurred generating the PDF preview." });
+       toast({ variant: "destructive", title: "Preview Failed", description: error instanceof Error ? error.message : "An unknown error occurred." });
      } finally {
        setIsPreviewing(false);
      }
-   };
-
-
-  const generateDocx = () => {
-       // Placeholder for DOCX generation - Requires a library like 'docx'
-       toast({
-           variant: "destructive",
-           title: "DOCX Export Not Implemented",
-           description: "Exporting as .docx is not yet available.",
-       });
-       console.warn("DOCX export functionality requires the 'docx' library and implementation.");
    };
 
   const handleExport = async () => {
@@ -288,19 +208,15 @@ export default function ExportPage() {
           downloadBlob(mdBlob, `${project.title.replace(/ /g, '_')}_report.md`);
           toast({ title: "Export Successful", description: `Report exported as ${format.toUpperCase()}.` });
           break;
-        // case 'docx': // Re-enable when implemented
-        //   generateDocx();
-        //   break;
         case 'pdf':
-          toast({ title: "Generating PDF...", description: "This may take a moment for longer reports."});
-          await generatePdfForExport(); // Use the specific export function
-          // Add success toast for PDF export
+          toast({ title: "Generating PDF...", description: "This may take a moment."});
+          await generatePdfForExport();
           toast({ title: "Export Successful", description: `Report exported as PDF.` });
           break;
       }
     } catch (error) {
         console.error("Export failed:", error);
-        toast({ variant: "destructive", title: "Export Failed", description: error instanceof Error ? error.message : "An unknown error occurred during export." });
+        toast({ variant: "destructive", title: "Export Failed", description: error instanceof Error ? error.message : "An unknown error occurred." });
     } finally {
         setIsExporting(false);
     }
@@ -317,52 +233,49 @@ export default function ExportPage() {
     URL.revokeObjectURL(url);
   };
 
-  // --- Render Logic ---
-
   if (isProjectFound === null) {
-    return ( <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,60px))] text-center p-4"><Loader2 className="h-16 w-16 animate-spin text-primary mb-4" /><p className="text-lg text-muted-foreground">Loading export options...</p></div> );
+    return ( <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,60px))] text-center p-4"><Loader2 className="h-12 w-12 sm:h-16 sm:w-16 animate-spin text-primary mb-4" /><p className="text-base sm:text-lg text-muted-foreground">Loading...</p></div> );
   }
 
   if (!isProjectFound || !project) {
-    return ( <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,60px))] text-center p-4"><CloudOff className="h-16 w-16 text-destructive mb-4" /><h2 className="text-2xl font-semibold text-destructive mb-2">Project Not Found</h2><p className="text-muted-foreground mb-6">Cannot export project with ID <code className="bg-muted px-1 rounded">{projectId}</code>.</p><Button onClick={() => router.push('/')}><Home className="mr-2 h-4 w-4" /> Go to Dashboard</Button></div> );
+    return ( <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,60px))] text-center p-4"><CloudOff className="h-12 w-12 sm:h-16 sm:w-16 text-destructive mb-4" /><h2 className="text-xl sm:text-2xl font-semibold text-destructive mb-2">Project Not Found</h2><p className="text-muted-foreground mb-6 text-sm sm:text-base">Cannot export project with ID <code className="bg-muted px-1 rounded">{projectId}</code>.</p><Button onClick={() => router.push('/')} size="sm"><Home className="mr-2 h-4 w-4" /> Dashboard</Button></div> );
   }
 
   return (
-    <div className="container mx-auto p-4 md:p-8 max-w-2xl">
-       <Button variant="ghost" size="sm" onClick={() => router.back()} className="mb-4">
-         <ChevronLeft className="mr-2 h-4 w-4" /> Back to Editor
+    <div className="container mx-auto p-3 sm:p-4 md:p-8 max-w-lg sm:max-w-xl md:max-w-2xl">
+       <Button variant="ghost" size="sm" onClick={() => router.back()} className="mb-4 text-xs sm:text-sm">
+         <ChevronLeft className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" /> Back to Editor
        </Button>
       <Card className="shadow-lg">
-        <CardHeader>
-          <CardTitle className="text-2xl text-primary text-glow-primary">Export Project Report</CardTitle>
-          <CardDescription>Choose the format and options for exporting "{project.title}".</CardDescription>
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="text-xl sm:text-2xl text-primary text-glow-primary">Export Report</CardTitle>
+          <CardDescription className="text-sm">Export "{project.title}" in your desired format.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="format-select">Export Format</Label>
+        <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6">
+          <div className="space-y-1 sm:space-y-2">
+            <Label htmlFor="format-select" className="text-sm">Format</Label>
             <Select value={format} onValueChange={(value: 'markdown' | 'pdf') => setFormat(value)}>
-              <SelectTrigger id="format-select" className="w-full">
+              <SelectTrigger id="format-select" className="w-full h-9 sm:h-10 text-sm">
                 <SelectValue placeholder="Select format" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="markdown">Markdown (.md)</SelectItem>
                 <SelectItem value="pdf">PDF (.pdf)</SelectItem>
-                <SelectItem value="docx" disabled>DOCX (.docx) - Coming Soon</SelectItem>
+                <SelectItem value="docx" disabled>DOCX (.docx) - Soon</SelectItem>
               </SelectContent>
             </Select>
-             {format === 'pdf' && <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1"><FileWarning className="h-3 w-3 text-amber-500"/> PDF formatting has limitations and may differ from screen.</p>}
-             {format === 'docx' && <p className="text-xs text-muted-foreground mt-1">DOCX export is not yet available.</p>}
+             {format === 'pdf' && <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1"><FileWarning className="h-3 w-3 text-amber-500"/> PDF formatting may vary.</p>}
           </div>
 
-          <div className="space-y-4">
-             <Label>Include</Label>
+          <div className="space-y-3 sm:space-y-4">
+             <Label className="text-sm">Include</Label>
              <div className="flex items-center space-x-2">
                 <Checkbox
                   id="include-title"
                   checked={includeTitlePage}
                   onCheckedChange={(checked) => setIncludeTitlePage(!!checked)}
                 />
-                <Label htmlFor="include-title" className="font-normal cursor-pointer">
+                <Label htmlFor="include-title" className="text-sm font-normal cursor-pointer">
                   Title Page / Project Details
                 </Label>
             </div>
@@ -372,7 +285,7 @@ export default function ExportPage() {
                   checked={includeToc}
                   onCheckedChange={(checked) => setIncludeToc(!!checked)}
                 />
-                <Label htmlFor="include-toc" className="font-normal cursor-pointer">
+                <Label htmlFor="include-toc" className="text-sm font-normal cursor-pointer">
                   Table of Contents (if generated)
                 </Label>
              </div>
@@ -383,31 +296,31 @@ export default function ExportPage() {
                       checked={addHeadersFooters}
                       onCheckedChange={(checked) => setAddHeadersFooters(!!checked)}
                     />
-                    <Label htmlFor="add-headers-footers" className="font-normal cursor-pointer">
-                      Headers (Title) & Footers (Page Numbers)
+                    <Label htmlFor="add-headers-footers" className="text-sm font-normal cursor-pointer">
+                      Headers & Footers (PDF only)
                     </Label>
                  </div>
              )}
           </div>
 
         </CardContent>
-        <CardFooter className="flex flex-col sm:flex-row gap-2">
+        <CardFooter className="flex flex-col sm:flex-row gap-2 p-4 sm:p-6">
            <Button
                variant="outline"
                onClick={handlePreview}
                disabled={isPreviewing || isExporting || format !== 'pdf'}
-               className="w-full sm:w-auto focus-visible:glow-accent"
+               className="w-full sm:w-auto focus-visible:glow-accent h-9 sm:h-10 text-sm"
            >
                {isPreviewing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Eye className="mr-2 h-4 w-4" />}
-               {isPreviewing ? 'Generating Preview...' : 'Preview PDF'}
+               {isPreviewing ? 'Generating...' : 'Preview PDF'}
            </Button>
           <Button
             onClick={handleExport}
-            disabled={isExporting || isPreviewing || format === 'docx'} // Disable if exporting/previewing or format is DOCX
-            className="w-full sm:flex-1 hover:glow-primary focus-visible:glow-primary" // flex-1 to take remaining space on small screens if needed
+            disabled={isExporting || isPreviewing || format === 'docx'}
+            className="w-full sm:flex-1 hover:glow-primary focus-visible:glow-primary h-9 sm:h-10 text-sm"
           >
             {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-            {isExporting ? `Exporting as ${format.toUpperCase()}...` : `Export as ${format.toUpperCase()}`}
+            {isExporting ? `Exporting...` : `Export as ${format.toUpperCase()}`}
           </Button>
         </CardFooter>
       </Card>

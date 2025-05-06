@@ -1,3 +1,4 @@
+
 // src/app/register/page.tsx
 "use client";
 
@@ -23,7 +24,7 @@ export default function RegisterPage() {
 
     const handleRegister = (e: React.FormEvent) => {
         e.preventDefault();
-        setError(''); // Clear previous errors
+        setError('');
 
         if (password !== confirmPassword) {
             setError('Passwords do not match.');
@@ -35,30 +36,28 @@ export default function RegisterPage() {
         }
 
         setIsLoading(true);
-        // Simulate API call
         console.log('Registration attempt:', { name, email, password });
         setTimeout(() => {
             setIsLoading(false);
-            // Simulate successful registration
             toast({
                 title: 'Registration Successful',
                 description: 'You can now log in.',
             });
-            router.push('/login'); // Redirect to login page after registration
+            router.push('/login');
         }, 1500);
     };
 
     return (
-        <Card className="w-full max-w-md shadow-2xl">
-            <CardHeader className="text-center">
-                 <UserPlus className="w-12 h-12 mx-auto text-primary mb-2" />
-                <CardTitle className="text-2xl text-glow-primary">Create Account</CardTitle>
-                <CardDescription>Join Project Forge to start creating.</CardDescription>
+        <Card className="w-full max-w-sm sm:max-w-md shadow-2xl mx-4 sm:mx-0">
+            <CardHeader className="text-center p-4 sm:p-6">
+                 <UserPlus className="w-10 h-10 sm:w-12 sm:h-12 mx-auto text-primary mb-2" />
+                <CardTitle className="text-xl sm:text-2xl text-glow-primary">Create Account</CardTitle>
+                <CardDescription className="text-sm sm:text-base">Join Project Forge to start creating.</CardDescription>
             </CardHeader>
-            <CardContent>
-                <form onSubmit={handleRegister} className="space-y-5">
-                    <div className="space-y-2">
-                        <Label htmlFor="name" className="flex items-center gap-2">
+            <CardContent className="p-4 sm:p-6">
+                <form onSubmit={handleRegister} className="space-y-3 sm:space-y-5">
+                    <div className="space-y-1 sm:space-y-2">
+                        <Label htmlFor="name" className="flex items-center gap-2 text-sm">
                             <User className="w-4 h-4" /> Name
                         </Label>
                         <Input
@@ -68,11 +67,11 @@ export default function RegisterPage() {
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             required
-                             className="focus-visible:glow-primary"
+                             className="focus-visible:glow-primary h-9 sm:h-10"
                         />
                     </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="email" className="flex items-center gap-2">
+                    <div className="space-y-1 sm:space-y-2">
+                        <Label htmlFor="email" className="flex items-center gap-2 text-sm">
                             <Mail className="w-4 h-4" /> Email
                         </Label>
                         <Input
@@ -82,11 +81,11 @@ export default function RegisterPage() {
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             required
-                            className="focus-visible:glow-primary"
+                            className="focus-visible:glow-primary h-9 sm:h-10"
                         />
                     </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="password" className="flex items-center gap-2">
+                    <div className="space-y-1 sm:space-y-2">
+                        <Label htmlFor="password" className="flex items-center gap-2 text-sm">
                             <Lock className="w-4 h-4" /> Password
                         </Label>
                         <Input
@@ -97,11 +96,11 @@ export default function RegisterPage() {
                             onChange={(e) => setPassword(e.target.value)}
                             required
                             aria-describedby="password-error"
-                            className={`focus-visible:glow-primary ${error.includes('Password') ? 'border-destructive' : ''}`}
+                            className={`focus-visible:glow-primary h-9 sm:h-10 ${error.includes('Password') || error.includes('match') ? 'border-destructive' : ''}`}
                         />
                     </div>
-                    <div className="space-y-2">
-                         <Label htmlFor="confirmPassword" className="flex items-center gap-2">
+                    <div className="space-y-1 sm:space-y-2">
+                         <Label htmlFor="confirmPassword" className="flex items-center gap-2 text-sm">
                             <Lock className="w-4 h-4" /> Confirm Password
                         </Label>
                         <Input
@@ -112,18 +111,18 @@ export default function RegisterPage() {
                             onChange={(e) => setConfirmPassword(e.target.value)}
                             required
                             aria-describedby="password-error"
-                             className={`focus-visible:glow-primary ${error.includes('match') ? 'border-destructive' : ''}`}
+                             className={`focus-visible:glow-primary h-9 sm:h-10 ${error.includes('match') ? 'border-destructive' : ''}`}
                         />
                     </div>
 
-                    {error && <p id="password-error" className="text-sm text-destructive text-center">{error}</p>}
+                    {error && <p id="password-error" className="text-xs sm:text-sm text-destructive text-center">{error}</p>}
 
-                    <Button type="submit" className="w-full hover:glow-primary focus-visible:glow-primary" disabled={isLoading}>
+                    <Button type="submit" className="w-full hover:glow-primary focus-visible:glow-primary h-9 sm:h-10 text-sm sm:text-base" disabled={isLoading}>
                          {isLoading ? 'Creating Account...' : 'Sign Up'}
                     </Button>
                 </form>
             </CardContent>
-            <CardFooter className="flex justify-center text-sm">
+            <CardFooter className="flex justify-center text-xs sm:text-sm p-4 sm:p-6">
                 <p className="text-muted-foreground">
                     Already have an account?{' '}
                     <Link href="/login" className="text-primary hover:underline focus-visible:glow-accent">

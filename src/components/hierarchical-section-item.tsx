@@ -1,3 +1,4 @@
+
 // src/components/hierarchical-section-item.tsx
 "use client";
 
@@ -18,11 +19,10 @@ export interface HierarchicalSectionItemProps {
     setActiveSectionId: (id: SectionIdentifier) => void;
     onEditSectionName: (id: string, newName: string) => void;
     onDeleteSection: (id: string) => void;
-    onAddSubSection: (parentId: string) => void; // Function to add a sub-section to a specific parent
+    onAddSubSection: (parentId: string) => void;
     isEditing: boolean;
     onCloseSheet?: () => void;
-    // Prop to pass down the recursive rendering function
-    renderSubSections: (sections: HierarchicalProjectSection[], level: number, parentNumbering: string, onAddSubSection: (parentId: string) => void) => React.ReactNode[]; // Pass onAddSubSection recursively
+    renderSubSections: (sections: HierarchicalProjectSection[], level: number, parentNumbering: string, onAddSubSection: (parentId: string) => void) => React.ReactNode[];
 }
 
 export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = ({
@@ -33,10 +33,10 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
     setActiveSectionId,
     onEditSectionName,
     onDeleteSection,
-    onAddSubSection, // Get the add sub-section handler
+    onAddSubSection,
     isEditing,
     onCloseSheet,
-    renderSubSections, // Destructure the render function
+    renderSubSections,
 }) => {
     const isActive = section.id === activeSectionId;
     const [isExpanded, setIsExpanded] = useState(true); // Default to expanded
@@ -46,7 +46,6 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
     const hasSubSections = section.subSections && section.subSections.length > 0;
     const inputRef = useRef<HTMLInputElement>(null);
 
-    // Update tempName if the external section name changes while not editing
     useEffect(() => {
         if (!isNameEditing) {
             setTempName(section.name);
@@ -55,39 +54,37 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
 
 
     const handleSectionClick = () => {
-        if (isEditing || isNameEditing) return; // Prevent click if editing name or structure
+        if (isEditing || isNameEditing) return;
         setActiveSectionId(section.id);
         onCloseSheet?.();
     };
 
     const handleToggleExpand = (e: React.MouseEvent) => {
-         e.stopPropagation(); // Prevent parent button click
+         e.stopPropagation();
          setIsExpanded(!isExpanded);
     };
 
     const handleEditClick = (e: React.MouseEvent) => {
-         e.stopPropagation(); // Prevent parent button click
+         e.stopPropagation();
          setTempName(section.name);
          setIsNameEditing(true);
-         // Focus the input after state update
          setTimeout(() => inputRef.current?.focus(), 0);
     };
 
     const handleDeleteClick = (e: React.MouseEvent) => {
-        e.stopPropagation(); // Prevent parent button click
+        e.stopPropagation();
         onDeleteSection(section.id);
     };
 
-    // ** UPDATED: Handler for adding a sub-section **
     const handleAddSubSectionClick = (e: React.MouseEvent) => {
-        e.stopPropagation(); // Prevent parent button click
+        e.stopPropagation();
         if (typeof onAddSubSection !== 'function') {
              console.error("Error: onAddSubSection prop is not a function", { onAddSubSection });
              toast({ variant: "destructive", title: "Error", description: "Could not add sub-section." });
              return;
         }
-        onAddSubSection(section.id); // Call the passed handler with the current section's ID as parent
-        setIsExpanded(true); // Expand the parent when adding a sub-section
+        onAddSubSection(section.id);
+        setIsExpanded(true);
     };
 
     const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -97,7 +94,7 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
     const handleNameSave = () => {
         if (!tempName.trim()) {
             toast({ variant: "destructive", title: "Invalid Name", description: "Section name cannot be empty." });
-            setTempName(section.name); // Revert to original name
+            setTempName(section.name); // Revert
             setIsNameEditing(false);
             return;
         }
@@ -111,70 +108,68 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
         if (e.key === 'Enter') {
             handleNameSave();
         } else if (e.key === 'Escape') {
-            setTempName(section.name); // Revert on escape
+            setTempName(section.name);
             setIsNameEditing(false);
         }
     };
 
     const handleNameBlur = () => {
-        // Save on blur only if the name is valid and changed
         if (tempName.trim() && tempName.trim() !== section.name) {
             handleNameSave();
         } else {
-            // Otherwise, revert to original name and exit edit mode
             setTempName(section.name);
             setIsNameEditing(false);
         }
     };
 
 
-    // Make sure the return statement is correctly placed within the component function
+    // Main item structure
     return (
-        <div className="group w-full"> {/* Ensure group takes full width */}
-             {/* Main row containing content button and edit buttons */}
-            <div className="flex group/item relative w-full items-center"> {/* Use w-full and items-center */}
-
-                 {/* Indentation Spacer */}
+        <div className="group w-full">
+            {/* Main interactive row */}
+            <div
+                className={cn(
+                    "flex group/item relative w-full items-center pr-1 rounded-md", // Add rounded-md
+                    (isActive || isNameEditing) && !isEditing ? "bg-secondary" : "hover:bg-muted/50",
+                    "cursor-pointer" // Make the whole row subtly indicate clickability
+                )}
+                 onClick={handleSectionClick} // Click handler on the outer div
+                 role="button" // Indicate role
+                 tabIndex={0} // Make focusable
+                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleSectionClick(); }} // Keyboard activation
+            >
+                {/* Indentation, Expand/Collapse Toggle */}
                  <div
-                     className="flex-shrink-0 h-full"
-                     style={{ width: `${level * 1.5}rem` }}
-                 />
-
-                 {/* Expand/Collapse Toggle (if applicable) */}
-                 {hasSubSections ? (
-                     <Button
-                         variant="ghost"
-                         size="icon"
-                         onClick={handleToggleExpand} // Separate toggle handler
-                         className="h-6 w-6 mr-1 text-muted-foreground hover:bg-muted/50 flex-shrink-0"
-                         aria-label={isExpanded ? "Collapse section" : "Expand section"}
-                         tabIndex={0} // Make toggle focusable independently
-                     >
-                         {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                     </Button>
-                 ) : (
-                     <span className="w-6 mr-1 flex-shrink-0"></span> // Placeholder for alignment
-                 )}
-
-                {/* Section Content Button */}
-                <Button
-                    variant="ghost" // Use ghost variant for clickable area
-                    onClick={handleSectionClick}
-                    className={cn(
-                        "flex items-center justify-start text-left flex-1 group/btn h-8 min-w-0 pl-0 pr-1", // Adjusted padding
-                        (isActive || isNameEditing) && !isEditing ? "bg-secondary" : "hover:bg-ghost",
-                        isEditing ? 'pr-[70px]' : 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md',
+                     className="flex items-center flex-shrink-0 h-8" // Fixed height for alignment
+                     style={{ paddingLeft: `${level * 1}rem` }} // Reduced indentation multiplier
+                     onClick={(e) => e.stopPropagation()} // Prevent click propagation from this area
+                 >
+                    {hasSubSections ? (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={handleToggleExpand} // Separate toggle handler
+                            className="h-6 w-6 mr-1 text-muted-foreground hover:bg-transparent" // Transparent hover
+                            aria-label={isExpanded ? "Collapse section" : "Expand section"}
+                            tabIndex={0} // Make toggle focusable independently
+                        >
+                            {isExpanded ? <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4" /> : <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />}
+                        </Button>
+                    ) : (
+                        <span className="w-6 mr-1 flex-shrink-0"></span>
                     )}
-                    disabled={isEditing || isNameEditing} // Disable button interaction during edits
-                    aria-current={isActive && !isEditing && !isNameEditing ? "page" : undefined}
-                    title={section.name} // Tooltip
-                    tabIndex={isEditing ? -1 : 0} // Focusable only when not editing
-                >
-                    {/* Numbering */}
-                    <span className="font-medium text-muted-foreground flex-shrink-0 mr-1">{numbering}</span>
-                    {/* Icon */}
-                    <FileText className="h-4 w-4 flex-shrink-0 mr-1" />
-                    {/* Name or Input */}
+                </div>
+
+                {/* Section Icon, Numbering, and Name/Input */}
+                 <div
+                    className={cn(
+                        "flex items-center flex-1 min-w-0 h-8 pl-0", // No extra padding, let indentation handle it
+                        isEditing ? 'pr-[60px] sm:pr-[70px]' : '' // Space for edit buttons
+                    )}
+                     onClick={(e) => e.stopPropagation()} // Prevent click propagation when clicking text/input area
+                 >
+                    <FileText className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 mr-1 text-muted-foreground" />
+                    <span className="font-medium text-xs sm:text-sm text-muted-foreground flex-shrink-0 mr-1">{numbering}</span>
                     {isNameEditing ? (
                         <Input
                             ref={inputRef}
@@ -182,29 +177,28 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
                             onChange={handleNameChange}
                             onKeyDown={handleNameKeyDown}
                             onBlur={handleNameBlur}
-                            className="h-6 px-1 text-sm flex-1 bg-transparent border-b border-primary focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-primary text-left"
-                            onClick={(e) => e.stopPropagation()} // Prevent clicks propagating to parent button
-                            onMouseDown={(e) => e.stopPropagation()} // Prevent drag initiation on input
+                            className="h-6 px-1 text-xs sm:text-sm flex-1 bg-transparent border-b border-primary focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-primary text-left"
+                            onClick={(e) => e.stopPropagation()}
+                            onMouseDown={(e) => e.stopPropagation()}
                             aria-label={`Editing section name ${section.name}`}
                         />
                     ) : (
-                        <span className="flex-1 truncate text-left">{section.name}</span>
+                        <span className="flex-1 truncate text-left text-xs sm:text-sm">{section.name}</span>
                     )}
-                </Button>
+                </div>
 
 
-                 {/* Edit, Delete, and Add Sub-section Buttons (visible only in edit mode) */}
+                 {/* Edit, Delete, and Add Sub-section Buttons */}
                  {isEditing && !isNameEditing && (
-                     <div className="absolute right-1 top-1/2 transform -translate-y-1/2 flex gap-0.5 opacity-100 group-hover/item:opacity-100 transition-opacity z-10 bg-card">
-                         <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={handleEditClick} aria-label={`Edit section name ${section.name}`} title="Edit name">
-                             <Edit3 className="h-4 w-4" />
+                     <div className="absolute right-0.5 sm:right-1 top-1/2 transform -translate-y-1/2 flex gap-0 sm:gap-0.5 opacity-100 group-hover/item:opacity-100 transition-opacity z-10 bg-card">
+                         <Button variant="ghost" size="icon" className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground hover:text-primary" onClick={handleEditClick} aria-label={`Edit section name ${section.name}`} title="Edit name">
+                             <Edit3 className="h-3 w-3 sm:h-4 sm:w-4" />
                          </Button>
-                          {/* ** UPDATED: "+" button now calls handleAddSubSectionClick ** */}
-                          <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={handleAddSubSectionClick} aria-label={`Add sub-section to ${section.name}`} title="Add sub-section">
-                              <PlusCircle className="h-4 w-4" />
+                          <Button variant="ghost" size="icon" className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground hover:text-primary" onClick={handleAddSubSectionClick} aria-label={`Add sub-section to ${section.name}`} title="Add sub-section">
+                              <PlusCircle className="h-3 w-3 sm:h-4 sm:w-4" />
                           </Button>
-                         <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={handleDeleteClick} aria-label={`Delete section ${section.name}`} title="Delete section">
-                            <Trash2 className="h-4 w-4" />
+                         <Button variant="ghost" size="icon" className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground hover:text-destructive" onClick={handleDeleteClick} aria-label={`Delete section ${section.name}`} title="Delete section">
+                            <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
                         </Button>
                     </div>
                  )}
@@ -212,7 +206,7 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
 
             {/* Render Sub-sections recursively */}
             {hasSubSections && isExpanded && (
-                <div className="w-full"> {/* Ensure sub-section container takes full width */}
+                <div className="w-full">
                     {renderSubSections(section.subSections!, level + 1, numbering, onAddSubSection)}
                 </div>
             )}

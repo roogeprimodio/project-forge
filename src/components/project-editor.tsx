@@ -1,3 +1,4 @@
+
 // src/components/project-editor.tsx
 "use client";
 
@@ -9,27 +10,27 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, FileWarning, Eye, Projector, BrainCircuit } from 'lucide-react'; // Added BrainCircuit
+import { Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, FileWarning, Eye, Projector, BrainCircuit } from 'lucide-react';
 import Link from 'next/link';
-import type { Project, HierarchicalProjectSection, GeneratedSectionOutline, SectionIdentifier, OutlineSection } from '@/types/project'; // Use hierarchical type, Import OutlineSection
-import { findSectionById, updateSectionById, deleteSectionById, STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, TOC_SECTION_NAME } from '@/lib/project-utils'; // Import helpers from lib
+import type { Project, HierarchicalProjectSection, GeneratedSectionOutline, SectionIdentifier, OutlineSection } from '@/types/project';
+import { findSectionById, updateSectionById, deleteSectionById, STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, TOC_SECTION_NAME } from '@/lib/project-utils';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { useToast } from '@/hooks/use-toast';
-import { generateSectionAction, summarizeSectionAction, generateOutlineAction, suggestImprovementsAction, generateDiagramAction } from '@/app/actions'; // Added generateDiagramAction
-import type { GenerateDiagramMermaidInput } from '@/ai/flows/generate-diagram-mermaid'; // Import diagram input type
+import { generateSectionAction, summarizeSectionAction, generateOutlineAction, suggestImprovementsAction, generateDiagramAction } from '@/app/actions';
+import type { GenerateDiagramMermaidInput } from '@/ai/flows/generate-diagram-mermaid';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet"; // Import Sheet components
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { marked } from 'marked';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { v4 as uuidv4 } from 'uuid';
-import AiDiagramGenerator from './ai-diagram-generator'; // Import the diagram generator
-import MermaidDiagram from './mermaid-diagram'; // Import diagram renderer
-import { ProjectSidebarContent } from '@/components/project-sidebar-content'; // Correct import path
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // Import Tabs
-import { updateProject as updateProjectHelper } from '@/lib/project-utils'; // Import the helper function
-import MarkdownPreview from '@/components/markdown-preview'; // Import the MarkdownPreview component
+import AiDiagramGenerator from './ai-diagram-generator';
+import MermaidDiagram from './mermaid-diagram';
+import { ProjectSidebarContent } from '@/components/project-sidebar-content'; // Ensure this path is correct
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { updateProject as updateProjectHelper } from '@/lib/project-utils';
+import MarkdownPreview from '@/components/markdown-preview';
 
 
 interface ProjectEditorProps {
@@ -40,7 +41,7 @@ const MIN_CONTEXT_LENGTH = 50; // Minimum character length for context
 const MIN_CONTEXT_WORDS = 10; // Minimum word count for context
 const MAX_HISTORY_LENGTH = 10;
 
-// Logo Upload Component
+// Logo Upload Component (Optimized for Responsive Size)
 const LogoUpload = ({
     label,
     logoUrl,
@@ -96,7 +97,7 @@ const LogoUpload = ({
                     "flex flex-col items-center justify-center w-full border-2 border-dashed rounded-lg cursor-pointer bg-muted/50 hover:bg-muted/80 transition-colors duration-200",
                     !logoUrl && "p-4 text-center",
                     logoUrl && "relative overflow-hidden",
-                    "aspect-square h-32" // Fixed aspect ratio and height
+                    "aspect-square h-24 sm:h-32" // Responsive height
                 )}
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
@@ -104,15 +105,15 @@ const LogoUpload = ({
             >
                 {isUploading ? (
                      <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                        <Loader2 className="w-8 h-8 mb-3 text-muted-foreground animate-spin" />
-                        <p className="text-sm text-muted-foreground">Uploading...</p>
+                        <Loader2 className="w-6 h-6 sm:w-8 sm:h-8 mb-3 text-muted-foreground animate-spin" />
+                        <p className="text-xs sm:text-sm text-muted-foreground">Uploading...</p>
                     </div>
                 ) : logoUrl ? (
                     <>
                         <img
                             src={logoUrl}
                             alt={`${label} Preview`}
-                            className="absolute inset-0 w-full h-full object-contain p-2"
+                            className="absolute inset-0 w-full h-full object-contain p-1 sm:p-2"
                             data-ai-hint={`${label.toLowerCase().replace(' logo', '')} logo`}
                         />
                         <Button
@@ -123,16 +124,16 @@ const LogoUpload = ({
                                 e.preventDefault();
                                 onRemove(field);
                             }}
-                            className="absolute top-1 right-1 z-10 bg-background/50 hover:bg-destructive hover:text-destructive-foreground h-6 w-6 rounded-full"
+                            className="absolute top-1 right-1 z-10 bg-background/50 hover:bg-destructive hover:text-destructive-foreground h-5 w-5 sm:h-6 sm:w-6 rounded-full"
                             title={`Remove ${label}`}
                         >
-                            <XCircle className="h-4 w-4" />
+                            <XCircle className="h-3 w-3 sm:h-4 sm:w-4" />
                         </Button>
                     </>
                 ) : (
                     <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center">
-                        <UploadCloud className="w-8 h-8 mb-3 text-muted-foreground" />
-                        <p className="mb-1 text-sm text-muted-foreground"><span className="font-semibold">Click or drag</span></p>
+                        <UploadCloud className="w-6 h-6 sm:w-8 sm:h-8 mb-2 sm:mb-3 text-muted-foreground" />
+                        <p className="mb-1 text-xs sm:text-sm text-muted-foreground"><span className="font-semibold">Click or drag</span></p>
                         <p className="text-xs text-muted-foreground">PNG, JPG, WEBP</p>
                     </div>
                 )}
@@ -154,24 +155,21 @@ const LogoUpload = ({
 const StandardPagePlaceholder = ({ pageName }: { pageName: string }) => (
     <Card className="shadow-md mb-6">
         <CardHeader>
-            <CardTitle className="text-primary text-glow-primary flex items-center gap-2">
+            <CardTitle className="text-primary text-glow-primary flex items-center gap-2 text-lg md:text-xl">
                 <FileWarning className="w-5 h-5 text-amber-500" /> {pageName}
             </CardTitle>
-            <CardDescription>
-                This is a standard report page. Its content is typically generated automatically or requires specific formatting based on project details.
+            <CardDescription className="text-sm">
+                This is a standard report page. Content is typically generated automatically during export.
             </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4 min-h-[200px] flex flex-col items-center justify-center text-center">
-            <ShieldAlert className="w-12 h-12 text-muted-foreground opacity-50 mb-4" />
-            <p className="text-muted-foreground">
-                Content for the "{pageName}" is usually auto-generated during export or needs manual creation following specific guidelines.
-            </p>
-            <p className="text-xs text-muted-foreground">
-                (Direct editing is not available for this standard page type here.)
+        <CardContent className="space-y-4 min-h-[200px] flex flex-col items-center justify-center text-center text-sm text-muted-foreground p-4">
+            <ShieldAlert className="w-10 h-10 md:w-12 md:h-12 opacity-50 mb-3" />
+            <p>
+                Content for the "{pageName}" is usually auto-generated or requires manual creation following specific guidelines. Direct editing is not available here.
             </p>
              {pageName === TOC_SECTION_NAME && (
-                <p className="text-xs text-muted-foreground mt-2">
-                    The Table of Contents is automatically generated based on the sections defined in the sidebar.
+                <p className="text-xs mt-2">
+                    The Table of Contents is based on the sections defined in the sidebar.
                 </p>
              )}
         </CardContent>
@@ -190,7 +188,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const [suggestionInput, setSuggestionInput] = useState('');
   const [suggestions, setSuggestions] = useState<string | null>(null);
   const [isProjectFound, setIsProjectFound] = useState<boolean | null>(null);
-  const [isMobileSheetOpen, setIsMobileSheetOpen] = useState(false);
+  const [isMobileSheetOpen, setIsMobileSheetOpen] = useState(false); // State for mobile sidebar sheet
   const [hasMounted, setHasMounted] = useState(false);
   const [showOutlineContextAlert, setShowOutlineContextAlert] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState<Record<'universityLogoUrl' | 'collegeLogoUrl', boolean>>({ universityLogoUrl: false, collegeLogoUrl: false });
@@ -201,7 +199,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const [historyIndex, setHistoryIndex] = useState<number>(-1); // Current position in history
   const isUpdatingHistory = useRef(false); // Flag to prevent history loops
 
-  // Floating Action Button (FAB) state
+  // Floating Action Button (FAB) state for mobile sidebar trigger
   const [fabPosition, setFabPosition] = useState({ x: 0, y: 0 });
   const [isDraggingFab, setIsDraggingFab] = useState(false);
   const fabRef = useRef<HTMLButtonElement>(null);
@@ -213,16 +211,16 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
   useEffect(() => {
     setHasMounted(true);
-    // Set initial FAB position on mount
+    // Set initial FAB position on mount (relative to viewport)
     const updateInitialFabPosition = () => {
         if (typeof window === 'undefined') return;
-        const fabWidth = 56; // approx width of FAB
-        const fabHeight = 56; // approx height of FAB
-        const margin = 24; // margin from edge
+        const fabWidth = 56; // approx width of FAB (w-14)
+        const fabHeight = 56; // approx height of FAB (h-14)
+        const margin = 16; // margin from edge (space-4)
         const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
         const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
         const initialX = vw - fabWidth - margin;
-        const initialY = vh - fabHeight - margin;
+        const initialY = vh - fabHeight - margin; // Position from bottom
         setFabPosition({ x: initialX, y: initialY });
     };
     updateInitialFabPosition();
@@ -262,6 +260,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
       if (activeSectionId !== newActiveId) {
           setActiveSectionId(newActiveId);
       }
+      // Close mobile sheet when a section is selected
+      setIsMobileSheetOpen(false);
   }, [activeSectionId]); // Depend only on activeSectionId
 
   // Check if project exists on mount and handle redirects
@@ -283,7 +283,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
       toast({
         variant: "destructive",
         title: "Project Not Found",
-        description: `The project with ID ${projectId} could not be found. It might have been deleted or the link is incorrect.`,
+        description: `The project with ID ${projectId} could not be found. Redirecting...`,
       });
       const timer = setTimeout(() => router.push('/'), 2000); // Redirect after 2 seconds
       return () => clearTimeout(timer); // Cleanup timer on unmount
@@ -353,14 +353,26 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
 
   // Update project details fields - no history save on every change
-  const handleProjectDetailChange = (field: keyof Project, value: string) => {
+  const handleProjectDetailChange = (field: keyof Project, value: string | number) => { // Allow number for counters
     if (!project) return;
-    // Ensure we only update valid string fields this way
+    // Update fields based on type
     const validStringFields: (keyof Project)[] = ['title', 'projectContext', 'teamDetails', 'instituteName', 'collegeInfo', 'teamId', 'subject', 'semester', 'branch', 'guideName'];
-    if (validStringFields.includes(field)) {
-        updateProject({ [field]: value }, false); // saveToHistory = false
+    const validNumberFields: (keyof Project)[] = ['maxSections', 'maxSubSectionsPerSection'];
+
+    if (validStringFields.includes(field) && typeof value === 'string') {
+        updateProject({ [field]: value }, false);
+    } else if (validNumberFields.includes(field) && typeof value === 'number' && !isNaN(value)) {
+         updateProject({ [field]: Math.max(0, value) }, false); // Ensure non-negative
+    } else if (validNumberFields.includes(field) && typeof value === 'string') {
+        // Handle string input for number fields, attempt conversion
+        const numValue = parseInt(value, 10);
+        if (!isNaN(numValue)) {
+             updateProject({ [field]: Math.max(0, numValue) }, false);
+        } else if (value === '') {
+             updateProject({ [field]: 0 }, false); // Treat empty string as 0 or keep previous? Let's use 0 for now.
+        }
     } else {
-        console.warn(`Attempted to update non-string/optional field ${String(field)} via handleProjectDetailChange`);
+        console.warn(`Attempted to update field ${String(field)} with incompatible value type: ${typeof value}`);
     }
   };
 
@@ -381,38 +393,35 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const handleLogoUpload = (field: 'universityLogoUrl' | 'collegeLogoUrl', file: File | null) => {
     if (!project || !file) return;
 
-    // Basic file type validation
     if (!file.type.startsWith('image/')) {
         toast({ variant: 'destructive', title: 'Invalid File Type', description: 'Please upload an image file.' });
         return;
     }
-     // Basic size validation (e.g., 2MB limit)
     const maxSizeInBytes = 2 * 1024 * 1024; // 2MB
     if (file.size > maxSizeInBytes) {
          toast({ variant: 'destructive', title: 'File Too Large', description: `Image must be smaller than ${maxSizeInBytes / (1024 * 1024)}MB.` });
         return;
     }
 
-
-    setIsUploadingLogo(prev => ({ ...prev, [field]: true })); // Show loading state
+    setIsUploadingLogo(prev => ({ ...prev, [field]: true }));
     const reader = new FileReader();
     reader.onloadend = () => {
-        updateProject({ [field]: reader.result as string }, true); // saveToHistory = true
+        updateProject({ [field]: reader.result as string }, true);
         toast({ title: 'Logo Uploaded', description: `${field === 'universityLogoUrl' ? 'University' : 'College'} logo updated.` });
-        setIsUploadingLogo(prev => ({ ...prev, [field]: false })); // Hide loading state
+        setIsUploadingLogo(prev => ({ ...prev, [field]: false }));
     };
     reader.onerror = (error) => {
         console.error("Error reading file:", error);
         toast({ variant: 'destructive', title: 'Upload Failed', description: 'Could not read the file.' });
-        setIsUploadingLogo(prev => ({ ...prev, [field]: false })); // Hide loading state
+        setIsUploadingLogo(prev => ({ ...prev, [field]: false }));
     };
-    reader.readAsDataURL(file); // Read file as Data URL
+    reader.readAsDataURL(file);
   };
 
   // Handle logo removal - save immediately to history
   const handleRemoveLogo = (field: 'universityLogoUrl' | 'collegeLogoUrl') => {
        if (!project) return;
-       updateProject({ [field]: undefined }, true); // saveToHistory = true
+       updateProject({ [field]: undefined }, true);
        toast({ title: 'Logo Removed', description: `${field === 'universityLogoUrl' ? 'University' : 'College'} logo removed.` });
    };
 
@@ -426,23 +435,32 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             return;
         }
 
-
-        // Recursive function to convert AI outline structure to Project Section structure
          const convertOutlineToSections = (outlineSections: OutlineSection[], level = 0): HierarchicalProjectSection[] => {
-             return outlineSections.map(outlineSection => {
-                 const newId = uuidv4(); // Generate unique ID for each section and sub-section
-                 // Determine if this section is intended to be a diagram based on name
+             // Limit top-level sections
+            const limitedTopLevel = outlineSections.slice(0, project.maxSections || 10); // Use counter or default
+
+             return limitedTopLevel.map(outlineSection => {
+                 const newId = uuidv4();
                  const isDiagram = outlineSection.name.toLowerCase().startsWith("diagram:") || outlineSection.name.toLowerCase().startsWith("figure");
+
+                 // Recursively convert subsections, limiting depth
+                 let subSections: HierarchicalProjectSection[] = [];
+                 if (outlineSection.subSections && level < (project.maxSubSectionsPerSection || 2)) { // Use counter or default depth
+                     subSections = convertOutlineToSections(outlineSection.subSections, level + 1);
+                 } else if (outlineSection.subSections) {
+                     console.warn(`Subsections for "${outlineSection.name}" ignored due to depth limit.`);
+                 }
+
+
                  return {
                      id: newId,
                      name: outlineSection.name.trim(),
-                     // Provide different default prompts for text vs diagram sections
                      prompt: isDiagram
                          ? `Generate Mermaid code for: ${outlineSection.name.replace(/^(Diagram:|Figure \d+:)\s*/i, '').trim()}`
                          : `Generate the ${outlineSection.name.trim()} section for the project titled "${project.title}". Context: ${project.projectContext || '[No context]'}.`,
-                     content: '', // Start empty
+                     content: '',
                      lastGenerated: undefined,
-                     subSections: outlineSection.subSections ? convertOutlineToSections(outlineSection.subSections, level + 1) : [],
+                     subSections: subSections, // Assign converted (and possibly limited) subsections
                  };
              });
          };
@@ -451,23 +469,23 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
         updateProject(prev => ({
             ...prev,
-            sections: newSections, // Replace completely
-        }), true); // saveToHistory = true
+            sections: newSections,
+        }), true);
 
-        toast({ title: "Sections Generated", description: `Hierarchical sections created, including diagram placeholders.`, duration: 7000 });
+        toast({ title: "Sections Generated", description: `Hierarchical sections created based on AI outline and limits.`, duration: 7000 });
 
-        // Reset active section if it was deleted, or select first if none was active
+        // Reset active section if needed
         const currentActiveSection = activeSectionId ? findSectionById(project.sections, activeSectionId) : null;
         if (currentActiveSection && !findSectionById(newSections, activeSectionId)) {
-            handleSetActiveSection(String(-1)); // Set back to Project Details
+            handleSetActiveSection(String(-1));
         } else if (newSections.length > 0 && activeSectionId === null) {
-            handleSetActiveSection(newSections[0].id); // Select the first section
+            handleSetActiveSection(newSections[0].id);
         } else if (newSections.length === 0) {
-            handleSetActiveSection(String(-1)); // No sections, go to details
+            handleSetActiveSection(String(-1));
         }
-        setIsMobileSheetOpen(false); // Close mobile sheet if open
+        setIsMobileSheetOpen(false);
 
-    }, [project, updateProject, toast, activeSectionId, handleSetActiveSection]); // Dependencies
+    }, [project, updateProject, toast, activeSectionId, handleSetActiveSection]);
 
 
   // Generate content for a specific section
@@ -475,30 +493,25 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
       const section = project ? findSectionById(project.sections, id) : null;
       if (!project || !section || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting || isGeneratingDiagram) return;
 
-      // Check if it's a diagram section
       const isDiagram = section.name.toLowerCase().startsWith("diagram:") || section.name.toLowerCase().startsWith("figure");
 
       if (isDiagram) {
-         // Handle Diagram Generation
          setIsGeneratingDiagram(true);
          try {
             const diagramInput: GenerateDiagramMermaidInput = {
-                description: section.prompt || `Diagram for ${section.name}`, // Use prompt or name as description
-                // Optionally derive diagram type hint from name/prompt if possible
-                // diagramTypeHint: 'flowchart' // Example default
+                description: section.prompt || `Diagram for ${section.name}`,
             };
             const result = await generateDiagramAction(diagramInput);
             if ('error' in result) {
                  throw new Error(result.error);
             }
-            // Store the Mermaid code in the content field
             updateProject(prev => ({
                  ...prev,
                  sections: updateSectionById(prev.sections, id, {
-                    content: result.mermaidCode, // Store Mermaid code
+                    content: result.mermaidCode,
                     lastGenerated: new Date().toISOString(),
                  }),
-            }), true); // saveToHistory = true
+            }), true);
             toast({ title: "Diagram Generated", description: `Mermaid code for "${section.name}" created.` });
 
          } catch (error) {
@@ -509,7 +522,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
          }
 
       } else {
-         // Handle Text Content Generation
          setIsGenerating(true);
          try {
            const input = {
@@ -536,7 +548,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                content: result.reportSectionContent,
                lastGenerated: new Date().toISOString(),
              }),
-           }), true); // saveToHistory = true
+           }), true);
            toast({ title: "Section Generated", description: `"${section.name}" content updated.` });
          } catch (error) {
            console.error("Generation failed:", error);
@@ -552,7 +564,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     const handleSummarizeSection = async (id: string) => {
       const section = project ? findSectionById(project.sections, id) : null;
       if (!project || !section || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting) return;
-       // Don't summarize diagram sections
        const isDiagram = section.name.toLowerCase().startsWith("diagram:") || section.name.toLowerCase().startsWith("figure");
        if (isDiagram) {
             toast({ variant: "destructive", title: "Cannot Summarize", description: "Diagram sections cannot be summarized." });
@@ -599,19 +610,21 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         try {
             const result = await generateOutlineAction({
                 projectTitle: project.title,
-                projectContext: project.projectContext || ''
+                projectContext: project.projectContext || '',
+                // Pass the limits to the AI flow (requires updating the flow's input schema)
+                // maxSections: project.maxSections || 10,
+                // maxSubSectionsPerSection: project.maxSubSectionsPerSection || 2,
             });
 
-             // Check for error property
             if (result && typeof result === 'object' && 'error' in result) {
                 toast({ variant: "destructive", title: "Outline Generation Failed", description: result.error || "An unknown error occurred from the AI." });
                 setIsGeneratingOutline(false);
                 return;
             }
 
-            // Validate the structure more deeply
             if (!result || !Array.isArray(result.sections) || !validateOutlineStructure(result.sections)) {
-                toast({ variant: "destructive", title: "Outline Generation Failed", description: "AI did not return the expected hierarchical section structure." });
+                 console.error("Invalid outline structure received:", result);
+                 toast({ variant: "destructive", title: "Outline Generation Failed", description: "AI did not return the expected hierarchical section structure. Check console for details." });
                 setIsGeneratingOutline(false);
                 return;
             }
@@ -624,7 +637,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 return;
             }
 
-            updateSectionsFromToc(outlineResult); // Update project state
+            updateSectionsFromToc(outlineResult);
 
         } catch (error) {
             console.error("Outline generation failed:", error);
@@ -632,7 +645,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         } finally {
             setIsGeneratingOutline(false);
         }
-    }, [project, isGenerating, isSummarizing, isGeneratingOutline, isSuggesting, updateSectionsFromToc, toast]); // Dependencies
+    }, [project, isGenerating, isSummarizing, isGeneratingOutline, isSuggesting, updateSectionsFromToc, toast]);
 
 
    // Handle click on the "Generate TOC" button, includes context check
@@ -643,9 +656,9 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         const contextWords = project.projectContext?.trim().split(/\s+/).filter(Boolean).length || 0;
 
         if (contextLength < MIN_CONTEXT_LENGTH || contextWords < MIN_CONTEXT_WORDS) {
-            setShowOutlineContextAlert(true); // Show warning dialog
+            setShowOutlineContextAlert(true);
         } else {
-            proceedWithTocGeneration(); // Proceed directly if context is sufficient
+            proceedWithTocGeneration();
         }
     };
 
@@ -657,7 +670,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
      setIsSuggesting(true);
      setSuggestions(null);
      try {
-        // Flatten the hierarchical structure into a single string for the AI
         const flattenSections = (sections: HierarchicalProjectSection[], level = 0): string => {
             return sections.map(s =>
                 `${'#'.repeat(level + 2)} ${s.name}\n\n${s.content || '[Empty Section]'}\n\n` +
@@ -675,7 +687,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
          existingSections: project.sections.map(s => s.name).join(', '),
          projectType: project.projectType,
        };
-
 
        const result = await suggestImprovementsAction(suggestionActionInput);
 
@@ -700,7 +711,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
          updateProject(prev => ({
              ...prev,
              sections: updateSectionById(prev.sections, id, { name: newName }),
-         }), true); // saveToHistory = true
+         }), true);
          toast({ title: "Section Name Updated", description: `Section "${newName}" renamed.` });
      };
 
@@ -715,10 +726,9 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         updateProject(prev => ({
             ...prev,
             sections: deleteSectionById(prev.sections, sectionToDelete),
-        }), true); // saveToHistory = true
+        }), true);
         toast({ title: "Section Deleted" });
-        setSectionToDelete(null); // Close dialog
-        // If the active section was deleted, reset to project details
+        setSectionToDelete(null);
         if (activeSectionId === sectionToDelete) {
             handleSetActiveSection(String(-1));
         }
@@ -728,6 +738,25 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     const cancelDeleteSection = () => {
         setSectionToDelete(null);
     };
+
+    // Handler for adding a NEW top-level section
+     const handleAddNewSection = () => {
+         if (!project) return;
+         const newSection: HierarchicalProjectSection = {
+             id: uuidv4(),
+             name: `New Section ${project.sections.length + 1}`,
+             prompt: `Generate content for this new section.`,
+             content: '',
+             lastGenerated: undefined,
+             subSections: [],
+         };
+         updateProject(prev => ({
+             ...prev,
+             sections: [...prev.sections, newSection],
+         }), true);
+         toast({ title: "Section Added", description: `"${newSection.name}" added.` });
+         setActiveSectionId(newSection.id); // Optionally activate the new section
+     };
 
 
   // --- Placeholder Actions ---
@@ -752,14 +781,13 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     const section = findSectionById(project.sections, activeSectionId);
     if (!section) return;
 
-    // Store the Mermaid code in the content field for this diagram section
     updateProject(prev => ({
         ...prev,
         sections: updateSectionById(prev.sections, activeSectionId!, {
-            content: mermaidCode, // Store Mermaid code
+            content: mermaidCode,
             lastGenerated: new Date().toISOString(),
         }),
-    }), true); // saveToHistory = true
+    }), true);
 
     toast({ title: 'Diagram Code Saved', description: `Mermaid code saved for "${section.name}".` });
   };
@@ -778,6 +806,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
       y: e.clientY - rect.top,
     };
     target.style.cursor = 'grabbing';
+    document.body.style.userSelect = 'none'; // Prevent text selection during drag
     e.preventDefault();
   };
 
@@ -787,25 +816,27 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
      const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
      const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
 
-
     let newX = e.clientX - dragOffset.current.x;
     let newY = e.clientY - dragOffset.current.y;
 
     const fabWidth = fabRef.current.offsetWidth;
     const fabHeight = fabRef.current.offsetHeight;
-    const margin = 16;
+    const margin = 16; // Same as Tailwind's space-4
 
+    // Constrain movement within viewport boundaries
     newX = Math.max(margin, Math.min(newX, vw - fabWidth - margin));
     newY = Math.max(margin, Math.min(newY, vh - fabHeight - margin));
-
 
     setFabPosition({ x: newX, y: newY });
   }, [isDraggingFab]);
 
   const onFabMouseUp = useCallback(() => {
-    if (isDraggingFab && fabRef.current) {
+    if (isDraggingFab) {
       setIsDraggingFab(false);
-      fabRef.current.style.cursor = 'grab';
+      if (fabRef.current) {
+        fabRef.current.style.cursor = 'grab';
+      }
+      document.body.style.userSelect = ''; // Re-enable text selection
     }
   }, [isDraggingFab]);
 
@@ -821,6 +852,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     return () => {
       window.removeEventListener('mousemove', onFabMouseMove);
       window.removeEventListener('mouseup', onFabMouseUp);
+      document.body.style.userSelect = ''; // Ensure cleanup on unmount
     };
   }, [isDraggingFab, onFabMouseMove, onFabMouseUp]);
 
@@ -858,7 +890,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const activeSection = activeSectionId ? findSectionById(project.sections, activeSectionId) : null;
   const standardPageIndex = !isNaN(parseInt(activeSectionId ?? '', 10)) ? parseInt(activeSectionId!, 10) : NaN;
 
-  // Check if the active section is a diagram placeholder
   if (activeSection) {
       isDiagramSection = activeSection.name.toLowerCase().startsWith("diagram:") || activeSection.name.toLowerCase().startsWith("figure");
   }
@@ -869,41 +900,79 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
       activeViewContent = (
             <Card className="shadow-md mb-6">
               <CardHeader>
-                <CardTitle className="text-glow-primary">Project Details</CardTitle>
+                <CardTitle className="text-glow-primary text-xl md:text-2xl">Project Details</CardTitle>
                 <CardDescription>Edit general information. Context helps AI generate relevant sections.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+                {/* Title */}
                 <div>
                   <Label htmlFor="projectTitleMain">Project Title *</Label>
                   <Input id="projectTitleMain" value={project.title} onChange={(e) => handleProjectDetailChange('title', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="Enter Project Title" className="mt-1 focus-visible:glow-primary" required />
                 </div>
+                 {/* Project Type Toggle */}
                 <div className="space-y-2">
                     <Label>Project Type</Label>
-                    <RadioGroup value={project.projectType} onValueChange={(value: 'mini-project' | 'internship') => handleProjectTypeChange(value)} className="flex items-center gap-4">
+                    <RadioGroup value={project.projectType} onValueChange={(value: 'mini-project' | 'internship') => handleProjectTypeChange(value)} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                       <div className="flex items-center space-x-2"> <RadioGroupItem value="mini-project" id="type-mini" /> <Label htmlFor="type-mini" className="cursor-pointer">Mini Project</Label> </div>
                       <div className="flex items-center space-x-2"> <RadioGroupItem value="internship" id="type-internship" /> <Label htmlFor="type-internship" className="cursor-pointer">Internship</Label> </div>
                     </RadioGroup>
                 </div>
+                 {/* Project Context */}
                 <div>
                   <Label htmlFor="projectContext">Project Context *</Label>
                   <Textarea id="projectContext" value={project.projectContext} onChange={(e) => handleProjectDetailChange('projectContext', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="Briefly describe your project, goals, scope, technologies..." className="mt-1 min-h-[120px] focus-visible:glow-primary" required />
-                  <p className="text-xs text-muted-foreground mt-1">Crucial for AI section generation (at least {MIN_CONTEXT_WORDS} words and {MIN_CONTEXT_LENGTH} characters recommended).</p>
+                  <p className="text-xs text-muted-foreground mt-1">Crucial for AI section generation ({MIN_CONTEXT_WORDS}+ words, {MIN_CONTEXT_LENGTH}+ chars recommended).</p>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                 {/* Section Limits */}
+                 <div className="grid grid-cols-2 gap-4">
+                     <div>
+                         <Label htmlFor="maxSections">Max Sections</Label>
+                         <Input
+                             id="maxSections"
+                             type="number"
+                             value={project.maxSections ?? 10} // Use default if undefined
+                             onChange={(e) => handleProjectDetailChange('maxSections', e.target.value)}
+                             onBlur={handleProjectDetailBlur}
+                             placeholder="e.g., 10"
+                             className="mt-1"
+                             min="1"
+                         />
+                         <p className="text-xs text-muted-foreground mt-1">Limit AI-generated top-level sections.</p>
+                     </div>
+                     <div>
+                         <Label htmlFor="maxSubSectionsPerSection">Max Sub-Section Depth</Label>
+                         <Input
+                             id="maxSubSectionsPerSection"
+                             type="number"
+                             value={project.maxSubSectionsPerSection ?? 2} // Use default if undefined
+                             onChange={(e) => handleProjectDetailChange('maxSubSectionsPerSection', e.target.value)}
+                             onBlur={handleProjectDetailBlur}
+                             placeholder="e.g., 2"
+                             className="mt-1"
+                             min="0" // 0 means no subsections
+                         />
+                         <p className="text-xs text-muted-foreground mt-1">Limit how many levels of sub-sections AI generates.</p>
+                     </div>
+                 </div>
+                 {/* Logos */}
+                <div className="grid grid-cols-2 gap-4 md:gap-6">
                     <LogoUpload label="University Logo" logoUrl={project.universityLogoUrl} field="universityLogoUrl" onUpload={handleLogoUpload} onRemove={handleRemoveLogo} isUploading={isUploadingLogo.universityLogoUrl} />
                     <LogoUpload label="College Logo" logoUrl={project.collegeLogoUrl} field="collegeLogoUrl" onUpload={handleLogoUpload} onRemove={handleRemoveLogo} isUploading={isUploadingLogo.collegeLogoUrl} />
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Institute, Branch, Semester, Subject */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div> <Label htmlFor="instituteName">Institute Name</Label> <Input id="instituteName" value={project.instituteName || ''} onChange={(e) => handleProjectDetailChange('instituteName', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="e.g., L. D. College of Engineering" className="mt-1"/> </div>
                   <div> <Label htmlFor="branch">Branch</Label> <Input id="branch" value={project.branch || ''} onChange={(e) => handleProjectDetailChange('branch', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="e.g., Computer Engineering" className="mt-1"/> </div>
                   <div> <Label htmlFor="semester">Semester</Label> <Input id="semester" value={project.semester || ''} onChange={(e) => handleProjectDetailChange('semester', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="e.g., 5" type="number" className="mt-1"/> </div>
                   <div> <Label htmlFor="subject">Subject</Label> <Input id="subject" value={project.subject || ''} onChange={(e) => handleProjectDetailChange('subject', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="e.g., Design Engineering - 1A" className="mt-1"/> </div>
                 </div>
                 <Separator />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Team ID, Guide Name */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div> <Label htmlFor="teamId">Team ID</Label> <Input id="teamId" value={project.teamId || ''} onChange={(e) => handleProjectDetailChange('teamId', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="Enter Team ID" className="mt-1"/> </div>
                   <div> <Label htmlFor="guideName">Faculty Guide Name</Label> <Input id="guideName" value={project.guideName || ''} onChange={(e) => handleProjectDetailChange('guideName', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="Enter Guide's Name" className="mt-1"/> </div>
                 </div>
+                 {/* Team Details */}
                 <div>
                   <Label htmlFor="teamDetails">Team Details (Members & Enrollment)</Label>
                   <Textarea id="teamDetails" value={project.teamDetails} onChange={(e) => handleProjectDetailChange('teamDetails', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="John Doe - 123456789&#10;Jane Smith - 987654321" className="mt-1 min-h-[120px] focus-visible:glow-primary"/>
@@ -927,32 +996,28 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         activeViewName = activeSection.name;
 
         if (isDiagramSection) {
-            // Display Diagram Editor/Generator View
+             // Display Diagram Editor/Generator View
              activeViewContent = (
                 <div className="space-y-6">
                     <Card className="shadow-md">
                       <CardHeader>
-                        <CardTitle className="text-primary text-glow-primary flex items-center gap-2"> <Projector className="w-5 h-5"/> {activeSection.name} - Diagram</CardTitle>
-                        {activeSection.lastGenerated && ( <CardDescription>Last generated: {new Date(activeSection.lastGenerated).toLocaleString()}</CardDescription> )}
+                        <CardTitle className="text-primary text-glow-primary flex items-center gap-2 text-lg md:text-xl"> <Projector className="w-5 h-5"/> {activeSection.name} - Diagram</CardTitle>
+                        {activeSection.lastGenerated && ( <CardDescription className="text-xs md:text-sm">Last generated: {new Date(activeSection.lastGenerated).toLocaleString()}</CardDescription> )}
                       </CardHeader>
                       <CardContent className="space-y-4">
                         <p className="text-sm text-muted-foreground">Use the AI generator below to create the diagram content. The generated Mermaid code will be stored.</p>
-                        {/* Diagram Generator - Pass handler to save code */}
                         <AiDiagramGenerator onDiagramGenerated={handleDiagramGeneratedInSection} />
-                        {/* Button to trigger generation based on prompt */}
-                        <Button onClick={() => handleGenerateSection(activeSection.id)} disabled={isGeneratingDiagram || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting} className="hover:glow-primary focus-visible:glow-primary">
+                        <Button onClick={() => handleGenerateSection(activeSection.id)} disabled={isGeneratingDiagram || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting} className="hover:glow-primary focus-visible:glow-primary mt-2">
                           {isGeneratingDiagram ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BrainCircuit className="mr-2 h-4 w-4" />}
                           {isGeneratingDiagram ? 'Generating Diagram...' : 'Generate/Update Diagram with AI'}
                         </Button>
-                        {/* Display current diagram if code exists */}
                          {activeSection.content && (
-                            <div className="mt-4">
+                            <div className="mt-4 space-y-2">
                                 <Label>Current Diagram:</Label>
                                 <MermaidDiagram chart={activeSection.content} id={`diagram-${activeSection.id}`} />
-                                {/* Optionally show the code */}
                                 <details className="mt-2 text-xs">
                                     <summary className="cursor-pointer text-muted-foreground hover:text-foreground">Show Mermaid Code</summary>
-                                    <pre className="mt-1 p-2 bg-muted rounded-md text-muted-foreground overflow-x-auto max-h-40">
+                                    <pre className="mt-1 p-2 bg-muted rounded-md text-muted-foreground overflow-x-auto max-h-40 text-[10px] md:text-xs">
                                       <code>{activeSection.content}</code>
                                     </pre>
                                 </details>
@@ -968,8 +1033,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 <div className="space-y-6">
                     <Card className="shadow-md">
                       <CardHeader>
-                        <CardTitle className="text-primary text-glow-primary">{activeSection.name} - AI Prompt</CardTitle>
-                        {activeSection.lastGenerated && ( <CardDescription>Last generated: {new Date(activeSection.lastGenerated).toLocaleString()}</CardDescription> )}
+                        <CardTitle className="text-primary text-glow-primary text-lg md:text-xl">{activeSection.name} - AI Prompt</CardTitle>
+                        {activeSection.lastGenerated && ( <CardDescription className="text-xs md:text-sm">Last generated: {new Date(activeSection.lastGenerated).toLocaleString()}</CardDescription> )}
                       </CardHeader>
                       <CardContent className="space-y-4">
                         <div>
@@ -983,10 +1048,11 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                       </CardContent>
                     </Card>
 
+                    {/* Content Editor and Preview */}
                     <Card className="shadow-md mb-6">
                        <CardHeader>
-                         <CardTitle>{activeSection.name} - Content</CardTitle>
-                         <CardDescription>Edit the content using Markdown and preview the output.</CardDescription>
+                         <CardTitle className="text-lg md:text-xl">{activeSection.name} - Content</CardTitle>
+                         <CardDescription className="text-sm">Edit the content using Markdown and preview the output.</CardDescription>
                        </CardHeader>
                        <CardContent>
                          <Tabs defaultValue="edit" className="w-full">
@@ -995,7 +1061,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                              <TabsTrigger value="preview">Preview</TabsTrigger>
                            </TabsList>
                            <TabsContent value="edit" className="space-y-4">
-                               <Textarea id={`section-content-${activeSection.id}`} value={activeSection.content} onChange={(e) => handleSectionContentChange(activeSection.id, e.target.value)} onBlur={handleSectionContentBlur} placeholder={"Generated content appears here. Use Markdown..."} className="min-h-[400px] text-base focus-visible:glow-primary font-mono" />
+                               {/* Reduced height on mobile */}
+                               <Textarea id={`section-content-${activeSection.id}`} value={activeSection.content} onChange={(e) => handleSectionContentChange(activeSection.id, e.target.value)} onBlur={handleSectionContentBlur} placeholder={"Generated content appears here. Use Markdown..."} className="min-h-[300px] md:min-h-[400px] text-sm md:text-base focus-visible:glow-primary font-mono" />
                            </TabsContent>
                            <TabsContent value="preview">
                                <MarkdownPreview content={activeSection.content || ''} />
@@ -1003,7 +1070,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                          </Tabs>
                        </CardContent>
                        <CardFooter className="flex justify-end">
-                         <Button variant="outline" onClick={() => handleSummarizeSection(activeSection.id)} disabled={isSummarizing || isGenerating || isGeneratingOutline || isSuggesting || !activeSection.content?.trim()} className="hover:glow-accent focus-visible:glow-accent">
+                         <Button variant="outline" size="sm" onClick={() => handleSummarizeSection(activeSection.id)} disabled={isSummarizing || isGenerating || isGeneratingOutline || isSuggesting || !activeSection.content?.trim()} className="hover:glow-accent focus-visible:glow-accent">
                            {isSummarizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ScrollText className="mr-2 h-4 w-4" />}
                            {isSummarizing ? 'Summarizing...' : 'Summarize'}
                          </Button>
@@ -1015,14 +1082,14 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     } else {
         // Placeholder if no section is selected
         activeViewContent = (
-            <div className="flex items-center justify-center h-full">
+            <div className="flex items-center justify-center h-full p-4">
                <Card className="text-center py-8 px-6 max-w-md mx-auto shadow-md">
                   <CardHeader>
                     <CardTitle className="text-xl text-primary text-glow-primary">Select or Generate Sections</CardTitle>
-                    <CardDescription className="mt-2">Choose an item from the sidebar or generate sections if none exist.</CardDescription>
+                    <CardDescription className="mt-2 text-sm">Choose an item from the sidebar or generate sections if none exist.</CardDescription>
                   </CardHeader>
                   <CardContent className="mt-4 space-y-4">
-                     <p>Go to <Button variant="link" className="p-0 h-auto text-base" onClick={() => handleSetActiveSection(String(-1))}>Project Details</Button>, provide context, then click "Generate Sections".</p>
+                     <p className="text-sm">Go to <Button variant="link" className="p-0 h-auto text-base" onClick={() => handleSetActiveSection(String(-1))}>Project Details</Button>, provide context, then click "Generate Sections".</p>
                     <Button variant="default" size="sm" onClick={handleGenerateTocClick} disabled={isGeneratingOutline || isGenerating || isSummarizing || isSuggesting || !project.projectContext?.trim()} className="hover:glow-primary focus-visible:glow-primary">
                       {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
                       {isGeneratingOutline ? 'Generating...' : 'Generate Sections'}
@@ -1034,22 +1101,24 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         );
     }
 
-  // Main Editor Layout
+  // Main Editor Layout using Sheet for mobile sidebar
   return (
     <Sheet open={isMobileSheetOpen} onOpenChange={setIsMobileSheetOpen}>
-      <div className="flex h-full relative">
+      <div className="flex h-full relative"> {/* Ensure relative for FAB positioning */}
 
+        {/* --- Sidebar Area --- */}
         {/* Mobile: Sidebar inside Sheet */}
-        <SheetContent side="left" className="p-0 w-64 bg-card md:hidden">
+        <SheetContent side="left" className="p-0 w-72 sm:w-80 bg-card md:hidden"> {/* Adjust width */}
           <SheetHeader className="p-4 border-b">
             <SheetTitle>Project Menu</SheetTitle>
-            <SheetDescription>Navigate and manage your project sections.</SheetDescription>
+            <SheetDescription>Navigate and manage your project.</SheetDescription>
           </SheetHeader>
+          {/* Pass close handler to sidebar content */}
           <ProjectSidebarContent
             project={project}
             updateProject={updateProject}
             activeSectionId={activeSectionId}
-            setActiveSectionId={handleSetActiveSection}
+            setActiveSectionId={handleSetActiveSection} // Already closes sheet
             handleGenerateTocClick={handleGenerateTocClick}
             isGeneratingOutline={isGeneratingOutline}
             isGenerating={isGenerating}
@@ -1063,11 +1132,15 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             setIsEditingSections={setIsEditingSections}
             onEditSectionName={handleEditSectionName}
             onDeleteSection={handleDeleteSection}
+            handleAddNewSection={handleAddNewSection} // Pass the handler
           />
         </SheetContent>
 
         {/* Desktop: Static Sidebar */}
-        <div className={cn("hidden md:flex md:flex-col transition-all duration-300 ease-in-out overflow-y-auto overflow-x-hidden", "w-64 border-r")}>
+        <div className={cn(
+             "hidden md:flex md:flex-col transition-all duration-300 ease-in-out overflow-y-auto overflow-x-hidden",
+             "w-72 lg:w-80 border-r bg-card" // Slightly wider on desktop
+         )}>
             <ProjectSidebarContent
                 project={project}
                 updateProject={updateProject}
@@ -1085,32 +1158,42 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 setIsEditingSections={setIsEditingSections}
                 onEditSectionName={handleEditSectionName}
                 onDeleteSection={handleDeleteSection}
+                handleAddNewSection={handleAddNewSection} // Pass the handler
             />
         </div>
 
         {/* --- Main Content Area --- */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/95 backdrop-blur-sm px-4 lg:px-6 flex-shrink-0">
-            <h1 className="flex-1 text-lg font-semibold md:text-xl text-primary truncate text-glow-primary">
+          <header className="sticky top-0 z-10 flex h-14 items-center gap-2 sm:gap-4 border-b bg-background/95 backdrop-blur-sm px-3 sm:px-4 lg:px-6 flex-shrink-0">
+            {/* Header Title */}
+            <h1 className="flex-1 text-base sm:text-lg font-semibold md:text-xl text-primary truncate text-glow-primary">
                {activeViewName}
             </h1>
-            <div className="flex items-center gap-1 text-xs text-muted-foreground ml-auto mr-2" title={`Project stored ${project.storageType === 'local' ? 'locally' : 'in the cloud'}`}>
+             {/* Storage Status */}
+            <div className="flex items-center gap-1 text-xs text-muted-foreground ml-auto mr-1 sm:mr-2" title={`Project stored ${project.storageType === 'local' ? 'locally' : 'in the cloud'}`}>
               {project.storageType === 'local' ? <CloudOff className="h-4 w-4" /> : <Cloud className="h-4 w-4 text-green-500" />}
-              <span>{project.storageType === 'local' ? 'Local' : 'Cloud'}</span>
+              <span className="hidden sm:inline">{project.storageType === 'local' ? 'Local' : 'Cloud'}</span>
             </div>
-            <Button variant="outline" size="sm" onClick={handleNavigateToExport} className="hover:glow-accent focus-visible:glow-accent ml-2">
-              <Download className="mr-2 h-4 w-4" /> Export Report
+             {/* Export Button */}
+            <Button variant="outline" size="sm" onClick={handleNavigateToExport} className="hover:glow-accent focus-visible:glow-accent text-xs px-2 sm:px-3 py-1 h-auto">
+              <Download className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">Export</span> Report
             </Button>
+             {/* Back to Dashboard Button - More prominent */}
+             <Button variant="ghost" size="sm" onClick={() => router.push('/')} className="text-xs px-2 sm:px-3 py-1 h-auto">
+                <Home className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4"/> Dashboard
+             </Button>
           </header>
 
-          <ScrollArea className="flex-1 p-4 md:p-6">
+          <ScrollArea className="flex-1 p-3 sm:p-4 md:p-6">
               {activeViewContent}
+             {/* AI Suggestions Section */}
              <Card className="shadow-md mt-6">
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-primary text-glow-primary"><Sparkles className="w-5 h-5" /> AI Suggestions</CardTitle>
-                    <CardDescription>Ask the AI for feedback on your report. Provide specific focus areas for targeted suggestions.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
+                 <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-lg md:text-xl text-primary text-glow-primary"><Sparkles className="w-5 h-5" /> AI Suggestions</CardTitle>
+                    <CardDescription className="text-sm">Ask the AI for feedback on your report. Provide specific focus areas for targeted suggestions.</CardDescription>
+                 </CardHeader>
+                 <CardContent className="space-y-4">
                     <div>
                         <Label htmlFor="suggestion-input">Focus area (Optional)</Label>
                         <Input id="suggestion-input" value={suggestionInput} onChange={(e) => setSuggestionInput(e.target.value)} placeholder="e.g., Improve flow, Check clarity, Add technical details..." className="mt-1 focus-visible:glow-primary" />
@@ -1125,7 +1208,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                             <div className="prose prose-sm max-w-none dark:prose-invert text-foreground" dangerouslySetInnerHTML={{ __html: marked.parse(suggestions) }} />
                         </div>
                     )}
-                </CardContent>
+                 </CardContent>
              </Card>
           </ScrollArea>
         </div>
@@ -1137,12 +1220,13 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                  variant="default"
                  size="icon"
                  className={cn(
-                     "fixed z-20 rounded-full shadow-lg w-14 h-14 hover:glow-primary focus-visible:glow-primary cursor-grab active:cursor-grabbing",
+                     "fixed z-20 rounded-full shadow-lg w-12 h-12 sm:w-14 sm:h-14 hover:glow-primary focus-visible:glow-primary cursor-grab active:cursor-grabbing",
                      "md:hidden" // Hide FAB on medium screens and up
                  )}
                  style={{ left: `${fabPosition.x}px`, top: `${fabPosition.y}px`, position: 'fixed' }}
                  onMouseDown={onFabMouseDown}
                  onClick={(e) => {
+                     // Only trigger sheet open if not dragging
                      if (!isDraggingFab) {
                         setIsMobileSheetOpen(true);
                      }
@@ -1150,21 +1234,21 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                  title="Open project menu"
                  aria-label="Open project menu"
              >
-                 <Menu className="h-6 w-6" />
+                 <Menu className="h-5 w-5 sm:h-6 sm:w-6" />
              </Button>
          </SheetTrigger>
 
 
         <AlertDialog open={showOutlineContextAlert} onOpenChange={setShowOutlineContextAlert}>
           <AlertDialogContent>
-            <AlertDialogHeader> <AlertDialogTitle>Project Context May Be Limited</AlertDialogTitle> <AlertDialogDescription> The project context is short ({project?.projectContext?.trim().split(/\s+/).filter(Boolean).length || 0} words, minimum {MIN_CONTEXT_WORDS} recommended). Generating accurate sections might be difficult. Consider adding more details in "Project Context" for better results. Proceed anyway? </AlertDialogDescription> </AlertDialogHeader>
+            <AlertDialogHeader> <AlertDialogTitle>Project Context May Be Limited</AlertDialogTitle> <AlertDialogDescription> The project context is short ({project?.projectContext?.trim().split(/\s+/).filter(Boolean).length || 0} words). Generating accurate sections might be difficult. Consider adding more details. Proceed anyway? </AlertDialogDescription> </AlertDialogHeader>
             <AlertDialogFooter> <AlertDialogCancel>Cancel</AlertDialogCancel> <AlertDialogAction onClick={proceedWithTocGeneration}>Generate Anyway</AlertDialogAction> </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
 
          <AlertDialog open={!!sectionToDelete} onOpenChange={(open) => !open && setSectionToDelete(null)}>
            <AlertDialogContent>
-             <AlertDialogHeader> <AlertDialogTitle>Delete Section?</AlertDialogTitle> <AlertDialogDescription> Are you sure you want to delete the section "{sectionToDelete ? findSectionById(project.sections, sectionToDelete)?.name : ''}" and all its sub-sections? This action cannot be undone. </AlertDialogDescription> </AlertDialogHeader>
+             <AlertDialogHeader> <AlertDialogTitle>Delete Section?</AlertDialogTitle> <AlertDialogDescription> Are you sure you want to delete "{sectionToDelete ? findSectionById(project.sections, sectionToDelete)?.name : ''}" and its sub-sections? This cannot be undone. </AlertDialogDescription> </AlertDialogHeader>
              <AlertDialogFooter> <AlertDialogCancel onClick={cancelDeleteSection}>Cancel</AlertDialogCancel> <AlertDialogAction onClick={confirmDeleteSection} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction> </AlertDialogFooter>
            </AlertDialogContent>
          </AlertDialog>
@@ -1185,13 +1269,11 @@ const validateOutlineStructure = (sections: any[] | undefined): sections is Outl
             console.warn("Validation failed: Section missing name or is not an object:", section);
             return false;
         }
-        // If subSections exists, it MUST be an array. Recursively validate.
         if (section.hasOwnProperty('subSections')) {
             if (!Array.isArray(section.subSections)) {
                 console.warn("Validation failed: subSections exists but is not an array:", section);
                 return false;
             }
-            // Recursively validate sub-sections
             if (!validateOutlineStructure(section.subSections)) {
                  console.warn("Validation failed: Invalid structure within subSections of:", section.name);
                  return false;
@@ -1200,3 +1282,4 @@ const validateOutlineStructure = (sections: any[] | undefined): sections is Outl
         return true;
     });
 };
+

@@ -1,5 +1,6 @@
+
 // src/app/profile/page.tsx
-"use client"; // Make this a client component for state management
+"use client";
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -7,34 +8,31 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input'; // Import Input
-import { Label } from '@/components/ui/label'; // Import Label
-import { useToast } from '@/hooks/use-toast'; // Import useToast
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { User, Mail, Bell, Palette, ShieldCheck, Activity, Edit3, LogOut, Save, XCircle, Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils'; // Import cn for conditional classes
 
 export default function ProfilePage() {
     const router = useRouter();
     const { toast } = useToast();
 
-    // State for user data (could come from context or API later)
     const [user, setUser] = useState({
         name: 'Alex Doe',
         email: 'alex.doe@example.com',
-        avatarUrl: 'https://picsum.photos/id/237/200/200', // Example avatar
-        username: 'alex_doe', // Added username
+        avatarUrl: 'https://picsum.photos/id/237/200/200',
+        username: 'alex_doe',
     });
 
-    // State for API keys, using local storage
     const [geminiApiKey, setGeminiApiKey] = useLocalStorage<string>('geminiApiKey', '');
     const [openaiApiKey, setOpenaiApiKey] = useLocalStorage<string>('openaiApiKey', '');
 
-    // State for profile editing
     const [isEditing, setIsEditing] = useState(false);
     const [editForm, setEditForm] = useState({ name: '', email: '', username: '' });
     const [isSaving, setIsSaving] = useState(false);
 
-    // Effect to initialize edit form when editing starts or user data changes
     useEffect(() => {
         if (isEditing) {
             setEditForm({
@@ -47,7 +45,6 @@ export default function ProfilePage() {
 
     const handleEditToggle = () => {
         setIsEditing(!isEditing);
-        // Reset form state if canceling edit
         if (isEditing) {
             setEditForm({ name: user.name, email: user.email, username: user.username });
         }
@@ -60,9 +57,8 @@ export default function ProfilePage() {
 
     const handleSave = () => {
         setIsSaving(true);
-        // Simulate saving data (includes profile info AND API keys if changed)
         console.log('Saving profile:', editForm);
-        console.log('Saving API keys (local storage):', { geminiApiKey: '...', openaiApiKey: '...' }); // Log placeholders
+        console.log('Saving API keys (local storage):', { geminiApiKey: '...', openaiApiKey: '...' });
         setTimeout(() => {
             setUser(prevUser => ({
                 ...prevUser,
@@ -70,7 +66,6 @@ export default function ProfilePage() {
                 email: editForm.email,
                 username: editForm.username,
             }));
-            // API keys are saved automatically by useLocalStorage hook
             setIsSaving(false);
             setIsEditing(false);
             toast({
@@ -81,35 +76,35 @@ export default function ProfilePage() {
     };
 
     const handleLogout = () => {
-        // Simulate logout
         console.log('Logging out...');
         toast({
             title: 'Logged Out',
             description: 'You have been successfully logged out.',
         });
-        router.push('/login'); // Redirect to login page
+        router.push('/login');
     };
 
-    // Placeholder data - replace with actual user data if authentication is added
-    const joinDate = new Date(Date.now() - 1000 * 60 * 60 * 24 * 90); // Joined 90 days ago
-    const projectsCount = 5; // Placeholder
+    const joinDate = new Date(Date.now() - 1000 * 60 * 60 * 24 * 90);
+    const projectsCount = 5;
 
     return (
-        <div className="container mx-auto p-4 md:p-8">
+        // Responsive container padding
+        <div className="container mx-auto p-2 sm:p-4 md:p-8">
             <Card className="max-w-3xl mx-auto shadow-lg overflow-hidden">
-                <CardHeader className="bg-gradient-to-r from-primary/10 via-background to-primary/10 p-6 md:p-8 relative">
-                    <div className="flex flex-col md:flex-row items-center gap-4">
-                        <Avatar className="w-24 h-24 md:w-32 md:h-32 border-4 border-background shadow-md hover:scale-105 transition-transform duration-300">
+                <CardHeader className="bg-gradient-to-r from-primary/10 via-background to-primary/10 p-4 sm:p-6 md:p-8 relative">
+                    {/* Flex layout for avatar and info, responsive direction */}
+                    <div className="flex flex-col items-center text-center sm:flex-row sm:items-center sm:text-left gap-3 sm:gap-4">
+                        <Avatar className="w-20 h-20 sm:w-24 sm:h-24 md:w-32 md:h-32 border-4 border-background shadow-md hover:scale-105 transition-transform duration-300">
                             <AvatarImage src={user.avatarUrl} alt={user.name} data-ai-hint="professional person portrait" />
-                            <AvatarFallback className="text-4xl">
+                            <AvatarFallback className="text-3xl sm:text-4xl">
                                 {user.name.split(' ').map(n => n[0]).join('')}
                             </AvatarFallback>
                         </Avatar>
-                        <div className="text-center md:text-left flex-1">
+                        <div className="flex-1">
                             {!isEditing ? (
                                 <>
-                                    <CardTitle className="text-3xl font-bold text-primary text-glow-primary">{user.name}</CardTitle>
-                                    <CardDescription className="text-lg text-muted-foreground mt-1 flex items-center justify-center md:justify-start gap-2">
+                                    <CardTitle className="text-2xl sm:text-3xl font-bold text-primary text-glow-primary">{user.name}</CardTitle>
+                                    <CardDescription className="text-base sm:text-lg text-muted-foreground mt-1 flex items-center justify-center sm:justify-start gap-2">
                                         <Mail className="w-4 h-4" /> {user.email}
                                     </CardDescription>
                                 </>
@@ -121,7 +116,7 @@ export default function ProfilePage() {
                                         value={editForm.name}
                                         onChange={handleInputChange}
                                         placeholder="Your Name"
-                                        className="text-3xl font-bold border-0 shadow-none focus-visible:ring-0 focus-visible:border-b focus-visible:border-primary p-0 h-auto"
+                                        className="text-2xl sm:text-3xl font-bold border-0 shadow-none focus-visible:ring-0 focus-visible:border-b focus-visible:border-primary p-0 h-auto"
                                     />
                                     <Input
                                         id="edit-email"
@@ -130,45 +125,51 @@ export default function ProfilePage() {
                                         value={editForm.email}
                                         onChange={handleInputChange}
                                         placeholder="Your Email"
-                                        className="text-lg border-0 shadow-none focus-visible:ring-0 focus-visible:border-b focus-visible:border-primary p-0 h-auto text-muted-foreground"
+                                        className="text-base sm:text-lg border-0 shadow-none focus-visible:ring-0 focus-visible:border-b focus-visible:border-primary p-0 h-auto text-muted-foreground"
                                     />
                                 </div>
                             )}
-                            <p className="text-sm text-muted-foreground mt-2">Joined {joinDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
-                            <p className="text-sm text-muted-foreground">{projectsCount} Projects Created</p>
+                            <p className="text-xs sm:text-sm text-muted-foreground mt-2">Joined {joinDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                            <p className="text-xs sm:text-sm text-muted-foreground">{projectsCount} Projects Created</p>
                         </div>
-                         <div className="absolute top-4 right-4 flex gap-2">
+                         {/* Edit/Save buttons adjusted for mobile */}
+                         <div className={cn(
+                             "flex gap-2 mt-3 sm:mt-0",
+                             "sm:absolute sm:top-4 sm:right-4" // Position on larger screens
+                         )}>
                             {isEditing ? (
                                 <>
-                                    <Button variant="ghost" size="icon" onClick={handleEditToggle} className="text-muted-foreground hover:text-destructive" title="Cancel Edit">
-                                        <XCircle className="h-5 w-5" />
+                                    <Button variant="ghost" size="icon" onClick={handleEditToggle} className="text-muted-foreground hover:text-destructive h-8 w-8 sm:h-auto sm:w-auto sm:px-3" title="Cancel Edit">
+                                        <XCircle className="h-4 w-4 sm:h-5 sm:w-5" />
+                                        <span className="sm:hidden ml-1 text-xs">Cancel</span>
                                     </Button>
-                                     <Button variant="default" size="sm" onClick={handleSave} disabled={isSaving} className="hover:glow-primary focus-visible:glow-primary" title="Save Changes">
-                                         {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                                     <Button variant="default" size="sm" onClick={handleSave} disabled={isSaving} className="hover:glow-primary focus-visible:glow-primary h-8 sm:h-auto" title="Save Changes">
+                                         {isSaving ? <Loader2 className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <Save className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />}
                                          {isSaving ? 'Saving...' : 'Save'}
                                      </Button>
                                 </>
                             ) : (
-                                <Button variant="outline" size="sm" onClick={handleEditToggle} className="focus-visible:glow-accent hover:glow-accent" title="Edit Profile">
-                                    <Edit3 className="mr-2 h-4 w-4" /> Edit Profile
+                                <Button variant="outline" size="sm" onClick={handleEditToggle} className="focus-visible:glow-accent hover:glow-accent h-8 sm:h-auto" title="Edit Profile">
+                                    <Edit3 className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" /> Edit Profile
                                 </Button>
                             )}
                          </div>
                     </div>
                 </CardHeader>
 
-                <CardContent className="p-6 md:p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Responsive grid for content sections */}
+                <CardContent className="p-4 sm:p-6 md:p-8 grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
                     {/* Personal Information & Settings Section */}
-                    <div className="space-y-6">
-                        <h3 className="text-xl font-semibold text-primary flex items-center gap-2"><User className="w-5 h-5" /> Account Details</h3>
+                    <div className="space-y-4 md:space-y-6">
+                        <h3 className="text-lg sm:text-xl font-semibold text-primary flex items-center gap-2"><User className="w-5 h-5" /> Account Details</h3>
                          {!isEditing ? (
-                            <div className="space-y-3 text-sm">
+                            <div className="space-y-2 text-sm">
                                 <p><strong className="text-foreground">Username:</strong> {user.username}</p>
                                 <p><strong className="text-foreground">Email:</strong> {user.email}</p>
-                                <Button variant="link" className="p-0 h-auto text-primary hover:underline">Change Password</Button>
+                                <Button variant="link" className="p-0 h-auto text-primary hover:underline text-sm">Change Password</Button>
                             </div>
                          ) : (
-                             <div className="space-y-4 text-sm">
+                             <div className="space-y-3 text-sm">
                                 <div>
                                      <Label htmlFor="edit-username">Username</Label>
                                      <Input
@@ -177,88 +178,83 @@ export default function ProfilePage() {
                                         value={editForm.username}
                                         onChange={handleInputChange}
                                         placeholder="Username"
-                                        className="mt-1 focus-visible:glow-primary"
+                                        className="mt-1 focus-visible:glow-primary h-9" // Smaller height
                                      />
                                 </div>
-                                <p><strong className="text-foreground">Email:</strong> {editForm.email} (Cannot change email here)</p>
-                                <Button variant="link" className="p-0 h-auto text-primary hover:underline">Change Password</Button>
+                                <p><strong className="text-foreground">Email:</strong> {editForm.email} (Cannot change)</p>
+                                <Button variant="link" className="p-0 h-auto text-primary hover:underline text-sm">Change Password</Button>
                              </div>
                          )}
 
                         <Separator />
 
                         {/* API Keys Section */}
-                        <h3 className="text-xl font-semibold text-primary flex items-center gap-2"><ShieldCheck className="w-5 h-5" /> API Keys (Stored Locally)</h3>
-                        <div className="space-y-4">
+                        <h3 className="text-lg sm:text-xl font-semibold text-primary flex items-center gap-2"><ShieldCheck className="w-5 h-5" /> API Keys (Local)</h3>
+                        <div className="space-y-3">
                             <div>
-                                <Label htmlFor="gemini-api-key">Google Gemini API Key</Label>
+                                <Label htmlFor="gemini-api-key" className="text-sm">Google Gemini API Key</Label>
                                 <Input
                                     id="gemini-api-key"
-                                    type="password" // Mask the key
+                                    type="password"
                                     value={geminiApiKey}
                                     onChange={(e) => setGeminiApiKey(e.target.value)}
-                                    placeholder="Enter your Gemini API key"
-                                    className="mt-1 focus-visible:glow-primary"
-                                    autoComplete="off" // Discourage browser saving
+                                    placeholder="Enter Gemini API key"
+                                    className="mt-1 focus-visible:glow-primary h-9"
+                                    autoComplete="off"
                                 />
-                                <p className="text-xs text-muted-foreground mt-1">Optional. If provided, this key will be used for Gemini features.</p>
+                                <p className="text-xs text-muted-foreground mt-1">Optional. For Gemini features.</p>
                             </div>
                             <div>
-                                <Label htmlFor="openai-api-key">OpenAI API Key</Label>
+                                <Label htmlFor="openai-api-key" className="text-sm">OpenAI API Key</Label>
                                 <Input
                                     id="openai-api-key"
-                                    type="password" // Mask the key
+                                    type="password"
                                     value={openaiApiKey}
                                     onChange={(e) => setOpenaiApiKey(e.target.value)}
-                                    placeholder="Enter your OpenAI API key (sk-...)"
-                                    className="mt-1 focus-visible:glow-primary"
-                                    autoComplete="off" // Discourage browser saving
+                                    placeholder="Enter OpenAI API key"
+                                    className="mt-1 focus-visible:glow-primary h-9"
+                                    autoComplete="off"
                                 />
-                                <p className="text-xs text-muted-foreground mt-1">Optional. Used for features leveraging OpenAI models (if implemented).</p>
+                                <p className="text-xs text-muted-foreground mt-1">Optional. For OpenAI features.</p>
                             </div>
-                            {/* Add more inputs for other providers as needed */}
-                             <p className="text-xs text-destructive">Note: Keys are stored in your browser's local storage. Do not use this on shared computers.</p>
+                             <p className="text-xs text-destructive">Note: Keys are stored locally. Do not use on shared computers.</p>
                         </div>
 
                         <Separator />
 
-                        <h3 className="text-xl font-semibold text-primary flex items-center gap-2"><Palette className="w-5 h-5" /> Preferences</h3>
-                        <div className="space-y-3 text-sm">
-                            <p><strong className="text-foreground">Theme:</strong> (Theme toggle in sidebar)</p>
+                        <h3 className="text-lg sm:text-xl font-semibold text-primary flex items-center gap-2"><Palette className="w-5 h-5" /> Preferences</h3>
+                        <div className="space-y-2 text-sm">
+                            <p><strong className="text-foreground">Theme:</strong> (Toggle in sidebar)</p>
                             <p><strong className="text-foreground">Language:</strong> English (US)</p>
                         </div>
 
                         <Separator />
 
-                        <h3 className="text-xl font-semibold text-primary flex items-center gap-2"><Bell className="w-5 h-5" /> Notifications</h3>
-                        <div className="space-y-3 text-sm text-muted-foreground">
-                            <p>Manage notification preferences here (e.g., email updates, project alerts).</p>
-                            {/* Add Switches or Checkboxes here later */}
+                        <h3 className="text-lg sm:text-xl font-semibold text-primary flex items-center gap-2"><Bell className="w-5 h-5" /> Notifications</h3>
+                        <div className="space-y-2 text-sm text-muted-foreground">
+                            <p>Manage notification preferences (e.g., email updates).</p>
                         </div>
 
                         <Separator />
 
-                        <h3 className="text-xl font-semibold text-primary flex items-center gap-2"><ShieldCheck className="w-5 h-5" /> Security</h3>
-                        <div className="space-y-3 text-sm text-muted-foreground">
-                            <p>Review login activity and security settings.</p>
-                            <Button variant="link" className="p-0 h-auto text-primary hover:underline">View Login History</Button>
+                        <h3 className="text-lg sm:text-xl font-semibold text-primary flex items-center gap-2"><ShieldCheck className="w-5 h-5" /> Security</h3>
+                        <div className="space-y-2 text-sm text-muted-foreground">
+                            <p>Review login activity.</p>
+                            <Button variant="link" className="p-0 h-auto text-primary hover:underline text-sm">View Login History</Button>
                         </div>
 
                         <Separator />
-                         <Button variant="destructive" className="w-full mt-4" onClick={handleLogout}>
+                         <Button variant="destructive" className="w-full mt-3 sm:mt-4" onClick={handleLogout}>
                             <LogOut className="mr-2 h-4 w-4" /> Log Out
                          </Button>
                     </div>
 
                     {/* Activity Feed Section (Placeholder) */}
-                    <div className="space-y-6">
-                        <h3 className="text-xl font-semibold text-primary flex items-center gap-2"><Activity className="w-5 h-5" /> Recent Activity</h3>
-                        <div className="space-y-4 text-sm p-4 border rounded-md bg-muted/30 min-h-[200px] flex flex-col justify-center items-center">
-                            <p className="text-muted-foreground">Your recent project activities will appear here.</p>
-                            <p className="text-xs text-muted-foreground">(e.g., "Created project 'AI Report'", "Generated 'Introduction' section")</p>
-                        </div>
-                        <div className="text-center mt-6">
-                            <p className="text-sm text-muted-foreground">(Activity feed is currently a placeholder)</p>
+                    <div className="space-y-4 md:space-y-6">
+                        <h3 className="text-lg sm:text-xl font-semibold text-primary flex items-center gap-2"><Activity className="w-5 h-5" /> Recent Activity</h3>
+                        <div className="space-y-3 text-sm p-3 sm:p-4 border rounded-md bg-muted/30 min-h-[150px] sm:min-h-[200px] flex flex-col justify-center items-center">
+                            <p className="text-muted-foreground">Recent project activities appear here.</p>
+                            <p className="text-xs text-muted-foreground">(Placeholder)</p>
                         </div>
                     </div>
                 </CardContent>

@@ -1,3 +1,4 @@
+
 // src/app/login/page.tsx
 "use client";
 
@@ -21,30 +22,29 @@ export default function LoginPage() {
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
-        // Simulate API call
         console.log('Login attempt:', { email, password });
         setTimeout(() => {
             setIsLoading(false);
-            // Simulate successful login
             toast({
                 title: 'Login Successful',
                 description: 'Redirecting to dashboard...',
             });
-            router.push('/'); // Redirect to dashboard after "login"
+            router.push('/');
         }, 1500);
     };
 
     return (
-        <Card className="w-full max-w-md shadow-2xl">
-            <CardHeader className="text-center">
-                <LogIn className="w-12 h-12 mx-auto text-primary mb-2" />
-                <CardTitle className="text-2xl text-glow-primary">Welcome Back!</CardTitle>
-                <CardDescription>Log in to access your projects.</CardDescription>
+        // Card width adjusted for mobile, max-w-md for larger screens
+        <Card className="w-full max-w-sm sm:max-w-md shadow-2xl mx-4 sm:mx-0">
+            <CardHeader className="text-center p-4 sm:p-6">
+                <LogIn className="w-10 h-10 sm:w-12 sm:h-12 mx-auto text-primary mb-2" />
+                <CardTitle className="text-xl sm:text-2xl text-glow-primary">Welcome Back!</CardTitle>
+                <CardDescription className="text-sm sm:text-base">Log in to access your projects.</CardDescription>
             </CardHeader>
-            <CardContent>
-                <form onSubmit={handleLogin} className="space-y-6">
-                    <div className="space-y-2">
-                        <Label htmlFor="email" className="flex items-center gap-2">
+            <CardContent className="p-4 sm:p-6">
+                <form onSubmit={handleLogin} className="space-y-4 sm:space-y-6">
+                    <div className="space-y-1 sm:space-y-2">
+                        <Label htmlFor="email" className="flex items-center gap-2 text-sm">
                             <Mail className="w-4 h-4" /> Email
                         </Label>
                         <Input
@@ -54,11 +54,11 @@ export default function LoginPage() {
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             required
-                            className="focus-visible:glow-primary"
+                            className="focus-visible:glow-primary h-9 sm:h-10" // Adjusted height
                         />
                     </div>
-                    <div className="space-y-2">
-                         <Label htmlFor="password" className="flex items-center gap-2">
+                    <div className="space-y-1 sm:space-y-2">
+                         <Label htmlFor="password" className="flex items-center gap-2 text-sm">
                              <Lock className="w-4 h-4" /> Password
                         </Label>
                         <Input
@@ -68,15 +68,15 @@ export default function LoginPage() {
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             required
-                            className="focus-visible:glow-primary"
+                            className="focus-visible:glow-primary h-9 sm:h-10" // Adjusted height
                         />
                     </div>
-                     <Button type="submit" className="w-full hover:glow-primary focus-visible:glow-primary" disabled={isLoading}>
+                     <Button type="submit" className="w-full hover:glow-primary focus-visible:glow-primary h-9 sm:h-10 text-sm sm:text-base" disabled={isLoading}>
                         {isLoading ? 'Logging in...' : 'Log In'}
                      </Button>
                 </form>
             </CardContent>
-            <CardFooter className="flex flex-col items-center text-sm">
+            <CardFooter className="flex flex-col items-center text-xs sm:text-sm p-4 sm:p-6">
                 <p className="text-muted-foreground">
                     Don&apos;t have an account?{' '}
                     <Link href="/register" className="text-primary hover:underline focus-visible:glow-accent">
