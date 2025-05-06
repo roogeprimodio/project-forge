@@ -46,7 +46,7 @@ const prompt = ai.definePrompt({
     - **{{this}}**
     {{/each}}
     {{else}}
-    {{{teamDetails}}}
+    **{{{teamDetails}}}**
     {{/if}}
   - Degree: {{{degree}}}
   - Branch: {{{branch}}}
@@ -64,7 +64,7 @@ const prompt = ai.definePrompt({
   5.  Include placeholders for signatures of the Project Guide and Head of Department (if HOD name is provided).
   6.  Add the submission year.
   7.  If a college logo URL is provided, embed it at the top center.
-  8.  Use Markdown for professional formatting (bold, headings, horizontal lines for signature spaces).
+  8.  Use Markdown for professional formatting (bold, headings, horizontal lines for signature spaces). Use HTML for layout if necessary (e.g., centering logo, signature layout).
   9.  Output ONLY the Markdown content. No extra text or explanations.
 
   **Example Structure (Conceptual):**
@@ -131,4 +131,3 @@ const generateCertificateFlow = ai.defineFlow(
     return output!;
   }
 );
-

@@ -44,7 +44,7 @@ const prompt = ai.definePrompt({
     - {{this}}
     {{/each}}
     {{else}}
-    {{{teamDetails}}}
+    **{{{teamDetails}}}**
     {{/if}}
   - Degree: {{{degree}}}
   - Branch: {{{branch}}}
@@ -57,7 +57,7 @@ const prompt = ai.definePrompt({
   2.  The heading should be "DECLARATION".
   3.  The text should state that the student(s) declare the project report titled "{{{projectTitle}}}" is their own original work, carried out under the guidance of {{{guideName}}}.
   4.  Specify that the work has not been submitted in part or full for any other degree or diploma.
-  5.  Include placeholders for the signatures of all team members, along with their names and enrollment numbers as provided in teamDetailsLines.
+  5.  Include placeholders for the signatures of all team members, along with their names and enrollment numbers as provided in teamDetailsLines. Use HTML for multi-line signature blocks if needed.
   6.  Include the submission date.
   7.  Use Markdown for professional formatting.
   8.  Output ONLY the Markdown content. No extra text or explanations.
@@ -108,4 +108,3 @@ const generateDeclarationFlow = ai.defineFlow(
     return output!;
   }
 );
-

@@ -34,7 +34,7 @@ export async function generateCoverPage(input: GenerateCoverPageInput): Promise<
 
 const prompt = ai.definePrompt({
   name: 'generateCoverPagePrompt',
-  input: { schema: GenerateCoverPageInputSchema.extend({ teamDetailsLines: z.array(z.string()).optional() }) }, // Add teamDetailsLines to schema for prompt
+  input: { schema: GenerateCoverPageInputSchema.extend({ teamDetailsLines: z.array(z.string()).optional() }) },
   output: { schema: GenerateCoverPageOutputSchema },
   prompt: `You are an AI assistant tasked with generating a professional cover page for a student project report in Markdown format.
 
@@ -46,7 +46,7 @@ const prompt = ai.definePrompt({
     **{{this}}**
     {{/each}}
     {{else}}
-    {{{teamDetails}}}
+    **{{{teamDetails}}}**
     {{/if}}
   - In partial fulfillment for the award of the degree of: {{{degree}}}
   - In: {{{branch}}}
@@ -66,6 +66,7 @@ const prompt = ai.definePrompt({
   7.  Use appropriate Markdown formatting for headings, bold text, lists, etc., to make the page look professional and readable.
   8.  Ensure all provided information is accurately reflected.
   9.  The output should be ONLY the Markdown content for the cover page. Do not include any other text, explanations, or conversational elements.
+  10. Use HTML for centering logos if provided, like <div style="text-align: center;">...</div>.
 
   **Example Structure (Conceptual):**
 
@@ -132,4 +133,3 @@ const generateCoverPageFlow = ai.defineFlow(
     return output!;
   }
 );
-

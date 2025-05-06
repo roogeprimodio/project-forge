@@ -54,7 +54,13 @@ const prompt = ai.definePrompt({
   - Branch/Department: {{{branch}}}
   {{#if hodName}}- Head of Department: {{{hodName}}}{{/if}}
   - Team Members & Enrollment (for signature and "I" vs "We" pronoun):
+    {{#if teamDetailsLines}}
+    {{#each teamDetailsLines}}
+    {{this}}
+    {{/each}}
+    {{else}}
     {{{teamDetails}}}
+    {{/if}}
   {{#if additionalThanks}}- Specific people/groups to thank: {{{additionalThanks}}}{{/if}}
 
   **Instructions for Generating the Acknowledgement:**
@@ -64,7 +70,7 @@ const prompt = ai.definePrompt({
   4.  Specifically thank the project guide, **{{{guideName}}}**, for their guidance, support, and mentorship.
   5.  Thank the **{{{instituteName}}}** and the Department of **{{{branch}}}**. If a Head of Department (HOD) name ({{{hodName}}}) is provided, thank them explicitly.
   6.  If specific additional thanks ({{{additionalThanks}}}) are provided, incorporate them naturally. This could include friends, family, specific faculty, or staff.
-  7.  Use "I" or "We" (and corresponding possessives like "my"/"our") appropriately based on the number of team members implied by \`teamDetails\` (if multiple lines/names, use "We"; otherwise, use "I").
+  7.  Use "I" or "We" (and corresponding possessives like "my"/"our") appropriately based on the number of team members implied by \`teamDetailsLines\` (if multiple entries, use "We"; otherwise, use "I").
   8.  Conclude with a closing like "With sincere regards," or similar, followed by the names and enrollment numbers of all team members (from \`teamDetailsLines\`). Each member on a new line.
   9.  Do NOT include a heading like "# Acknowledgement" in the output; only provide the acknowledgement text itself.
   10. Output ONLY the Markdown content for the acknowledgement. No extra text or explanations.
@@ -92,4 +98,3 @@ const generateAcknowledgementFlow = ai.defineFlow(
     return output!;
   }
 );
-
