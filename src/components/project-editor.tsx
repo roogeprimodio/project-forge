@@ -9,10 +9,10 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, FileWarning, Eye, Projector, BrainCircuit, Plus, Minus, CheckCircle } from 'lucide-react'; // Added CheckCircle
+import { Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, FileWarning, Eye, Projector, BrainCircuit, Plus, Minus, CheckCircle, Edit3 } from 'lucide-react'; // Added CheckCircle, Edit3
 import Link from 'next/link';
 import type { Project, HierarchicalProjectSection, GeneratedSectionOutline, SectionIdentifier, OutlineSection } from '@/types/project'; // Use hierarchical type
-import { findSectionById, updateSectionById, deleteSectionById, STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, TOC_SECTION_NAME } from '@/lib/project-utils'; // Import functions and constants
+import { findSectionById, updateSectionById, deleteSectionById, STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, TOC_SECTION_NAME, ensureDefaultSubSection, getSectionNumbering } from '@/lib/project-utils'; // Import functions and constants
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { useToast } from '@/hooks/use-toast';
 import { generateSectionAction, summarizeSectionAction, generateOutlineAction, suggestImprovementsAction, generateDiagramAction } from '@/app/actions';
@@ -26,10 +26,10 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { v4 as uuidv4 } from 'uuid';
 import AiDiagramGenerator from '@/components/ai-diagram-generator';
 import MermaidDiagram from '@/components/mermaid-diagram';
-import { ProjectSidebarContent } from '@/components/project-sidebar-content'; // Correct import path
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // Import Tabs
-import { updateProject as updateProjectHelper } from '@/lib/project-utils'; // Import the helper function
-import MarkdownPreview from '@/components/markdown-preview'; // Import MarkdownPreview
+import { ProjectSidebarContent } from '@/components/project-sidebar-content';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { updateProject as updateProjectHelper } from '@/lib/project-utils';
+import MarkdownPreview from '@/components/markdown-preview';
 
 // Recursive component to render the preview outline
 const OutlinePreviewItem: React.FC<{ item: OutlineSection; level: number }> = ({ item, level }) => {
@@ -45,7 +45,7 @@ const OutlinePreviewItem: React.FC<{ item: OutlineSection; level: number }> = ({
       {hasSubSections && (
         <div className="border-l border-muted/30 ml-2 pl-2">
           {item.subSections.map((subItem, index) => (
-            <OutlinePreviewItem key={`${item.name}-${index}`} item={subItem} level={level + 1} />
+            <OutlinePreviewItem key={`${item.name}-${index}`} item={subItem} level={0} />
           ))}
         </div>
       )}
@@ -58,11 +58,10 @@ interface ProjectEditorProps {
   projectId: string;
 }
 
-const MIN_CONTEXT_LENGTH = 50; // Minimum character length for context
-const MIN_CONTEXT_WORDS = 10; // Minimum word count for context
+const MIN_CONTEXT_LENGTH = 30;
+const MIN_CONTEXT_WORDS = 5;
 const MAX_HISTORY_LENGTH = 10;
 
-// Logo Upload Component (Optimized for Responsive Size)
 const LogoUpload = ({
     label,
     logoUrl,
@@ -118,7 +117,7 @@ const LogoUpload = ({
                     "flex flex-col items-center justify-center w-full border-2 border-dashed rounded-lg cursor-pointer bg-muted/50 hover:bg-muted/80 transition-colors duration-200",
                     !logoUrl && "p-4 text-center",
                     logoUrl && "relative overflow-hidden",
-                    "aspect-square h-24 sm:h-32" // Responsive height
+                    "aspect-square h-24 sm:h-32"
                 )}
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
@@ -172,7 +171,6 @@ const LogoUpload = ({
     );
 };
 
-// Placeholder for Standard Pages
 const StandardPagePlaceholder = ({ pageName }: { pageName: string }) => (
     <Card className="shadow-md mb-6">
         <CardHeader>
@@ -197,8 +195,6 @@ const StandardPagePlaceholder = ({ pageName }: { pageName: string }) => (
     </Card>
 );
 
-
-// Counter Input Component
 const CounterInput = ({ label, value, onChange, onBlur, min = 0 }: {
     label: string;
     value: number;
@@ -207,14 +203,14 @@ const CounterInput = ({ label, value, onChange, onBlur, min = 0 }: {
     min?: number;
 }) => {
     const handleIncrement = () => onChange(value + 1);
-    const handleDecrement = () => onChange(Math.max(min, value - 1)); // Ensure value doesn't go below min
+    const handleDecrement = () => onChange(Math.max(min, value - 1));
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const numValue = parseInt(e.target.value, 10);
         if (!isNaN(numValue)) {
             onChange(Math.max(min, numValue));
         } else if (e.target.value === '') {
-            onChange(min); // Reset to min if input is cleared
+            onChange(min);
         }
     };
 
@@ -238,7 +234,7 @@ const CounterInput = ({ label, value, onChange, onBlur, min = 0 }: {
                     value={value}
                     onChange={handleInputChange}
                     onBlur={onBlur}
-                    className="h-8 text-center w-16 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" // Hide number spinners
+                    className="h-8 text-center w-16 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     min={min}
                 />
                 <Button
@@ -268,40 +264,36 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const [suggestionInput, setSuggestionInput] = useState('');
   const [suggestions, setSuggestions] = useState<string | null>(null);
   const [isProjectFound, setIsProjectFound] = useState<boolean | null>(null);
-  const [isMobileSheetOpen, setIsMobileSheetOpen] = useState(false); // State for mobile sidebar sheet
+  const [isMobileSheetOpen, setIsMobileSheetOpen] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
   const [showOutlineContextAlert, setShowOutlineContextAlert] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState<Record<'universityLogoUrl' | 'collegeLogoUrl', boolean>>({ universityLogoUrl: false, collegeLogoUrl: false });
   const router = useRouter();
-  const [isEditingSections, setIsEditingSections] = useState(false); // State for toggling section edit mode
-  const [sectionToDelete, setSectionToDelete] = useState<string | null>(null); // State for delete confirmation
-  const [history, setHistory] = useState<Project[]>([]); // History for undo
-  const [historyIndex, setHistoryIndex] = useState<number>(-1); // Current position in history
-  const isUpdatingHistory = useRef(false); // Flag to prevent history loops
-  const [previewedOutline, setPreviewedOutline] = useState<GeneratedSectionOutline | null>(null); // State for the previewed outline
-
-  // Floating Action Button (FAB) state for mobile sidebar trigger
+  const [isEditingSections, setIsEditingSections] = useState(false);
+  const [sectionToDelete, setSectionToDelete] = useState<string | null>(null);
+  const [history, setHistory] = useState<Project[]>([]);
+  const [historyIndex, setHistoryIndex] = useState<number>(-1);
+  const isUpdatingHistory = useRef(false);
+  const [previewedOutline, setPreviewedOutline] = useState<GeneratedSectionOutline | null>(null);
   const [fabPosition, setFabPosition] = useState({ x: 0, y: 0 });
   const [isDraggingFab, setIsDraggingFab] = useState(false);
   const fabRef = useRef<HTMLButtonElement>(null);
   const dragOffset = useRef({ x: 0, y: 0 });
-
-  // State for diagram generator in section editor
   const [isGeneratingDiagram, setIsGeneratingDiagram] = useState(false);
 
+  const [activeSubSectionId, setActiveSubSectionId] = useState<string | null>(null); // For managing which sub-section's editor is open
 
   useEffect(() => {
     setHasMounted(true);
-    // Set initial FAB position on mount (relative to viewport)
     const updateInitialFabPosition = () => {
         if (typeof window === 'undefined') return;
-        const fabWidth = 56; // approx width of FAB (w-14)
-        const fabHeight = 56; // approx height of FAB (h-14)
-        const margin = 16; // margin from edge (space-4)
+        const fabWidth = 56;
+        const fabHeight = 56;
+        const margin = 16;
         const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
         const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
         const initialX = vw - fabWidth - margin;
-        const initialY = vh - fabHeight - margin; // Position from bottom
+        const initialY = vh - fabHeight - margin;
         setFabPosition({ x: initialX, y: initialY });
     };
     updateInitialFabPosition();
@@ -309,7 +301,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     return () => window.removeEventListener('resize', updateInitialFabPosition);
   }, []);
 
-  // Derive current project state from history if available, otherwise from main projects list
    const project = useMemo(() => {
      if (historyIndex >= 0 && historyIndex < history.length) {
        return history[historyIndex];
@@ -318,7 +309,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
      return currentProjects.find(p => p.id === projectId);
    }, [projects, projectId, history, historyIndex]);
 
-  // Initialize history with the current project state on mount
   useEffect(() => {
     if (hasMounted && project && history.length === 0 && historyIndex === -1) {
       setHistory([project]);
@@ -326,41 +316,30 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     }
   }, [project, hasMounted, history.length, historyIndex]);
 
-
-  // Update project state and optionally save to history
    const updateProject = useCallback((updatedData: Partial<Project> | ((prev: Project) => Project), saveToHistory: boolean = true) => {
        updateProjectHelper(updatedData, saveToHistory, projectId, project, setProjects, setHistory, setHistoryIndex, isUpdatingHistory, historyIndex, MAX_HISTORY_LENGTH);
    }, [projectId, project, setProjects, setHistory, setHistoryIndex, historyIndex]);
 
-
-  // --- Event Handlers for UI interactions ---
-
-  // Set active section in the sidebar
     const handleSetActiveSection = useCallback((idOrIndex: SectionIdentifier) => {
         const newActiveId = String(idOrIndex);
+        setActiveSubSectionId(null); // Reset active sub-section when main section changes
         if (activeSectionId !== newActiveId) {
             setActiveSectionId(newActiveId);
-            // Clear the outline preview when navigating away from Project Details
             if (newActiveId !== String(-1)) {
                 setPreviewedOutline(null);
             }
         }
         setIsMobileSheetOpen(false);
-    }, [activeSectionId]); // Depend on activeSectionId
+    }, [activeSectionId]);
 
-  // Check if project exists on mount and handle redirects
   useEffect(() => {
-    // Prevent running this effect if project state is being updated by history changes
      if (!hasMounted || projects === undefined || isUpdatingHistory.current) return;
-
     const currentProjects = Array.isArray(projects) ? projects : [];
     const projectExists = currentProjects.some(p => p.id === projectId);
-
     if (projectExists && isProjectFound !== true) {
       setIsProjectFound(true);
-      // Set initial active section (e.g., Project Details) if none is active
       if (activeSectionId === null) {
-        handleSetActiveSection(String(-1)); // -1 for Project Details
+        handleSetActiveSection(String(-1));
       }
     } else if (!projectExists && isProjectFound !== false) {
       setIsProjectFound(false);
@@ -369,22 +348,17 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         title: "Project Not Found",
         description: `The project with ID ${projectId} could not be found. Redirecting...`,
       });
-      const timer = setTimeout(() => router.push('/'), 2000); // Redirect after 2 seconds
-      return () => clearTimeout(timer); // Cleanup timer on unmount
+      const timer = setTimeout(() => router.push('/'), 2000);
+      return () => clearTimeout(timer);
     }
-     // Only run when projectId, projects, activeSectionId, or isProjectFound change
-  }, [projectId, projects, activeSectionId, toast, router, isProjectFound, hasMounted, handleSetActiveSection]); // Added handleSetActiveSection dependency
+  }, [projectId, projects, activeSectionId, toast, router, isProjectFound, hasMounted, handleSetActiveSection]);
 
-
-  // Handle Undo action
   const handleUndo = useCallback(() => {
     if (historyIndex > 0) {
-       isUpdatingHistory.current = true; // Prevent feedback loop
+       isUpdatingHistory.current = true;
       const newIndex = historyIndex - 1;
-      setHistoryIndex(newIndex); // Move back in history
-      const undoneProject = history[newIndex]; // Get the previous project state
-
-      // Update the main projects state to reflect the undone state
+      setHistoryIndex(newIndex);
+      const undoneProject = history[newIndex];
       setProjects((prevProjects = []) => {
          const currentProjectsArray = Array.isArray(prevProjects) ? prevProjects : [];
          const projectIndex = currentProjectsArray.findIndex(p => p.id === projectId);
@@ -393,9 +367,9 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             updatedProjects[projectIndex] = undoneProject;
             return updatedProjects;
          }
-         return currentProjectsArray; // Should ideally not happen if project exists
+         return currentProjectsArray;
       });
-      setPreviewedOutline(null); // Clear preview on undo
+      setPreviewedOutline(null);
       toast({ title: "Undo successful" });
        requestAnimationFrame(() => { isUpdatingHistory.current = false; });
     } else {
@@ -405,88 +379,74 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
   const canUndo = historyIndex > 0;
 
-  // Update section content (e.g., from textarea) - no history save on every change
   const handleSectionContentChange = (id: string, content: string) => {
     if (!project) return;
      updateProject(prev => ({
          ...prev,
          sections: updateSectionById(prev.sections, id, { content }),
-     }), false); // saveToHistory = false
+     }), false);
   };
 
-   // Save content changes to history on blur
    const handleSectionContentBlur = () => {
        if (!project) return;
-       updateProject(prev => ({ ...prev }), true); // saveToHistory = true
+       updateProject(prev => ({ ...prev }), true);
    };
 
-  // Update section prompt - no history save on every change
   const handleSectionPromptChange = (id: string, prompt: string) => {
     if (!project) return;
      updateProject(prev => ({
          ...prev,
          sections: updateSectionById(prev.sections, id, { prompt }),
-     }), false); // saveToHistory = false
+     }), false);
   }
 
-   // Save prompt changes to history on blur
    const handleSectionPromptBlur = () => {
        if (!project) return;
-       updateProject(prev => ({ ...prev }), true); // saveToHistory = true
+       updateProject(prev => ({ ...prev }), true);
    };
 
-
-  // Update project details fields - no history save on every change
-  const handleProjectDetailChange = (field: keyof Project, value: string | number) => { // Allow number for counters
+  const handleProjectDetailChange = (field: keyof Project, value: string | number) => {
     if (!project) return;
-    // Update fields based on type
     const validStringFields: (keyof Project)[] = ['title', 'projectContext', 'teamDetails', 'instituteName', 'collegeInfo', 'teamId', 'subject', 'semester', 'branch', 'guideName'];
-    const validNumberFields: (keyof Project)[] = ['minSections', 'maxSubSectionsPerSection']; // Updated fields
+    const validNumberFields: (keyof Project)[] = ['minSections', 'maxSubSectionsPerSection'];
 
     if (validStringFields.includes(field) && typeof value === 'string') {
         updateProject({ [field]: value }, false);
     } else if (validNumberFields.includes(field) && typeof value === 'number' && !isNaN(value)) {
-         updateProject({ [field]: Math.max(0, value) }, false); // Ensure non-negative
+         updateProject({ [field]: Math.max(0, value) }, false);
     } else if (validNumberFields.includes(field) && typeof value === 'string') {
-        // Handle string input for number fields, attempt conversion
         const numValue = parseInt(value, 10);
         if (!isNaN(numValue)) {
              updateProject({ [field]: Math.max(0, numValue) }, false);
         } else if (value === '') {
-             updateProject({ [field]: 0 }, false); // Treat empty string as 0 or keep previous? Let's use 0 for now.
+             updateProject({ [field]: 0 }, false);
         }
     } else {
         console.warn(`Attempted to update field ${String(field)} with incompatible value type: ${typeof value}`);
     }
   };
 
-  // Save project detail changes to history on blur
   const handleProjectDetailBlur = () => {
       if (!project) return;
-      updateProject(prev => ({ ...prev }), true); // saveToHistory = true
+      updateProject(prev => ({ ...prev }), true);
   };
 
-
-  // Update project type - save immediately to history
   const handleProjectTypeChange = (value: 'mini-project' | 'internship') => {
     if (!project) return;
-    updateProject({ projectType: value }, true); // saveToHistory = true
+    updateProject({ projectType: value }, true);
   };
 
-  // Handle logo upload - save immediately to history
   const handleLogoUpload = (field: 'universityLogoUrl' | 'collegeLogoUrl', file: File | null) => {
     if (!project || !file) return;
-
     if (!file.type.startsWith('image/')) {
         toast({ variant: 'destructive', title: 'Invalid File Type', description: 'Please upload an image file.' });
         return;
     }
-    const maxSizeInBytes = 2 * 1024 * 1024; // 2MB
+    const maxSizeInBytes = 2 * 1024 * 1024;
     if (file.size > maxSizeInBytes) {
          toast({ variant: 'destructive', title: 'File Too Large', description: `Image must be smaller than ${maxSizeInBytes / (1024 * 1024)}MB.` });
         return;
     }
-
     setIsUploadingLogo(prev => ({ ...prev, [field]: true }));
     const reader = new FileReader();
     reader.onloadend = () => {
@@ -502,41 +462,31 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     reader.readAsDataURL(file);
   };
 
-  // Handle logo removal - save immediately to history
   const handleRemoveLogo = (field: 'universityLogoUrl' | 'collegeLogoUrl') => {
        if (!project) return;
        updateProject({ [field]: undefined }, true);
        toast({ title: 'Logo Removed', description: `${field === 'universityLogoUrl' ? 'University' : 'College'} logo removed.` });
    };
 
-
-  // Function to actually apply the generated outline to the project sections
     const applyGeneratedOutline = useCallback(() => {
         if (!project || !previewedOutline) return;
-
         if (!previewedOutline || !Array.isArray(previewedOutline.sections)) {
             toast({ variant: "destructive", title: "Section Update Failed", description: "No valid outline preview available to apply." });
             return;
         }
-
-         const convertOutlineToSections = (outlineSections: OutlineSection[], level = 0): HierarchicalProjectSection[] => {
-             // Limit top-level sections based on project setting or default
-            const limitedTopLevel = outlineSections.slice(0, project.minSections || 5); // Use project setting or default
-
-             return limitedTopLevel.map(outlineSection => {
+         const convertOutlineToSections = (outlineSections: OutlineSection[], level = 0, parentNumbering = ''): HierarchicalProjectSection[] => {
+            const limitedTopLevel = level === 0 ? outlineSections.slice(0, project.minSections || 5) : outlineSections;
+             return limitedTopLevel.map((outlineSection, index) => {
+                 const currentNumber = parentNumbering ? `${parentNumbering}.${index + 1}` : `${index + 1}`;
                  const newId = uuidv4();
                  const isDiagram = outlineSection.name.toLowerCase().startsWith("diagram:") || outlineSection.name.toLowerCase().startsWith("figure");
-
-                 // Recursively convert subsections, limiting depth based on project setting or default
                  let subSections: HierarchicalProjectSection[] = [];
-                 if (outlineSection.subSections && level < (project.maxSubSectionsPerSection || 2)) { // Use project setting or default depth
-                     subSections = convertOutlineToSections(outlineSection.subSections, level + 1);
+                 if (outlineSection.subSections && level < (project.maxSubSectionsPerSection || 2)) {
+                     subSections = convertOutlineToSections(outlineSection.subSections, level + 1, currentNumber);
                  } else if (outlineSection.subSections) {
                      console.warn(`Subsections for "${outlineSection.name}" ignored due to depth limit.`);
                  }
-
-
-                 return {
+                 let baseSection: HierarchicalProjectSection = {
                      id: newId,
                      name: outlineSection.name.trim(),
                      prompt: isDiagram
@@ -544,22 +494,24 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                          : `Generate the ${outlineSection.name.trim()} section for the project titled "${project.title}". Context: ${project.projectContext || '[No context]'}.`,
                      content: '',
                      lastGenerated: undefined,
-                     subSections: subSections, // Assign converted (and possibly limited) subsections
+                     subSections: subSections,
                  };
+                  // If it's a leaf node (no AI-generated subSections or depth limit reached but AI provided some)
+                  // AND it's not a diagram, ensure it gets a default content-bearing sub-section.
+                  // Diagrams are handled differently; their content is the Mermaid code.
+                 if (subSections.length === 0 && !isDiagram) {
+                    baseSection = ensureDefaultSubSection(baseSection, currentNumber);
+                 }
+                 return baseSection;
              });
          };
-
          const newSections = convertOutlineToSections(previewedOutline.sections);
-
         updateProject(prev => ({
             ...prev,
             sections: newSections,
-        }), true); // Save to history when applying
-
+        }), true);
         toast({ title: "Sections Updated", description: `Project sections updated with the generated outline.`, duration: 7000 });
-        setPreviewedOutline(null); // Clear the preview after applying
-
-        // Reset active section if needed
+        setPreviewedOutline(null);
         const currentActiveSection = activeSectionId ? findSectionById(project.sections, activeSectionId) : null;
         if (currentActiveSection && !findSectionById(newSections, activeSectionId)) {
             handleSetActiveSection(String(-1));
@@ -569,22 +521,68 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             handleSetActiveSection(String(-1));
         }
         setIsMobileSheetOpen(false);
-
     }, [project, updateProject, toast, activeSectionId, handleSetActiveSection, previewedOutline]);
 
+    const proceedWithOutlinePreviewGeneration = useCallback(async () => {
+        if (!project || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting) return;
+        setIsGeneratingOutline(true);
+        setPreviewedOutline(null);
+        try {
+            const result = await generateOutlineAction({
+                projectTitle: project.title,
+                projectContext: project.projectContext || '',
+                minSections: project.minSections,
+                maxSubSectionsPerSection: project.maxSubSectionsPerSection,
+            });
+            if (result && typeof result === 'object' && 'error' in result) {
+                toast({ variant: "destructive", title: "Outline Generation Failed", description: result.error || "An unknown error occurred from the AI." });
+                setIsGeneratingOutline(false);
+                return;
+            }
+            if (!result || !Array.isArray(result.sections) || !validateOutlineStructure(result.sections)) {
+                 console.error("Invalid outline structure received:", result);
+                 toast({ variant: "destructive", title: "Outline Generation Failed", description: "AI did not return the expected hierarchical section structure. Check console for details." });
+                 setIsGeneratingOutline(false);
+                 return;
+            }
+             const outlineResult = result as GeneratedSectionOutline;
+            if (!outlineResult.sections?.length) {
+                toast({ variant: "destructive", title: "Outline Generation Failed", description: "AI did not return suggested sections." });
+                 setIsGeneratingOutline(false);
+                return;
+            }
+            setPreviewedOutline(outlineResult);
+            toast({ title: "Outline Preview Generated", description: `Review the proposed outline below and click "Apply Outline".` });
+        } catch (error) {
+            console.error("Outline generation failed:", error);
+            toast({ variant: "destructive", title: "Outline Generation Failed", description: error instanceof Error ? error.message : "Could not generate sections." });
+        } finally {
+            setIsGeneratingOutline(false);
+        }
+    }, [project, isGenerating, isSummarizing, isGeneratingOutline, isSuggesting, toast]);
 
-  // Generate content for a specific section
-    const handleGenerateSection = async (id: string) => {
-      const section = project ? findSectionById(project.sections, id) : null;
-      if (!project || !section || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting || isGeneratingDiagram) return;
+    const handleGenerateTocClick = () => {
+        if (!project || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting) return;
+        const contextLength = project.projectContext?.trim().length || 0;
+        const contextWords = project.projectContext?.trim().split(/\s+/).filter(Boolean).length || 0;
+        if (contextLength < MIN_CONTEXT_LENGTH || contextWords < MIN_CONTEXT_WORDS) {
+            setShowOutlineContextAlert(true);
+        } else {
+            proceedWithOutlinePreviewGeneration();
+        }
+    };
 
-      const isDiagram = section.name.toLowerCase().startsWith("diagram:") || section.name.toLowerCase().startsWith("figure");
+    const handleGenerateSection = async (sectionIdToGenerate: string) => {
+      const targetSection = project ? findSectionById(project.sections, sectionIdToGenerate) : null;
+      if (!project || !targetSection || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting || isGeneratingDiagram) return;
+
+      const isDiagram = targetSection.name.toLowerCase().startsWith("diagram:") || targetSection.name.toLowerCase().startsWith("figure");
 
       if (isDiagram) {
          setIsGeneratingDiagram(true);
          try {
             const diagramInput: GenerateDiagramMermaidInput = {
-                description: section.prompt || `Diagram for ${section.name}`,
+                description: targetSection.prompt || `Diagram for ${targetSection.name}`,
             };
             const result = await generateDiagramAction(diagramInput);
             if ('error' in result) {
@@ -592,27 +590,25 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             }
             updateProject(prev => ({
                  ...prev,
-                 sections: updateSectionById(prev.sections, id, {
+                 sections: updateSectionById(prev.sections, sectionIdToGenerate, {
                     content: result.mermaidCode,
                     lastGenerated: new Date().toISOString(),
                  }),
             }), true);
-            toast({ title: "Diagram Generated", description: `Mermaid code for "${section.name}" created.` });
-
+            toast({ title: "Diagram Generated", description: `Mermaid code for "${targetSection.name}" created.` });
          } catch (error) {
              console.error("Diagram generation failed:", error);
              toast({ variant: "destructive", title: "Diagram Generation Failed", description: error instanceof Error ? error.message : "Could not generate diagram." });
          } finally {
             setIsGeneratingDiagram(false);
          }
-
       } else {
          setIsGenerating(true);
          try {
            const input = {
              projectTitle: project.title || 'Untitled Project',
-             sectionName: section.name,
-             prompt: section.prompt,
+             sectionName: targetSection.name,
+             prompt: targetSection.prompt,
              teamDetails: project.teamDetails || '',
              instituteName: project.instituteName || '',
              teamId: project.teamId,
@@ -622,19 +618,17 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
              guideName: project.guideName,
            };
            const result = await generateSectionAction(input);
-
            if ('error' in result) {
              throw new Error(result.error);
            }
-
            updateProject(prev => ({
              ...prev,
-             sections: updateSectionById(prev.sections, id, {
+             sections: updateSectionById(prev.sections, sectionIdToGenerate, {
                content: result.reportSectionContent,
                lastGenerated: new Date().toISOString(),
              }),
            }), true);
-           toast({ title: "Section Generated", description: `"${section.name}" content updated.` });
+           toast({ title: "Section Generated", description: `"${targetSection.name}" content updated.` });
          } catch (error) {
            console.error("Generation failed:", error);
            toast({ variant: "destructive", title: "Generation Failed", description: error instanceof Error ? error.message : "Could not generate content." });
@@ -644,35 +638,29 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
       }
     };
 
-
-  // Summarize content of a specific section (Only makes sense for text sections)
-    const handleSummarizeSection = async (id: string) => {
-      const section = project ? findSectionById(project.sections, id) : null;
-      if (!project || !section || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting) return;
-       const isDiagram = section.name.toLowerCase().startsWith("diagram:") || section.name.toLowerCase().startsWith("figure");
+    const handleSummarizeSection = async (sectionIdToSummarize: string) => {
+      const targetSection = project ? findSectionById(project.sections, sectionIdToSummarize) : null;
+      if (!project || !targetSection || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting) return;
+       const isDiagram = targetSection.name.toLowerCase().startsWith("diagram:") || targetSection.name.toLowerCase().startsWith("figure");
        if (isDiagram) {
             toast({ variant: "destructive", title: "Cannot Summarize", description: "Diagram sections cannot be summarized." });
            return;
        }
-
-      if (!section.content?.trim()) {
+      if (!targetSection.content?.trim()) {
         toast({ variant: "destructive", title: "Summarization Failed", description: "Section content is empty." });
         return;
       }
-
       setIsSummarizing(true);
       try {
         const result = await summarizeSectionAction({
           projectTitle: project.title,
-          sectionText: section.content,
+          sectionText: targetSection.content,
         });
-
         if ('error' in result) {
           throw new Error(result.error);
         }
-
         toast({
-          title: `Summary for "${section.name}"`,
+          title: `Summary for "${targetSection.name}"`,
           description: (
             <ScrollArea className="h-32 w-full">
               <p className="text-sm">{result.summary}</p>
@@ -688,73 +676,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
       }
     };
 
-  // Proceed with generating the outline PREVIEW (called after context check)
-    const proceedWithOutlinePreviewGeneration = useCallback(async () => {
-        if (!project || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting) return;
-        setIsGeneratingOutline(true);
-        setPreviewedOutline(null); // Clear previous preview
-        try {
-            const result = await generateOutlineAction({
-                projectTitle: project.title,
-                projectContext: project.projectContext || '',
-                minSections: project.minSections,
-                maxSubSectionsPerSection: project.maxSubSectionsPerSection,
-            });
-
-            if (result && typeof result === 'object' && 'error' in result) {
-                toast({ variant: "destructive", title: "Outline Generation Failed", description: result.error || "An unknown error occurred from the AI." });
-                setIsGeneratingOutline(false);
-                return;
-            }
-
-            if (!result || !Array.isArray(result.sections) || !validateOutlineStructure(result.sections)) {
-                 console.error("Invalid outline structure received:", result);
-                 toast({ variant: "destructive", title: "Outline Generation Failed", description: "AI did not return the expected hierarchical section structure. Check console for details." });
-                 setIsGeneratingOutline(false);
-                 return;
-            }
-
-             const outlineResult = result as GeneratedSectionOutline;
-
-            if (!outlineResult.sections?.length) {
-                toast({ variant: "destructive", title: "Outline Generation Failed", description: "AI did not return suggested sections." });
-                 setIsGeneratingOutline(false);
-                return;
-            }
-
-            // Set the previewed outline instead of applying directly
-            setPreviewedOutline(outlineResult);
-            toast({ title: "Outline Preview Generated", description: `Review the proposed outline below and click "Apply Outline".` });
-
-
-        } catch (error) {
-            console.error("Outline generation failed:", error);
-            toast({ variant: "destructive", title: "Outline Generation Failed", description: error instanceof Error ? error.message : "Could not generate sections." });
-        } finally {
-            setIsGeneratingOutline(false);
-        }
-    }, [project, isGenerating, isSummarizing, isGeneratingOutline, isSuggesting, toast]);
-
-
-   // Handle click on the "Generate TOC" button, includes context check
-    const handleGenerateTocClick = () => {
-        if (!project || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting) return;
-
-        const contextLength = project.projectContext?.trim().length || 0;
-        const contextWords = project.projectContext?.trim().split(/\s+/).filter(Boolean).length || 0;
-
-        if (contextLength < MIN_CONTEXT_LENGTH || contextWords < MIN_CONTEXT_WORDS) {
-            setShowOutlineContextAlert(true);
-        } else {
-            proceedWithOutlinePreviewGeneration(); // Generate the preview
-        }
-    };
-
-
-  // Get AI suggestions for improvement
     const handleGetSuggestions = async () => {
      if (!project || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting) return;
-
      setIsSuggesting(true);
      setSuggestions(null);
      try {
@@ -764,28 +687,21 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 (s.subSections ? flattenSections(s.subSections, level + 1) : '')
             ).join('---\n\n');
         };
-
-       // Use the currently applied sections (not the preview) for suggestions
        const currentSectionsContent = project.sections ? flattenSections(project.sections) : '';
-
        const suggestionActionInput = {
          projectTitle: project.title,
          projectContext: project.projectContext,
-         allSectionsContent: currentSectionsContent, // Use current content
+         allSectionsContent: currentSectionsContent,
          focusArea: suggestionInput || undefined,
          existingSections: project.sections.map(s => s.name).join(', '),
          projectType: project.projectType,
        };
-
        const result = await suggestImprovementsAction(suggestionActionInput);
-
        if ('error' in result) {
          throw new Error(result.error);
        }
-
        setSuggestions(result.suggestions);
        toast({ title: "AI Suggestions Ready", description: "Suggestions for improvement generated." });
-
      } catch (error) {
        console.error("Suggestion generation failed:", error);
        toast({ variant: "destructive", title: "Suggestion Failed", description: error instanceof Error ? error.message : "Could not generate suggestions." });
@@ -794,7 +710,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
      }
    };
 
-   // Handle editing section name (called from HierarchicalSectionItem)
      const handleEditSectionName = (id: string, newName: string) => {
          if (!project) return;
          updateProject(prev => ({
@@ -804,12 +719,10 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
          toast({ title: "Section Name Updated", description: `Section "${newName}" renamed.` });
      };
 
-  // Initiate section deletion process (opens confirmation dialog)
     const handleDeleteSection = (id: string) => {
         setSectionToDelete(id);
     };
 
-  // Confirm deletion after dialog confirmation
     const confirmDeleteSection = () => {
         if (!project || !sectionToDelete) return;
         updateProject(prev => ({
@@ -818,42 +731,43 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         }), true);
         toast({ title: "Section Deleted" });
         setSectionToDelete(null);
-        if (activeSectionId === sectionToDelete) {
-            handleSetActiveSection(String(-1));
+        if (activeSectionId === sectionToDelete || activeSubSectionId === sectionToDelete) {
+            setActiveSectionId(String(-1)); // Go to project details
+            setActiveSubSectionId(null);
         }
     };
 
-   // Cancel deletion from dialog
     const cancelDeleteSection = () => {
         setSectionToDelete(null);
     };
 
-    // Handler for adding a NEW top-level section
      const handleAddNewSection = () => {
          if (!project) return;
+         const newSectionNumber = project.sections.length + 1;
          const newSection: HierarchicalProjectSection = {
              id: uuidv4(),
-             name: `New Section ${project.sections.length + 1}`,
+             name: `New Section ${newSectionNumber}`,
              prompt: `Generate content for this new section.`,
-             content: '',
+             content: '', // Main sections won't have direct content anymore
              lastGenerated: undefined,
-             subSections: [],
+             subSections: [], // Start with empty sub-sections
          };
+         // Ensure the new main section gets its default sub-section
+         const sectionWithDefaultSub = ensureDefaultSubSection(newSection, String(newSectionNumber));
+
          updateProject(prev => ({
              ...prev,
-             sections: [...prev.sections, newSection],
+             sections: [...prev.sections, sectionWithDefaultSub],
          }), true);
-         toast({ title: "Section Added", description: `"${newSection.name}" added.` });
-         setActiveSectionId(newSection.id); // Optionally activate the new section
-         setPreviewedOutline(null); // Clear preview if adding manually
+         toast({ title: "Section Added", description: `"${sectionWithDefaultSub.name}" added.` });
+         setActiveSectionId(newSection.id);
+         setActiveSubSectionId(sectionWithDefaultSub.subSections[0]?.id || null); // Activate its default sub-section
+         setPreviewedOutline(null);
      };
 
-
-  // --- Placeholder Actions ---
   const handleSaveOnline = () => {
      if (!project) return;
      toast({ title: "Save Online (Coming Soon)", description: "This will save your project to the cloud." });
-     // updateProject({ storageType: 'cloud' }, true); // Example state update
   };
 
    const handleNavigateToExport = () => {
@@ -864,31 +778,24 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
      }
    };
 
-   // --- Diagram Generator Specific Handler for Section Editor ---
   const handleDiagramGeneratedInSection = (mermaidCode: string) => {
-    if (!project || !activeSectionId) return;
-
-    const section = findSectionById(project.sections, activeSectionId);
-    if (!section) return;
-
+    if (!project || !activeSubSectionId) return;
+    const subSection = findSectionById(project.sections, activeSubSectionId);
+    if (!subSection) return;
     updateProject(prev => ({
         ...prev,
-        sections: updateSectionById(prev.sections, activeSectionId!, {
+        sections: updateSectionById(prev.sections, activeSubSectionId!, {
             content: mermaidCode,
             lastGenerated: new Date().toISOString(),
         }),
     }), true);
-
-    toast({ title: 'Diagram Code Saved', description: `Mermaid code saved for "${section.name}".` });
+    toast({ title: 'Diagram Code Saved', description: `Mermaid code saved for "${subSection.name}".` });
   };
 
-
-   // --- FAB Drag Handlers ---
   const onFabMouseDown = (e: React.MouseEvent<HTMLButtonElement>) => {
     if (e.button !== 0) return;
     const target = fabRef.current;
     if (!target) return;
-
     setIsDraggingFab(true);
     const rect = target.getBoundingClientRect();
     dragOffset.current = {
@@ -896,27 +803,21 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
       y: e.clientY - rect.top,
     };
     target.style.cursor = 'grabbing';
-    document.body.style.userSelect = 'none'; // Prevent text selection during drag
+    document.body.style.userSelect = 'none';
     e.preventDefault();
   };
 
   const onFabMouseMove = useCallback((e: MouseEvent) => {
     if (!isDraggingFab || !fabRef.current) return;
-
      const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
      const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
-
     let newX = e.clientX - dragOffset.current.x;
     let newY = e.clientY - dragOffset.current.y;
-
     const fabWidth = fabRef.current.offsetWidth;
     const fabHeight = fabRef.current.offsetHeight;
-    const margin = 16; // Same as Tailwind's space-4
-
-    // Constrain movement within viewport boundaries
+    const margin = 16;
     newX = Math.max(margin, Math.min(newX, vw - fabWidth - margin));
     newY = Math.max(margin, Math.min(newY, vh - fabHeight - margin));
-
     setFabPosition({ x: newX, y: newY });
   }, [isDraggingFab]);
 
@@ -926,11 +827,10 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
       if (fabRef.current) {
         fabRef.current.style.cursor = 'grab';
       }
-      document.body.style.userSelect = ''; // Re-enable text selection
+      document.body.style.userSelect = '';
     }
   }, [isDraggingFab]);
 
-  // Add/remove global mouse listeners for FAB dragging
   useEffect(() => {
     if (isDraggingFab) {
       window.addEventListener('mousemove', onFabMouseMove);
@@ -942,14 +842,10 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     return () => {
       window.removeEventListener('mousemove', onFabMouseMove);
       window.removeEventListener('mouseup', onFabMouseUp);
-      document.body.style.userSelect = ''; // Ensure cleanup on unmount
+      document.body.style.userSelect = '';
     };
   }, [isDraggingFab, onFabMouseMove, onFabMouseUp]);
 
-
-  // --- Render Logic ---
-
-  // Loading State
   if (!hasMounted || isProjectFound === null) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,60px))] text-center p-4">
@@ -959,7 +855,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     );
   }
 
-  // Project Not Found State
   if (isProjectFound === false || !project) {
       return (
           <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,60px))] text-center p-4">
@@ -971,21 +866,16 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
        );
   }
 
-  // Determine content to display based on activeSectionId
   let activeViewContent: React.ReactNode = null;
   let activeViewName = project.title ?? 'Project';
   let isStandardPage = false;
-  let isDiagramSection = false; // Flag for diagram sections
+  let currentSectionForSubSectionView: HierarchicalProjectSection | null = null;
 
-  const activeSection = activeSectionId ? findSectionById(project.sections, activeSectionId) : null;
-  const standardPageIndex = !isNaN(parseInt(activeSectionId ?? '', 10)) ? parseInt(activeSectionId!, 10) : NaN;
-
-  if (activeSection) {
-      isDiagramSection = activeSection.name.toLowerCase().startsWith("diagram:") || activeSection.name.toLowerCase().startsWith("figure");
-  }
+  const currentActiveMainSection = activeSectionId ? findSectionById(project.sections, activeSectionId) : null;
+  const currentActiveSubSection = activeSubSectionId ? findSectionById(project.sections, activeSubSectionId) : null;
+  const isDiagramSection = currentActiveSubSection?.name.toLowerCase().startsWith("diagram:") || currentActiveSubSection?.name.toLowerCase().startsWith("figure");
 
     if (activeSectionId === String(-1)) {
-      // Display Project Details Form
       activeViewName = 'Project Details';
       activeViewContent = (
             <Card className="shadow-md mb-6">
@@ -994,12 +884,10 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 <CardDescription>Edit general information. Context helps AI generate relevant sections.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* Title */}
                 <div>
                   <Label htmlFor="projectTitleMain">Project Title *</Label>
                   <Input id="projectTitleMain" value={project.title} onChange={(e) => handleProjectDetailChange('title', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="Enter Project Title" className="mt-1 focus-visible:glow-primary" required />
                 </div>
-                 {/* Project Type Toggle */}
                 <div className="space-y-2">
                     <Label>Project Type</Label>
                     <RadioGroup value={project.projectType} onValueChange={(value: 'mini-project' | 'internship') => handleProjectTypeChange(value)} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
@@ -1007,37 +895,32 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                       <div className="flex items-center space-x-2"> <RadioGroupItem value="internship" id="type-internship" /> <Label htmlFor="type-internship" className="cursor-pointer">Internship</Label> </div>
                     </RadioGroup>
                 </div>
-                 {/* Project Context */}
                 <div>
                   <Label htmlFor="projectContext">Project Context *</Label>
                   <Textarea id="projectContext" value={project.projectContext} onChange={(e) => handleProjectDetailChange('projectContext', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="Briefly describe your project, goals, scope, technologies..." className="mt-1 min-h-[120px] focus-visible:glow-primary" required />
                   <p className="text-xs text-muted-foreground mt-1">Crucial for AI section generation ({MIN_CONTEXT_WORDS}+ words, {MIN_CONTEXT_LENGTH}+ chars recommended).</p>
                 </div>
-                 {/* Section Limits Counters */}
                  <div className="grid grid-cols-2 gap-4">
                      <CounterInput
                          label="Min Sections"
-                         value={project.minSections ?? 5} // Use default if undefined
+                         value={project.minSections ?? 5}
                          onChange={(val) => handleProjectDetailChange('minSections', val)}
                          onBlur={handleProjectDetailBlur}
                          min={1}
                      />
                      <CounterInput
                          label="Max Sub-Section Depth"
-                         value={project.maxSubSectionsPerSection ?? 2} // Use default if undefined
+                         value={project.maxSubSectionsPerSection ?? 2}
                          onChange={(val) => handleProjectDetailChange('maxSubSectionsPerSection', val)}
                          onBlur={handleProjectDetailBlur}
                          min={0}
                      />
                  </div>
                  <p className="text-xs text-muted-foreground -mt-4">Control AI outline generation limits. Min sections aims for at least this many top-level sections. Max depth limits sub-section nesting (0=none, 1=1.1, 2=1.1.1).</p>
-
-                 {/* Logos */}
                 <div className="grid grid-cols-2 gap-4 md:gap-6">
                     <LogoUpload label="University Logo" logoUrl={project.universityLogoUrl} field="universityLogoUrl" onUpload={handleLogoUpload} onRemove={handleRemoveLogo} isUploading={isUploadingLogo.universityLogoUrl} />
                     <LogoUpload label="College Logo" logoUrl={project.collegeLogoUrl} field="collegeLogoUrl" onUpload={handleLogoUpload} onRemove={handleRemoveLogo} isUploading={isUploadingLogo.collegeLogoUrl} />
                 </div>
-                {/* Institute, Branch, Semester, Subject */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div> <Label htmlFor="instituteName">Institute Name</Label> <Input id="instituteName" value={project.instituteName || ''} onChange={(e) => handleProjectDetailChange('instituteName', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="e.g., L. D. College of Engineering" className="mt-1"/> </div>
                   <div> <Label htmlFor="branch">Branch</Label> <Input id="branch" value={project.branch || ''} onChange={(e) => handleProjectDetailChange('branch', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="e.g., Computer Engineering" className="mt-1"/> </div>
@@ -1045,12 +928,10 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                   <div> <Label htmlFor="subject">Subject</Label> <Input id="subject" value={project.subject || ''} onChange={(e) => handleProjectDetailChange('subject', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="e.g., Design Engineering - 1A" className="mt-1"/> </div>
                 </div>
                 <Separator />
-                {/* Team ID, Guide Name */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div> <Label htmlFor="teamId">Team ID</Label> <Input id="teamId" value={project.teamId || ''} onChange={(e) => handleProjectDetailChange('teamId', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="Enter Team ID" className="mt-1"/> </div>
                   <div> <Label htmlFor="guideName">Faculty Guide Name</Label> <Input id="guideName" value={project.guideName || ''} onChange={(e) => handleProjectDetailChange('guideName', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="Enter Guide's Name" className="mt-1"/> </div>
                 </div>
-                 {/* Team Details */}
                 <div>
                   <Label htmlFor="teamDetails">Team Details (Members & Enrollment)</Label>
                   <Textarea id="teamDetails" value={project.teamDetails} onChange={(e) => handleProjectDetailChange('teamDetails', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="John Doe - 123456789&#10;Jane Smith - 987654321" className="mt-1 min-h-[120px] focus-visible:glow-primary"/>
@@ -1062,7 +943,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                     {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
                     {isGeneratingOutline ? 'Generating Outline...' : 'Generate Outline Preview'}
                  </Button>
-                 {/* Outline Preview Section */}
                  {previewedOutline && (
                      <div className="w-full p-4 border rounded-md bg-muted/30 space-y-3">
                          <h4 className="font-semibold text-foreground">Generated Outline Preview:</h4>
@@ -1095,71 +975,61 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
               </CardFooter>
             </Card>
       );
-    } else if (!isNaN(standardPageIndex) && standardPageIndex < -1) {
-        const standardPageEntry = Object.entries(STANDARD_PAGE_INDICES).find(([, index]) => index === standardPageIndex);
-        activeViewName = standardPageEntry ? standardPageEntry[0] : 'Standard Page';
-        isStandardPage = true;
-        activeViewContent = <StandardPagePlaceholder pageName={activeViewName} />;
-    } else if (activeSection) {
-        activeViewName = activeSection.name;
-
+    } else if (currentActiveSubSection) { // If a sub-section is active, show its editor
+        activeViewName = currentActiveSubSection.name;
         if (isDiagramSection) {
-             // Display Diagram Editor/Generator View
+            activeViewContent = (
+               <div className="space-y-6">
+                   <Card className="shadow-md">
+                     <CardHeader>
+                       <CardTitle className="text-primary text-glow-primary flex items-center gap-2 text-lg md:text-xl"> <Projector className="w-5 h-5"/> {currentActiveSubSection.name} - Diagram</CardTitle>
+                       {currentActiveSubSection.lastGenerated && ( <CardDescription className="text-xs md:text-sm">Last generated: {new Date(currentActiveSubSection.lastGenerated).toLocaleString()}</CardDescription> )}
+                     </CardHeader>
+                     <CardContent className="space-y-4">
+                       <p className="text-sm text-muted-foreground">Use the AI generator below to create the diagram content. The generated Mermaid code will be stored.</p>
+                       <AiDiagramGenerator onDiagramGenerated={handleDiagramGeneratedInSection} />
+                       <Button onClick={() => handleGenerateSection(currentActiveSubSection.id)} disabled={isGeneratingDiagram || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting} className="hover:glow-primary focus-visible:glow-primary mt-2">
+                         {isGeneratingDiagram ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BrainCircuit className="mr-2 h-4 w-4" />}
+                         {isGeneratingDiagram ? 'Generating Diagram...' : 'Generate/Update Diagram with AI'}
+                       </Button>
+                        {currentActiveSubSection.content && (
+                           <div className="mt-4 space-y-2">
+                               <Label>Current Diagram:</Label>
+                               <MermaidDiagram chart={currentActiveSubSection.content} id={`diagram-${currentActiveSubSection.id}`} />
+                               <details className="mt-2 text-xs">
+                                   <summary className="cursor-pointer text-muted-foreground hover:text-foreground">Show Mermaid Code</summary>
+                                   <pre className="mt-1 p-2 bg-muted rounded-md text-muted-foreground overflow-x-auto max-h-40 text-[10px] md:text-xs">
+                                     <code>{currentActiveSubSection.content}</code>
+                                   </pre>
+                               </details>
+                           </div>
+                        )}
+                     </CardContent>
+                   </Card>
+               </div>
+            );
+        } else {
              activeViewContent = (
                 <div className="space-y-6">
                     <Card className="shadow-md">
                       <CardHeader>
-                        <CardTitle className="text-primary text-glow-primary flex items-center gap-2 text-lg md:text-xl"> <Projector className="w-5 h-5"/> {activeSection.name} - Diagram</CardTitle>
-                        {activeSection.lastGenerated && ( <CardDescription className="text-xs md:text-sm">Last generated: {new Date(activeSection.lastGenerated).toLocaleString()}</CardDescription> )}
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <p className="text-sm text-muted-foreground">Use the AI generator below to create the diagram content. The generated Mermaid code will be stored.</p>
-                        <AiDiagramGenerator onDiagramGenerated={handleDiagramGeneratedInSection} />
-                        <Button onClick={() => handleGenerateSection(activeSection.id)} disabled={isGeneratingDiagram || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting} className="hover:glow-primary focus-visible:glow-primary mt-2">
-                          {isGeneratingDiagram ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BrainCircuit className="mr-2 h-4 w-4" />}
-                          {isGeneratingDiagram ? 'Generating Diagram...' : 'Generate/Update Diagram with AI'}
-                        </Button>
-                         {activeSection.content && (
-                            <div className="mt-4 space-y-2">
-                                <Label>Current Diagram:</Label>
-                                <MermaidDiagram chart={activeSection.content} id={`diagram-${activeSection.id}`} />
-                                <details className="mt-2 text-xs">
-                                    <summary className="cursor-pointer text-muted-foreground hover:text-foreground">Show Mermaid Code</summary>
-                                    <pre className="mt-1 p-2 bg-muted rounded-md text-muted-foreground overflow-x-auto max-h-40 text-[10px] md:text-xs">
-                                      <code>{activeSection.content}</code>
-                                    </pre>
-                                </details>
-                            </div>
-                         )}
-                      </CardContent>
-                    </Card>
-                </div>
-             );
-        } else {
-            // Display Regular Section Editor (Text + Preview)
-            activeViewContent = (
-                <div className="space-y-6">
-                    <Card className="shadow-md">
-                      <CardHeader>
-                        <CardTitle className="text-primary text-glow-primary text-lg md:text-xl">{activeSection.name} - AI Prompt</CardTitle>
-                        {activeSection.lastGenerated && ( <CardDescription className="text-xs md:text-sm">Last generated: {new Date(activeSection.lastGenerated).toLocaleString()}</CardDescription> )}
+                        <CardTitle className="text-primary text-glow-primary text-lg md:text-xl">{currentActiveSubSection.name} - AI Prompt</CardTitle>
+                        {currentActiveSubSection.lastGenerated && ( <CardDescription className="text-xs md:text-sm">Last generated: {new Date(currentActiveSubSection.lastGenerated).toLocaleString()}</CardDescription> )}
                       </CardHeader>
                       <CardContent className="space-y-4">
                         <div>
-                          <Label htmlFor={`section-prompt-${activeSection.id}`}>Generation Prompt</Label>
-                          <Textarea id={`section-prompt-${activeSection.id}`} value={activeSection.prompt} onChange={(e) => handleSectionPromptChange(activeSection.id, e.target.value)} onBlur={handleSectionPromptBlur} placeholder="Instructions for the AI..." className="mt-1 min-h-[100px] font-mono text-sm focus-visible:glow-primary" />
+                          <Label htmlFor={`section-prompt-${currentActiveSubSection.id}`}>Generation Prompt</Label>
+                          <Textarea id={`section-prompt-${currentActiveSubSection.id}`} value={currentActiveSubSection.prompt} onChange={(e) => handleSectionPromptChange(currentActiveSubSection.id, e.target.value)} onBlur={handleSectionPromptBlur} placeholder="Instructions for the AI..." className="mt-1 min-h-[100px] font-mono text-sm focus-visible:glow-primary" />
                         </div>
-                        <Button onClick={() => handleGenerateSection(activeSection.id)} disabled={isGenerating || isSummarizing || isGeneratingOutline || isSuggesting || isGeneratingDiagram} className="hover:glow-primary focus-visible:glow-primary">
+                        <Button onClick={() => handleGenerateSection(currentActiveSubSection.id)} disabled={isGenerating || isSummarizing || isGeneratingOutline || isSuggesting || isGeneratingDiagram} className="hover:glow-primary focus-visible:glow-primary">
                           {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
                           {isGenerating ? 'Generating...' : 'Generate Content'}
                         </Button>
                       </CardContent>
                     </Card>
-
-                    {/* Content Editor and Preview */}
                     <Card className="shadow-md mb-6">
                        <CardHeader>
-                         <CardTitle className="text-lg md:text-xl">{activeSection.name} - Content</CardTitle>
+                         <CardTitle className="text-lg md:text-xl">{currentActiveSubSection.name} - Content</CardTitle>
                          <CardDescription className="text-sm">Edit the content using Markdown and preview the output.</CardDescription>
                        </CardHeader>
                        <CardContent>
@@ -1169,16 +1039,15 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                              <TabsTrigger value="preview">Preview</TabsTrigger>
                            </TabsList>
                            <TabsContent value="edit" className="space-y-4">
-                               {/* Reduced height on mobile */}
-                               <Textarea id={`section-content-${activeSection.id}`} value={activeSection.content} onChange={(e) => handleSectionContentChange(activeSection.id, e.target.value)} onBlur={handleSectionContentBlur} placeholder={"Generated content appears here. Use Markdown..."} className="min-h-[300px] md:min-h-[400px] text-sm md:text-base focus-visible:glow-primary font-mono" />
+                               <Textarea id={`section-content-${currentActiveSubSection.id}`} value={currentActiveSubSection.content} onChange={(e) => handleSectionContentChange(currentActiveSubSection.id, e.target.value)} onBlur={handleSectionContentBlur} placeholder={"Generated content appears here. Use Markdown..."} className="min-h-[300px] md:min-h-[400px] text-sm md:text-base focus-visible:glow-primary font-mono" />
                            </TabsContent>
                            <TabsContent value="preview">
-                               <MarkdownPreview content={activeSection.content || ''} />
+                               <MarkdownPreview content={currentActiveSubSection.content || ''} />
                            </TabsContent>
                          </Tabs>
                        </CardContent>
                        <CardFooter className="flex justify-end">
-                         <Button variant="outline" size="sm" onClick={() => handleSummarizeSection(activeSection.id)} disabled={isSummarizing || isGenerating || isGeneratingOutline || isSuggesting || !activeSection.content?.trim()} className="hover:glow-accent focus-visible:glow-accent">
+                         <Button variant="outline" size="sm" onClick={() => handleSummarizeSection(currentActiveSubSection.id)} disabled={isSummarizing || isGenerating || isGeneratingOutline || isSuggesting || !currentActiveSubSection.content?.trim()} className="hover:glow-accent focus-visible:glow-accent">
                            {isSummarizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ScrollText className="mr-2 h-4 w-4" />}
                            {isSummarizing ? 'Summarizing...' : 'Summarize'}
                          </Button>
@@ -1187,46 +1056,93 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 </div>
             );
         }
-    } else {
-        // Placeholder if no section is selected
-        activeViewContent = (
-            <div className="flex items-center justify-center h-full p-4">
-               <Card className="text-center py-8 px-6 max-w-md mx-auto shadow-md">
-                  <CardHeader>
-                    <CardTitle className="text-xl text-primary text-glow-primary">Select or Generate Sections</CardTitle>
-                    <CardDescription className="mt-2 text-sm">Choose an item from the sidebar or generate sections if none exist.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="mt-4 space-y-4">
-                     <p className="text-sm">Go to <Button variant="link" className="p-0 h-auto text-base" onClick={() => handleSetActiveSection(String(-1))}>Project Details</Button>, provide context, then click "Generate Outline Preview".</p>
-                    <Button variant="default" size="sm" onClick={handleGenerateTocClick} disabled={isGeneratingOutline || isGenerating || isSummarizing || isSuggesting || !project.projectContext?.trim()} className="hover:glow-primary focus-visible:glow-primary">
-                      {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
-                      {isGeneratingOutline ? 'Generating...' : 'Generate Outline Preview'}
-                    </Button>
-                    <p className="text-xs text-muted-foreground mt-3">The AI will create a proposed outline based on your project context.</p>
-                  </CardContent>
-                </Card>
-            </div>
+    } else if (currentActiveMainSection) { // If a main section is active, but no sub-section, show sub-section navigation
+        activeViewName = currentActiveMainSection.name;
+        currentSectionForSubSectionView = currentActiveMainSection;
+         activeViewContent = (
+            <Card className="shadow-md">
+                <CardHeader>
+                    <CardTitle className="text-primary text-glow-primary text-lg md:text-xl">
+                        Sub-sections of: {currentActiveMainSection.name}
+                    </CardTitle>
+                    <CardDescription className="text-sm">
+                        Select a sub-section to view or edit its content.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                    {(currentActiveMainSection.subSections && currentActiveMainSection.subSections.length > 0) ? (
+                        currentActiveMainSection.subSections.map((subSection, idx) => {
+                             const subSectionNumber = `${getSectionNumbering(project.sections, currentActiveMainSection.id)}.${idx + 1}`;
+                             const isSubSectionDiagram = subSection.name.toLowerCase().startsWith("diagram:") || subSection.name.toLowerCase().startsWith("figure");
+                            return (
+                            <Card
+                                key={subSection.id}
+                                className="hover:shadow-lg transition-shadow cursor-pointer"
+                                onClick={() => {
+                                    setActiveSubSectionId(subSection.id);
+                                    // No need to change activeSectionId here, parent is still the active main section
+                                }}
+                            >
+                                <CardContent className="p-3 flex items-center justify-between">
+                                    <div className="flex items-center">
+                                        {isSubSectionDiagram ? <Projector className="w-4 h-4 mr-2 text-muted-foreground"/> : <FileText className="w-4 h-4 mr-2 text-muted-foreground" />}
+                                        <span className="font-medium text-sm">{subSectionNumber} {subSection.name}</span>
+                                    </div>
+                                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                                </CardContent>
+                            </Card>
+                        )})
+                    ) : (
+                        <p className="text-sm text-muted-foreground italic">
+                            This section currently has no sub-sections. New sub-sections can be added in 'Edit Sections' mode.
+                        </p>
+                    )}
+                </CardContent>
+            </Card>
         );
+
+    } else {
+        const standardPageIndex = !isNaN(parseInt(activeSectionId ?? '', 10)) ? parseInt(activeSectionId!, 10) : NaN;
+        if (!isNaN(standardPageIndex) && standardPageIndex < -1) {
+             const standardPageEntry = Object.entries(STANDARD_PAGE_INDICES).find(([, index]) => index === standardPageIndex);
+             activeViewName = standardPageEntry ? standardPageEntry[0] : 'Standard Page';
+             isStandardPage = true;
+             activeViewContent = <StandardPagePlaceholder pageName={activeViewName} />;
+        } else {
+            activeViewContent = (
+                <div className="flex items-center justify-center h-full p-4">
+                   <Card className="text-center py-8 px-6 max-w-md mx-auto shadow-md">
+                      <CardHeader>
+                        <CardTitle className="text-xl text-primary text-glow-primary">Select or Generate Sections</CardTitle>
+                        <CardDescription className="mt-2 text-sm">Choose an item from the sidebar or generate sections if none exist.</CardDescription>
+                      </CardHeader>
+                      <CardContent className="mt-4 space-y-4">
+                         <p className="text-sm">Go to <Button variant="link" className="p-0 h-auto text-base" onClick={() => handleSetActiveSection(String(-1))}>Project Details</Button>, provide context, then click "Generate Outline Preview".</p>
+                        <Button variant="default" size="sm" onClick={handleGenerateTocClick} disabled={isGeneratingOutline || isGenerating || isSummarizing || isSuggesting || !project.projectContext?.trim()} className="hover:glow-primary focus-visible:glow-primary">
+                          {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
+                          {isGeneratingOutline ? 'Generating...' : 'Generate Outline Preview'}
+                        </Button>
+                        <p className="text-xs text-muted-foreground mt-3">The AI will create a proposed outline based on your project context.</p>
+                      </CardContent>
+                    </Card>
+                </div>
+            );
+        }
     }
 
-  // Main Editor Layout using Sheet for mobile sidebar
   return (
     <Sheet open={isMobileSheetOpen} onOpenChange={setIsMobileSheetOpen}>
-      <div className="flex h-full relative"> {/* Ensure relative for FAB positioning */}
-
-        {/* --- Sidebar Area --- */}
-        {/* Mobile: Sidebar inside Sheet */}
-        <SheetContent side="left" className="p-0 w-72 sm:w-80 bg-card md:hidden"> {/* Adjust width */}
+      <div className="flex h-full relative">
+        <SheetContent side="left" className="p-0 w-72 sm:w-80 bg-card md:hidden">
           <SheetHeader className="p-4 border-b">
             <SheetTitle>Project Menu</SheetTitle>
             <SheetDescription>Navigate and manage your project.</SheetDescription>
           </SheetHeader>
-          {/* Pass close handler to sidebar content */}
           <ProjectSidebarContent
             project={project}
             updateProject={updateProject}
             activeSectionId={activeSectionId}
-            setActiveSectionId={handleSetActiveSection} // Already closes sheet
+            setActiveSectionId={handleSetActiveSection}
             handleGenerateTocClick={handleGenerateTocClick}
             isGeneratingOutline={isGeneratingOutline}
             isGenerating={isGenerating}
@@ -1240,14 +1156,15 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             setIsEditingSections={setIsEditingSections}
             onEditSectionName={handleEditSectionName}
             onDeleteSection={handleDeleteSection}
-            handleAddNewSection={handleAddNewSection} // Pass the handler
+            handleAddNewSection={handleAddNewSection}
+            activeSubSectionId={activeSubSectionId}
+            setActiveSubSectionId={setActiveSubSectionId}
           />
         </SheetContent>
 
-        {/* Desktop: Static Sidebar */}
         <div className={cn(
              "hidden md:flex md:flex-col transition-all duration-300 ease-in-out overflow-y-auto overflow-x-hidden",
-             "w-72 lg:w-80 border-r bg-card" // Slightly wider on desktop
+             "w-72 lg:w-80 border-r bg-card"
          )}>
             <ProjectSidebarContent
                 project={project}
@@ -1266,28 +1183,25 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 setIsEditingSections={setIsEditingSections}
                 onEditSectionName={handleEditSectionName}
                 onDeleteSection={handleDeleteSection}
-                handleAddNewSection={handleAddNewSection} // Pass the handler
+                handleAddNewSection={handleAddNewSection}
+                activeSubSectionId={activeSubSectionId}
+                setActiveSubSectionId={setActiveSubSectionId}
             />
         </div>
 
-        {/* --- Main Content Area --- */}
         <div className="flex-1 flex flex-col overflow-hidden">
           <header className="sticky top-0 z-10 flex h-14 items-center gap-2 sm:gap-4 border-b bg-background/95 backdrop-blur-sm px-3 sm:px-4 lg:px-6 flex-shrink-0">
-            {/* Header Title */}
             <h1 className="flex-1 text-base sm:text-lg font-semibold md:text-xl text-primary truncate text-glow-primary">
                {activeViewName}
             </h1>
-             {/* Storage Status */}
             <div className="flex items-center gap-1 text-xs text-muted-foreground ml-auto mr-1 sm:mr-2" title={`Project stored ${project.storageType === 'local' ? 'locally' : 'in the cloud'}`}>
               {project.storageType === 'local' ? <CloudOff className="h-4 w-4" /> : <Cloud className="h-4 w-4 text-green-500" />}
               <span className="hidden sm:inline">{project.storageType === 'local' ? 'Local' : 'Cloud'}</span>
             </div>
-             {/* Export Button */}
             <Button variant="outline" size="sm" onClick={handleNavigateToExport} className="hover:glow-accent focus-visible:glow-accent text-xs px-2 sm:px-3 py-1 h-auto">
               <Download className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
               <span className="hidden sm:inline">Export</span> Report
             </Button>
-             {/* Back to Dashboard Button - More prominent */}
              <Button variant="ghost" size="sm" onClick={() => router.push('/')} className="text-xs px-2 sm:px-3 py-1 h-auto">
                 <Home className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4"/> Dashboard
              </Button>
@@ -1295,7 +1209,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
           <ScrollArea className="flex-1 p-3 sm:p-4 md:p-6">
               {activeViewContent}
-             {/* AI Suggestions Section */}
              <Card className="shadow-md mt-6">
                  <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-lg md:text-xl text-primary text-glow-primary"><Sparkles className="w-5 h-5" /> AI Suggestions</CardTitle>
@@ -1321,7 +1234,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
           </ScrollArea>
         </div>
 
-        {/* Floating Action Button (FAB) for Mobile Sidebar */}
          <SheetTrigger asChild>
              <Button
                  ref={fabRef}
@@ -1329,12 +1241,11 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                  size="icon"
                  className={cn(
                      "fixed z-20 rounded-full shadow-lg w-12 h-12 sm:w-14 sm:h-14 hover:glow-primary focus-visible:glow-primary cursor-grab active:cursor-grabbing",
-                     "md:hidden" // Hide FAB on medium screens and up
+                     "md:hidden"
                  )}
                  style={{ left: `${fabPosition.x}px`, top: `${fabPosition.y}px`, position: 'fixed' }}
                  onMouseDown={onFabMouseDown}
                  onClick={(e) => {
-                     // Only trigger sheet open if not dragging
                      if (!isDraggingFab) {
                         setIsMobileSheetOpen(true);
                      }
@@ -1345,7 +1256,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                  <Menu className="h-5 w-5 sm:h-6 sm:w-6" />
              </Button>
          </SheetTrigger>
-
 
         <AlertDialog open={showOutlineContextAlert} onOpenChange={setShowOutlineContextAlert}>
           <AlertDialogContent>
@@ -1365,8 +1275,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   );
 }
 
-
-// Helper function to validate the structure of the generated outline
 const validateOutlineStructure = (sections: any[] | undefined): sections is OutlineSection[] => {
     if (!Array.isArray(sections)) {
         console.warn("Validation failed: Main sections property is not an array.");

@@ -6,20 +6,21 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Settings, Undo, Lightbulb, Cloud, CloudOff, PlusCircle, FileText, Loader2, Edit3 } from 'lucide-react'; // Removed unused icons, kept Edit3
+import { Settings, Undo, Lightbulb, Cloud, CloudOff, PlusCircle, FileText, Loader2, Edit3 } from 'lucide-react';
 import type { Project, SectionIdentifier, HierarchicalProjectSection } from '@/types/project';
-import { STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, findSectionById, addSubSectionById } from '@/lib/project-utils'; // Use types/project for indices
+import { STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, findSectionById, addSubSectionById, getSectionNumbering } from '@/lib/project-utils';
 import { HierarchicalSectionItem } from './hierarchical-section-item';
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
 import { cn } from '@/lib/utils';
 
-// Props interface for ProjectSidebarContent
 export interface ProjectSidebarContentProps {
     project: Project;
     updateProject: (updatedData: Partial<Project> | ((prev: Project) => Project), saveToHistory?: boolean) => void;
     activeSectionId: string | null;
     setActiveSectionId: (id: SectionIdentifier) => void;
+    activeSubSectionId: string | null; // New prop for active sub-section
+    setActiveSubSectionId: (id: string | null) => void; // New prop setter
     handleGenerateTocClick: () => void;
     isGeneratingOutline: boolean;
     isGenerating: boolean;
@@ -28,7 +29,7 @@ export interface ProjectSidebarContentProps {
     handleSaveOnline: () => void;
     canUndo: boolean;
     handleUndo: () => void;
-    onCloseSheet?: () => void; // Used to close the mobile Sheet
+    onCloseSheet?: () => void;
     isEditingSections: boolean;
     setIsEditingSections: (editing: boolean) => void;
     onEditSectionName: (id: string, newName: string) => void;
@@ -36,16 +37,13 @@ export interface ProjectSidebarContentProps {
     handleAddNewSection: () => void;
 }
 
-/**
- * ProjectSidebarContent Component
- * Renders the sidebar content for the project editor, including project details,
- * standard pages, and the hierarchical report sections. Optimized for mobile using Sheet.
- */
 export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
     project,
     updateProject,
     activeSectionId,
     setActiveSectionId,
+    activeSubSectionId,
+    setActiveSubSectionId,
     handleGenerateTocClick,
     isGeneratingOutline,
     isGenerating,
@@ -63,47 +61,60 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
 }) => {
      const { toast } = useToast();
 
-     const handleSectionClick = (id: SectionIdentifier) => {
+     const handleMainSectionClick = (id: SectionIdentifier) => {
          setActiveSectionId(id);
-         onCloseSheet?.(); // Close the sheet on selection
+         setActiveSubSectionId(null); // When a main section is clicked, clear active sub-section
+         onCloseSheet?.();
      };
 
-      // Handler to add a new sub-section under a parent
+     const handleSubSectionClick = (subSectionId: string, parentSectionId: string) => {
+        setActiveSectionId(parentSectionId); // Keep parent section active
+        setActiveSubSectionId(subSectionId);
+        onCloseSheet?.();
+     };
+
+
       const handleAddNewSubSection = (parentId: string) => {
+            const parentSection = findSectionById(project.sections, parentId);
+            if (!parentSection) return;
+
+            const parentNumbering = getSectionNumbering(project.sections, parentId);
+            const newSubSectionNumber = (parentSection.subSections || []).length + 1;
+
             const newSubSectionData = {
-                name: "New Sub-Section",
-                prompt: `Generate content for "New Sub-Section" under parent ID ${parentId}.`,
+                name: `New Sub-Section ${parentNumbering}.${newSubSectionNumber}`,
+                prompt: `Generate content for "New Sub-Section ${parentNumbering}.${newSubSectionNumber}" under parent section "${parentSection.name}".`,
                 content: "",
                 lastGenerated: undefined,
             };
 
             updateProject(prev => ({
                 ...prev,
-                sections: addSubSectionById(prev.sections, parentId, newSubSectionData),
+                sections: addSubSectionById(prev.sections, parentId, newSubSectionData, parentNumbering),
             }), true);
             toast({ title: "Sub-Section Added", description: "A new sub-section has been added." });
         };
 
 
-     // Recursive function to render sections and sub-sections
      const renderSectionsRecursive = (sections: HierarchicalProjectSection[], level: number, parentNumbering: string = ''): React.ReactNode[] => {
         return sections.map((section, index) => {
-            // Correct hierarchical numbering (e.g., 1, 1.1, 1.1.1)
             const currentNumbering = parentNumbering ? `${parentNumbering}.${index + 1}` : `${index + 1}`;
             return (
                 <HierarchicalSectionItem
-                    key={section.id} // Use unique section ID
+                    key={section.id}
                     section={section}
                     level={level}
-                    numbering={currentNumbering} // Pass the full hierarchical number
+                    numbering={currentNumbering}
                     activeSectionId={activeSectionId}
-                    setActiveSectionId={setActiveSectionId}
+                    setActiveSectionId={handleMainSectionClick}
+                    activeSubSectionId={activeSubSectionId}
+                    setActiveSubSectionId={(subId) => handleSubSectionClick(subId, section.id)}
                     onEditSectionName={onEditSectionName}
                     onDeleteSection={onDeleteSection}
-                    onAddSubSection={handleAddNewSubSection} // Pass the sub-section handler
+                    onAddSubSection={handleAddNewSubSection}
                     isEditing={isEditingSections}
                     onCloseSheet={onCloseSheet}
-                    renderSubSections={renderSectionsRecursive} // Pass down the recursive function
+                    renderSubSections={renderSectionsRecursive}
                 />
             );
         });
@@ -111,9 +122,7 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
 
 
      return (
-        // Main container for sidebar content
         <div className="flex flex-col h-full bg-card">
-            {/* Header - Uses project.title which updates when parent re-renders */}
             <div className="p-4 border-b flex justify-between items-center flex-shrink-0">
                  <Input
                         id="projectTitleSidebar"
@@ -135,15 +144,14 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                 </Button>
             </div>
 
-            {/* Project Details Button */}
             <div className="px-2 py-2 flex-shrink-0">
                 <Button
                     key="-1"
-                    variant={activeSectionId === String(-1) ? "secondary" : "ghost"}
+                    variant={activeSectionId === String(-1) && activeSubSectionId === null ? "secondary" : "ghost"}
                     size="sm"
-                    onClick={() => handleSectionClick(String(-1))}
-                    className="justify-start w-full text-left text-sm hover:bg-muted/60 data-[variant=secondary]:bg-primary/10" // Improved hover/active
-                    aria-current={activeSectionId === String(-1) ? "page" : undefined}
+                    onClick={() => handleMainSectionClick(String(-1))}
+                    className="justify-start w-full text-left text-sm hover:bg-muted/60 data-[variant=secondary]:bg-primary/10"
+                    aria-current={activeSectionId === String(-1) && activeSubSectionId === null ? "page" : undefined}
                 >
                     <Settings className="mr-2 h-4 w-4" />
                     Project Details
@@ -151,8 +159,7 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
             </div>
             <Separator className="my-0 flex-shrink-0" />
 
-            {/* Standard Report Pages Section */}
-            <ScrollArea className="w-full flex-shrink-0 max-h-[250px]"> {/* Allow vertical scroll if needed */}
+            <ScrollArea className="w-full flex-shrink-0 max-h-[250px]">
                 <div className="px-2 py-2">
                     <p className="px-2 text-xs font-semibold text-muted-foreground mb-1 text-left uppercase">Standard Pages</p>
                     <nav className="flex flex-col gap-1 min-w-max text-left">
@@ -160,12 +167,12 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                             const pageId = String(STANDARD_PAGE_INDICES[pageName]);
                             return (
                                 <Button
-                                    key={pageId} // Unique key
-                                    variant={activeSectionId === pageId ? "secondary" : "ghost"}
+                                    key={pageId}
+                                    variant={activeSectionId === pageId && activeSubSectionId === null ? "secondary" : "ghost"}
                                     size="sm"
-                                    onClick={() => handleSectionClick(STANDARD_PAGE_INDICES[pageName])}
-                                    className="justify-start text-left text-sm hover:bg-muted/60 data-[variant=secondary]:bg-primary/10" // Improved hover/active
-                                    aria-current={activeSectionId === pageId ? "page" : undefined}
+                                    onClick={() => handleMainSectionClick(STANDARD_PAGE_INDICES[pageName])}
+                                    className="justify-start text-left text-sm hover:bg-muted/60 data-[variant=secondary]:bg-primary/10"
+                                    aria-current={activeSectionId === pageId && activeSubSectionId === null ? "page" : undefined}
                                     title={pageName}
                                 >
                                     <FileText className="mr-2 h-4 w-4 flex-shrink-0" />
@@ -176,11 +183,10 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                     </nav>
                 </div>
                 <ScrollBar orientation="vertical" />
-                <ScrollBar orientation="horizontal" /> {/* Added horizontal scrollbar */}
+                <ScrollBar orientation="horizontal" />
             </ScrollArea>
             <Separator className="my-0 flex-shrink-0" />
 
-            {/* Report Sections Section - Takes remaining space */}
             <div className="flex-1 flex flex-col min-h-0">
                  <div className="flex justify-between items-center pl-2 pr-4 py-2 flex-shrink-0">
                     <p className="text-xs font-semibold text-muted-foreground text-left uppercase">Report Sections</p>
@@ -193,36 +199,30 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                          <Edit3 className="h-3 w-3 mr-1"/> {isEditingSections ? 'Done' : 'Edit'}
                     </Button>
                  </div>
-                 <ScrollArea className="flex-1 w-full">
-                     <div className="px-2 pb-2">
-                        <nav className="flex flex-col gap-0.5 min-w-max text-left whitespace-nowrap">
-                            {/* ** Render the hierarchical sections ** */}
-                           {project.sections?.length > 0 ? (
-                               renderSectionsRecursive(project.sections, 0) // Start recursion
-                           ) : (
-                             <p className="px-2 py-1 text-xs text-muted-foreground italic">Generate sections or add manually in edit mode.</p>
-                           )}
-                           {isEditingSections && (
-                               <Button
-                                   key="add-new-top-level-section-button"
-                                   variant="outline"
-                                   size="sm"
-                                   onClick={handleAddNewSection}
-                                   className="justify-start mt-2 text-muted-foreground hover:text-primary text-left text-sm"
-                                   title="Add new top-level section"
-                               >
-                                   <PlusCircle className="mr-2 h-4 w-4" />
-                                   Add Section
-                               </Button>
-                           )}
-                        </nav>
-                     </div>
-                     <ScrollBar orientation="vertical" />
-                     <ScrollBar orientation="horizontal" /> {/* Added horizontal scrollbar */}
+                 <ScrollArea className="flex-1 px-2 py-2 overflow-x-auto">
+                    <nav className="flex flex-col gap-0.5 min-w-max text-left whitespace-nowrap">
+                       {project.sections?.length > 0 ? (
+                           renderSectionsRecursive(project.sections, 0)
+                       ) : (
+                         <p className="px-2 py-1 text-xs text-muted-foreground italic">Generate sections or add manually in edit mode.</p>
+                       )}
+                       {isEditingSections && (
+                           <Button
+                               key="add-new-top-level-section-button"
+                               variant="outline"
+                               size="sm"
+                               onClick={handleAddNewSection}
+                               className="justify-start mt-2 text-muted-foreground hover:text-primary text-left text-sm"
+                               title="Add new top-level section"
+                           >
+                               <PlusCircle className="mr-2 h-4 w-4" />
+                               Add Section
+                           </Button>
+                       )}
+                    </nav>
                  </ScrollArea>
              </div>
 
-             {/* Footer */}
              <div className="p-4 border-t space-y-2 flex-shrink-0">
                  <Button
                     variant="outline"

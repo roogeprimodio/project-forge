@@ -1,5 +1,5 @@
 // src/lib/project-utils.ts
-import type { Project, HierarchicalProjectSection } from '@/types/project';
+import type { Project, HierarchicalProjectSection, OutlineSection } from '@/types/project';
 import type React from 'react';
 import { v4 as uuidv4 } from 'uuid'; // Import uuid
 
@@ -40,34 +40,79 @@ export function updateSectionById(
     });
 }
 
-// ** NEW: Recursive function to add a subsection under a specific parent ID **
+// Helper function to generate numbering for sections
+export const getSectionNumbering = (sections: HierarchicalProjectSection[], targetId: string, parentNumbering: string = ''): string => {
+    for (let i = 0; i < sections.length; i++) {
+        const section = sections[i];
+        const currentNumbering = parentNumbering ? `${parentNumbering}.${i + 1}` : `${i + 1}`;
+        if (section.id === targetId) {
+            return currentNumbering;
+        }
+        if (section.subSections && section.subSections.length > 0) {
+            const foundNumbering = getSectionNumbering(section.subSections, targetId, currentNumbering);
+            if (foundNumbering) {
+                return foundNumbering;
+            }
+        }
+    }
+    return '';
+};
+
+
+// Function to ensure a section has a default sub-section if it's meant to hold content but has no explicit sub-sections
+export function ensureDefaultSubSection(section: HierarchicalProjectSection, baseNumbering: string): HierarchicalProjectSection {
+    if (!section.subSections || section.subSections.length === 0) {
+        const defaultSubSectionName = `${baseNumbering}.1 ${section.name} Content`;
+        return {
+            ...section,
+            subSections: [
+                {
+                    id: uuidv4(),
+                    name: defaultSubSectionName,
+                    prompt: `Generate detailed content for the "${section.name}" section, specifically focusing on what would be covered in "${defaultSubSectionName}".`,
+                    content: '',
+                    subSections: [], // Default sub-sections are leaves
+                    lastGenerated: undefined,
+                },
+            ],
+        };
+    }
+    return section;
+}
+
+
+// Recursive function to add a subsection under a specific parent ID
 export function addSubSectionById(
     sections: HierarchicalProjectSection[],
     parentId: string,
-    newSubSectionData: Omit<HierarchicalProjectSection, 'subSections' | 'id'> // Data for new subsection (ID generated internally)
+    newSubSectionData: Omit<HierarchicalProjectSection, 'subSections' | 'id'>,
+    parentNumbering: string = '' // Pass parent numbering for default sub-section naming
 ): HierarchicalProjectSection[] {
-    return sections.map(section => {
+    return sections.map((section, index) => {
+        const currentNumbering = parentNumbering ? `${parentNumbering}.${index + 1}` : `${index + 1}`;
         if (section.id === parentId) {
-            // Found the parent, add the new subsection
+            const newSubSectionId = uuidv4();
             const subSectionToAdd: HierarchicalProjectSection = {
                 ...newSubSectionData,
-                id: uuidv4(), // Generate unique ID
-                subSections: [], // Initialize empty subSections array for the new item
+                id: newSubSectionId,
+                subSections: [],
+                // Optional: Auto-generate a default prompt if none provided
+                prompt: newSubSectionData.prompt || `Generate content for ${newSubSectionData.name} as part of ${section.name}.`,
             };
+            // Ensure the newly added sub-section itself gets a default sub-section if it's meant to be a content leaf
+            // const processedSubSection = ensureDefaultSubSection(subSectionToAdd, `${currentNumbering}.${(section.subSections || []).length + 1}`);
+
             return {
                 ...section,
-                subSections: [...(section.subSections || []), subSectionToAdd], // Add to existing or new array
+                subSections: [...(section.subSections || []), subSectionToAdd],
             };
         }
         if (section.subSections) {
-            // Recursively search in subsections
-            const updatedSubSections = addSubSectionById(section.subSections, parentId, newSubSectionData);
+            const updatedSubSections = addSubSectionById(section.subSections, parentId, newSubSectionData, currentNumbering);
             if (updatedSubSections !== section.subSections) {
-                // If subsections were updated, return the section with the updated list
                 return { ...section, subSections: updatedSubSections };
             }
         }
-        // If not the parent and no changes in subsections, return the original section
         return section;
     });
 }
@@ -191,23 +236,23 @@ export const updateProject = (
 
 
         // --- Update Main Projects Array (for localStorage) ---
-        const updatedProjects = [...currentProjectsArray];
+        const updatedProjectsArray = [...currentProjectsArray];
         if (currentProjectIndex !== -1) {
             // Update existing project if found in the main list
-            if (JSON.stringify(updatedProjects[currentProjectIndex]) !== JSON.stringify(updatedProject)) {
-                updatedProjects[currentProjectIndex] = updatedProject;
-                return updatedProjects;
+            if (JSON.stringify(updatedProjectsArray[currentProjectIndex]) !== JSON.stringify(updatedProject)) {
+                updatedProjectsArray[currentProjectIndex] = updatedProject;
+                return updatedProjectsArray;
             }
         } else if (currentProjectState && saveToHistory) {
             // If project wasn't in the main list (maybe loaded from history), add it back
              // Ensure not to add duplicates if it somehow exists but index was wrong
-             if (!updatedProjects.some(p => p.id === projectId)) {
-                updatedProjects.push(updatedProject);
-                return updatedProjects;
+             if (!updatedProjectsArray.some(p => p.id === projectId)) {
+                updatedProjectsArray.push(updatedProject);
+                return updatedProjectsArray;
              }
         }
         // Return the potentially updated or original array
-        return updatedProjects;
+        return updatedProjectsArray;
     });
 
     // Reset the flag after the state update cycle
