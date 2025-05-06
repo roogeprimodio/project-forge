@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, FileWarning, Eye, Projector, BrainCircuit, Plus, Minus } from 'lucide-react'; // Added Plus, Minus
+import { Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, FileWarning, Eye, Projector, BrainCircuit, Plus, Minus, CheckCircle } from 'lucide-react'; // Added CheckCircle
 import Link from 'next/link';
 import type { Project, HierarchicalProjectSection, GeneratedSectionOutline, SectionIdentifier, OutlineSection } from '@/types/project'; // Use hierarchical type
 import { findSectionById, updateSectionById, deleteSectionById, STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, TOC_SECTION_NAME } from '@/lib/project-utils'; // Import functions and constants
@@ -30,6 +30,28 @@ import { ProjectSidebarContent } from '@/components/project-sidebar-content'; //
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // Import Tabs
 import { updateProject as updateProjectHelper } from '@/lib/project-utils'; // Import the helper function
 import MarkdownPreview from '@/components/markdown-preview'; // Import MarkdownPreview
+
+// Recursive component to render the preview outline
+const OutlinePreviewItem: React.FC<{ item: OutlineSection; level: number }> = ({ item, level }) => {
+  const hasSubSections = item.subSections && item.subSections.length > 0;
+  const isDiagram = item.name.toLowerCase().startsWith("diagram:") || item.name.toLowerCase().startsWith("figure");
+
+  return (
+    <div className="text-sm">
+      <div className="flex items-center" style={{ paddingLeft: `${level * 1.5}rem` }}>
+        <span className="mr-2 text-muted-foreground">-</span>
+        <span className={cn(isDiagram && "italic text-muted-foreground")}>{item.name}</span>
+      </div>
+      {hasSubSections && (
+        <div className="border-l border-muted/30 ml-2 pl-2">
+          {item.subSections.map((subItem, index) => (
+            <OutlinePreviewItem key={`${item.name}-${index}`} item={subItem} level={level + 1} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 
 interface ProjectEditorProps {
@@ -256,6 +278,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const [history, setHistory] = useState<Project[]>([]); // History for undo
   const [historyIndex, setHistoryIndex] = useState<number>(-1); // Current position in history
   const isUpdatingHistory = useRef(false); // Flag to prevent history loops
+  const [previewedOutline, setPreviewedOutline] = useState<GeneratedSectionOutline | null>(null); // State for the previewed outline
 
   // Floating Action Button (FAB) state for mobile sidebar trigger
   const [fabPosition, setFabPosition] = useState({ x: 0, y: 0 });
@@ -313,14 +336,17 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   // --- Event Handlers for UI interactions ---
 
   // Set active section in the sidebar
-  const handleSetActiveSection = useCallback((idOrIndex: SectionIdentifier) => {
-      const newActiveId = String(idOrIndex); // Always treat as string ID internally
-      if (activeSectionId !== newActiveId) {
-          setActiveSectionId(newActiveId);
-      }
-      // Close mobile sheet when a section is selected
-      setIsMobileSheetOpen(false);
-  }, [activeSectionId]); // Depend only on activeSectionId
+    const handleSetActiveSection = useCallback((idOrIndex: SectionIdentifier) => {
+        const newActiveId = String(idOrIndex);
+        if (activeSectionId !== newActiveId) {
+            setActiveSectionId(newActiveId);
+            // Clear the outline preview when navigating away from Project Details
+            if (newActiveId !== String(-1)) {
+                setPreviewedOutline(null);
+            }
+        }
+        setIsMobileSheetOpen(false);
+    }, [activeSectionId]); // Depend on activeSectionId
 
   // Check if project exists on mount and handle redirects
   useEffect(() => {
@@ -369,7 +395,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
          }
          return currentProjectsArray; // Should ideally not happen if project exists
       });
-
+      setPreviewedOutline(null); // Clear preview on undo
       toast({ title: "Undo successful" });
        requestAnimationFrame(() => { isUpdatingHistory.current = false; });
     } else {
@@ -484,12 +510,12 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
    };
 
 
-  // Function to process the generated hierarchical outline and update project sections
-    const updateSectionsFromToc = useCallback((outline: GeneratedSectionOutline) => {
-        if (!project) return;
+  // Function to actually apply the generated outline to the project sections
+    const applyGeneratedOutline = useCallback(() => {
+        if (!project || !previewedOutline) return;
 
-        if (!outline || !Array.isArray(outline.sections)) {
-            toast({ variant: "destructive", title: "Section Update Failed", description: "Received invalid outline structure from AI." });
+        if (!previewedOutline || !Array.isArray(previewedOutline.sections)) {
+            toast({ variant: "destructive", title: "Section Update Failed", description: "No valid outline preview available to apply." });
             return;
         }
 
@@ -523,14 +549,15 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
              });
          };
 
-         const newSections = convertOutlineToSections(outline.sections);
+         const newSections = convertOutlineToSections(previewedOutline.sections);
 
         updateProject(prev => ({
             ...prev,
             sections: newSections,
-        }), true);
+        }), true); // Save to history when applying
 
-        toast({ title: "Sections Generated", description: `Hierarchical sections created based on AI outline and limits.`, duration: 7000 });
+        toast({ title: "Sections Updated", description: `Project sections updated with the generated outline.`, duration: 7000 });
+        setPreviewedOutline(null); // Clear the preview after applying
 
         // Reset active section if needed
         const currentActiveSection = activeSectionId ? findSectionById(project.sections, activeSectionId) : null;
@@ -543,7 +570,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         }
         setIsMobileSheetOpen(false);
 
-    }, [project, updateProject, toast, activeSectionId, handleSetActiveSection]);
+    }, [project, updateProject, toast, activeSectionId, handleSetActiveSection, previewedOutline]);
 
 
   // Generate content for a specific section
@@ -661,15 +688,15 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
       }
     };
 
-  // Proceed with generating Table of Contents (called after context check)
-    const proceedWithTocGeneration = useCallback(async () => {
+  // Proceed with generating the outline PREVIEW (called after context check)
+    const proceedWithOutlinePreviewGeneration = useCallback(async () => {
         if (!project || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting) return;
         setIsGeneratingOutline(true);
+        setPreviewedOutline(null); // Clear previous preview
         try {
             const result = await generateOutlineAction({
                 projectTitle: project.title,
                 projectContext: project.projectContext || '',
-                // Pass the limits to the AI flow
                 minSections: project.minSections,
                 maxSubSectionsPerSection: project.maxSubSectionsPerSection,
             });
@@ -680,12 +707,11 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 return;
             }
 
-            // Enhanced Validation: Check if result.sections exists and is an array
             if (!result || !Array.isArray(result.sections) || !validateOutlineStructure(result.sections)) {
                  console.error("Invalid outline structure received:", result);
                  toast({ variant: "destructive", title: "Outline Generation Failed", description: "AI did not return the expected hierarchical section structure. Check console for details." });
-                setIsGeneratingOutline(false);
-                return;
+                 setIsGeneratingOutline(false);
+                 return;
             }
 
              const outlineResult = result as GeneratedSectionOutline;
@@ -696,7 +722,10 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 return;
             }
 
-            updateSectionsFromToc(outlineResult);
+            // Set the previewed outline instead of applying directly
+            setPreviewedOutline(outlineResult);
+            toast({ title: "Outline Preview Generated", description: `Review the proposed outline below and click "Apply Outline".` });
+
 
         } catch (error) {
             console.error("Outline generation failed:", error);
@@ -704,7 +733,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         } finally {
             setIsGeneratingOutline(false);
         }
-    }, [project, isGenerating, isSummarizing, isGeneratingOutline, isSuggesting, updateSectionsFromToc, toast]);
+    }, [project, isGenerating, isSummarizing, isGeneratingOutline, isSuggesting, toast]);
 
 
    // Handle click on the "Generate TOC" button, includes context check
@@ -717,7 +746,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         if (contextLength < MIN_CONTEXT_LENGTH || contextWords < MIN_CONTEXT_WORDS) {
             setShowOutlineContextAlert(true);
         } else {
-            proceedWithTocGeneration();
+            proceedWithOutlinePreviewGeneration(); // Generate the preview
         }
     };
 
@@ -736,16 +765,15 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             ).join('---\n\n');
         };
 
-       const allSectionsContent = flattenSections(project.sections);
+       // Use the currently applied sections (not the preview) for suggestions
+       const currentSectionsContent = project.sections ? flattenSections(project.sections) : '';
 
        const suggestionActionInput = {
          projectTitle: project.title,
          projectContext: project.projectContext,
-         allSectionsContent: allSectionsContent,
+         allSectionsContent: currentSectionsContent, // Use current content
          focusArea: suggestionInput || undefined,
-         // ** NEW: Pass existing section names **
          existingSections: project.sections.map(s => s.name).join(', '),
-         // ** NEW: Pass project type **
          projectType: project.projectType,
        };
 
@@ -817,6 +845,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
          }), true);
          toast({ title: "Section Added", description: `"${newSection.name}" added.` });
          setActiveSectionId(newSection.id); // Optionally activate the new section
+         setPreviewedOutline(null); // Clear preview if adding manually
      };
 
 
@@ -1028,11 +1057,41 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                   <p className="text-xs text-muted-foreground mt-1">One member per line.</p>
                 </div>
               </CardContent>
-              <CardFooter className="flex justify-end">
-                <Button variant="default" size="sm" onClick={handleGenerateTocClick} disabled={isGeneratingOutline || isGenerating || isSummarizing || isSuggesting || !project.projectContext?.trim()} className="hover:glow-primary focus-visible:glow-primary">
-                  {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
-                  {isGeneratingOutline ? 'Generating Sections...' : 'Generate/Update Sections'}
-                </Button>
+              <CardFooter className="flex flex-col items-start gap-4">
+                 <Button variant="default" size="sm" onClick={handleGenerateTocClick} disabled={isGeneratingOutline || isGenerating || isSummarizing || isSuggesting || !project.projectContext?.trim()} className="hover:glow-primary focus-visible:glow-primary">
+                    {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
+                    {isGeneratingOutline ? 'Generating Outline...' : 'Generate Outline Preview'}
+                 </Button>
+                 {/* Outline Preview Section */}
+                 {previewedOutline && (
+                     <div className="w-full p-4 border rounded-md bg-muted/30 space-y-3">
+                         <h4 className="font-semibold text-foreground">Generated Outline Preview:</h4>
+                         <ScrollArea className="max-h-60">
+                            {previewedOutline.sections.map((item, index) => (
+                                <OutlinePreviewItem key={`preview-${index}`} item={item} level={0} />
+                            ))}
+                         </ScrollArea>
+                         <div className="flex gap-2">
+                             <Button
+                                 variant="default"
+                                 size="sm"
+                                 onClick={applyGeneratedOutline}
+                                 disabled={isGeneratingOutline}
+                                 className="hover:glow-accent focus-visible:glow-accent"
+                             >
+                                 <CheckCircle className="mr-2 h-4 w-4" /> Apply Outline
+                             </Button>
+                              <Button
+                                 variant="outline"
+                                 size="sm"
+                                 onClick={() => setPreviewedOutline(null)}
+                                 disabled={isGeneratingOutline}
+                              >
+                                  Discard Preview
+                              </Button>
+                         </div>
+                     </div>
+                 )}
               </CardFooter>
             </Card>
       );
@@ -1138,12 +1197,12 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                     <CardDescription className="mt-2 text-sm">Choose an item from the sidebar or generate sections if none exist.</CardDescription>
                   </CardHeader>
                   <CardContent className="mt-4 space-y-4">
-                     <p className="text-sm">Go to <Button variant="link" className="p-0 h-auto text-base" onClick={() => handleSetActiveSection(String(-1))}>Project Details</Button>, provide context, then click "Generate Sections".</p>
+                     <p className="text-sm">Go to <Button variant="link" className="p-0 h-auto text-base" onClick={() => handleSetActiveSection(String(-1))}>Project Details</Button>, provide context, then click "Generate Outline Preview".</p>
                     <Button variant="default" size="sm" onClick={handleGenerateTocClick} disabled={isGeneratingOutline || isGenerating || isSummarizing || isSuggesting || !project.projectContext?.trim()} className="hover:glow-primary focus-visible:glow-primary">
                       {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
-                      {isGeneratingOutline ? 'Generating...' : 'Generate Sections'}
+                      {isGeneratingOutline ? 'Generating...' : 'Generate Outline Preview'}
                     </Button>
-                    <p className="text-xs text-muted-foreground mt-3">The AI will create sections based on your project context.</p>
+                    <p className="text-xs text-muted-foreground mt-3">The AI will create a proposed outline based on your project context.</p>
                   </CardContent>
                 </Card>
             </div>
@@ -1240,7 +1299,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
              <Card className="shadow-md mt-6">
                  <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-lg md:text-xl text-primary text-glow-primary"><Sparkles className="w-5 h-5" /> AI Suggestions</CardTitle>
-                    <CardDescription className="text-sm">Ask the AI for feedback on your report. Provide specific focus areas for targeted suggestions.</CardDescription>
+                    <CardDescription className="text-sm">Ask the AI for feedback on your report. Provide specific focus areas for targeted suggestions based on the current sections.</CardDescription>
                  </CardHeader>
                  <CardContent className="space-y-4">
                     <div>
@@ -1290,8 +1349,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
         <AlertDialog open={showOutlineContextAlert} onOpenChange={setShowOutlineContextAlert}>
           <AlertDialogContent>
-            <AlertDialogHeader> <AlertDialogTitle>Project Context May Be Limited</AlertDialogTitle> <AlertDialogDescription> The project context is short ({project?.projectContext?.trim().split(/\s+/).filter(Boolean).length || 0} words). Generating accurate sections might be difficult. Consider adding more details. Proceed anyway? </AlertDialogDescription> </AlertDialogHeader>
-            <AlertDialogFooter> <AlertDialogCancel>Cancel</AlertDialogCancel> <AlertDialogAction onClick={proceedWithTocGeneration}>Generate Anyway</AlertDialogAction> </AlertDialogFooter>
+            <AlertDialogHeader> <AlertDialogTitle>Project Context May Be Limited</AlertDialogTitle> <AlertDialogDescription> The project context is short ({project?.projectContext?.trim().split(/\s+/).filter(Boolean).length || 0} words). Generating an accurate outline might be difficult. Consider adding more details. Proceed anyway? </AlertDialogDescription> </AlertDialogHeader>
+            <AlertDialogFooter> <AlertDialogCancel>Cancel</AlertDialogCancel> <AlertDialogAction onClick={proceedWithOutlinePreviewGeneration}>Generate Anyway</AlertDialogAction> </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
 
