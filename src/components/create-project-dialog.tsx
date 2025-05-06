@@ -51,6 +51,8 @@ export function CreateProjectDialog({ onCreateProject, children }: CreateProject
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       storageType: 'local', // Default to local storage
+      minSections: 5, // Default min sections
+      maxSubSectionsPerSection: 2, // Default max sub-section depth
     };
     onCreateProject(newProject);
     setIsOpen(false); // Close dialog on success

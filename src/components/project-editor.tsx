@@ -10,10 +10,10 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, FileWarning, Eye, Projector, BrainCircuit } from 'lucide-react';
+import { Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, FileWarning, Eye, Projector, BrainCircuit, Plus, Minus } from 'lucide-react'; // Added Plus, Minus
 import Link from 'next/link';
-import type { Project, HierarchicalProjectSection, GeneratedSectionOutline, SectionIdentifier, OutlineSection } from '@/types/project';
-import { findSectionById, updateSectionById, deleteSectionById, STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, TOC_SECTION_NAME } from '@/lib/project-utils';
+import type { Project, HierarchicalProjectSection, GeneratedSectionOutline, SectionIdentifier, OutlineSection } from '@/types/project'; // Use hierarchical type
+import { findSectionById, updateSectionById, deleteSectionById, STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, TOC_SECTION_NAME } from '@/lib/project-utils'; // Import functions and constants
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { useToast } from '@/hooks/use-toast';
 import { generateSectionAction, summarizeSectionAction, generateOutlineAction, suggestImprovementsAction, generateDiagramAction } from '@/app/actions';
@@ -27,10 +27,10 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { v4 as uuidv4 } from 'uuid';
 import AiDiagramGenerator from './ai-diagram-generator';
 import MermaidDiagram from './mermaid-diagram';
-import { ProjectSidebarContent } from '@/components/project-sidebar-content'; // Ensure this path is correct
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { updateProject as updateProjectHelper } from '@/lib/project-utils';
-import MarkdownPreview from '@/components/markdown-preview';
+import { ProjectSidebarContent } from '@/components/project-sidebar-content'; // Correct import path
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // Import Tabs
+import { updateProject as updateProjectHelper } from '@/lib/project-utils'; // Import the helper function
+import MarkdownPreview from '@/components/markdown-preview'; // Import MarkdownPreview
 
 
 interface ProjectEditorProps {
@@ -175,6 +175,65 @@ const StandardPagePlaceholder = ({ pageName }: { pageName: string }) => (
         </CardContent>
     </Card>
 );
+
+
+// Counter Input Component
+const CounterInput = ({ label, value, onChange, onBlur, min = 0 }: {
+    label: string;
+    value: number;
+    onChange: (value: number) => void;
+    onBlur?: () => void;
+    min?: number;
+}) => {
+    const handleIncrement = () => onChange(value + 1);
+    const handleDecrement = () => onChange(Math.max(min, value - 1)); // Ensure value doesn't go below min
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const numValue = parseInt(e.target.value, 10);
+        if (!isNaN(numValue)) {
+            onChange(Math.max(min, numValue));
+        } else if (e.target.value === '') {
+            onChange(min); // Reset to min if input is cleared
+        }
+    };
+
+    return (
+        <div>
+            <Label htmlFor={`counter-${label.toLowerCase().replace(/\s+/g, '-')}`}>{label}</Label>
+            <div className="flex items-center gap-1 mt-1">
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={handleDecrement}
+                    className="h-8 w-8"
+                    aria-label={`Decrease ${label}`}
+                >
+                    <Minus className="h-4 w-4" />
+                </Button>
+                <Input
+                    id={`counter-${label.toLowerCase().replace(/\s+/g, '-')}`}
+                    type="number"
+                    value={value}
+                    onChange={handleInputChange}
+                    onBlur={onBlur}
+                    className="h-8 text-center w-16 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" // Hide number spinners
+                    min={min}
+                />
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={handleIncrement}
+                    className="h-8 w-8"
+                    aria-label={`Increase ${label}`}
+                >
+                    <Plus className="h-4 w-4" />
+                </Button>
+            </div>
+        </div>
+    );
+};
 
 
 export function ProjectEditor({ projectId }: ProjectEditorProps) {
@@ -357,7 +416,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     if (!project) return;
     // Update fields based on type
     const validStringFields: (keyof Project)[] = ['title', 'projectContext', 'teamDetails', 'instituteName', 'collegeInfo', 'teamId', 'subject', 'semester', 'branch', 'guideName'];
-    const validNumberFields: (keyof Project)[] = ['maxSections', 'maxSubSectionsPerSection'];
+    const validNumberFields: (keyof Project)[] = ['minSections', 'maxSubSectionsPerSection']; // Updated fields
 
     if (validStringFields.includes(field) && typeof value === 'string') {
         updateProject({ [field]: value }, false);
@@ -436,16 +495,16 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         }
 
          const convertOutlineToSections = (outlineSections: OutlineSection[], level = 0): HierarchicalProjectSection[] => {
-             // Limit top-level sections
-            const limitedTopLevel = outlineSections.slice(0, project.maxSections || 10); // Use counter or default
+             // Limit top-level sections based on project setting or default
+            const limitedTopLevel = outlineSections.slice(0, project.minSections || 5); // Use project setting or default
 
              return limitedTopLevel.map(outlineSection => {
                  const newId = uuidv4();
                  const isDiagram = outlineSection.name.toLowerCase().startsWith("diagram:") || outlineSection.name.toLowerCase().startsWith("figure");
 
-                 // Recursively convert subsections, limiting depth
+                 // Recursively convert subsections, limiting depth based on project setting or default
                  let subSections: HierarchicalProjectSection[] = [];
-                 if (outlineSection.subSections && level < (project.maxSubSectionsPerSection || 2)) { // Use counter or default depth
+                 if (outlineSection.subSections && level < (project.maxSubSectionsPerSection || 2)) { // Use project setting or default depth
                      subSections = convertOutlineToSections(outlineSection.subSections, level + 1);
                  } else if (outlineSection.subSections) {
                      console.warn(`Subsections for "${outlineSection.name}" ignored due to depth limit.`);
@@ -612,7 +671,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 projectTitle: project.title,
                 projectContext: project.projectContext || '',
                 // Pass the limits to the AI flow (requires updating the flow's input schema)
-                // maxSections: project.maxSections || 10,
+                // minSections: project.minSections || 5,
                 // maxSubSectionsPerSection: project.maxSubSectionsPerSection || 2,
             });
 
@@ -923,37 +982,25 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                   <Textarea id="projectContext" value={project.projectContext} onChange={(e) => handleProjectDetailChange('projectContext', e.target.value)} onBlur={handleProjectDetailBlur} placeholder="Briefly describe your project, goals, scope, technologies..." className="mt-1 min-h-[120px] focus-visible:glow-primary" required />
                   <p className="text-xs text-muted-foreground mt-1">Crucial for AI section generation ({MIN_CONTEXT_WORDS}+ words, {MIN_CONTEXT_LENGTH}+ chars recommended).</p>
                 </div>
-                 {/* Section Limits */}
+                 {/* Section Limits Counters */}
                  <div className="grid grid-cols-2 gap-4">
-                     <div>
-                         <Label htmlFor="maxSections">Max Sections</Label>
-                         <Input
-                             id="maxSections"
-                             type="number"
-                             value={project.maxSections ?? 10} // Use default if undefined
-                             onChange={(e) => handleProjectDetailChange('maxSections', e.target.value)}
-                             onBlur={handleProjectDetailBlur}
-                             placeholder="e.g., 10"
-                             className="mt-1"
-                             min="1"
-                         />
-                         <p className="text-xs text-muted-foreground mt-1">Limit AI-generated top-level sections.</p>
-                     </div>
-                     <div>
-                         <Label htmlFor="maxSubSectionsPerSection">Max Sub-Section Depth</Label>
-                         <Input
-                             id="maxSubSectionsPerSection"
-                             type="number"
-                             value={project.maxSubSectionsPerSection ?? 2} // Use default if undefined
-                             onChange={(e) => handleProjectDetailChange('maxSubSectionsPerSection', e.target.value)}
-                             onBlur={handleProjectDetailBlur}
-                             placeholder="e.g., 2"
-                             className="mt-1"
-                             min="0" // 0 means no subsections
-                         />
-                         <p className="text-xs text-muted-foreground mt-1">Limit how many levels of sub-sections AI generates.</p>
-                     </div>
+                     <CounterInput
+                         label="Min Sections"
+                         value={project.minSections ?? 5} // Use default if undefined
+                         onChange={(val) => handleProjectDetailChange('minSections', val)}
+                         onBlur={handleProjectDetailBlur}
+                         min={1}
+                     />
+                     <CounterInput
+                         label="Max Sub-Section Depth"
+                         value={project.maxSubSectionsPerSection ?? 2} // Use default if undefined
+                         onChange={(val) => handleProjectDetailChange('maxSubSectionsPerSection', val)}
+                         onBlur={handleProjectDetailBlur}
+                         min={0}
+                     />
                  </div>
+                 <p className="text-xs text-muted-foreground -mt-4">Control AI outline generation limits. Min sections aims for at least this many top-level sections. Max depth limits sub-section nesting (0=none, 1=1.1, 2=1.1.1).</p>
+
                  {/* Logos */}
                 <div className="grid grid-cols-2 gap-4 md:gap-6">
                     <LogoUpload label="University Logo" logoUrl={project.universityLogoUrl} field="universityLogoUrl" onUpload={handleLogoUpload} onRemove={handleRemoveLogo} isUploading={isUploadingLogo.universityLogoUrl} />

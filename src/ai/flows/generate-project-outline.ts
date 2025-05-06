@@ -23,6 +23,8 @@ const OutlineSectionSchema: z.ZodType<any> = z.lazy(() =>
 const GenerateProjectOutlineInputSchema = z.object({
   projectTitle: z.string().describe('The title of the project.'),
   projectContext: z.string().describe('A detailed description of the project, its goals, scope, target audience, key features, technologies used, and methodology (if known). More context leads to better outlines.'),
+  minSections: z.number().optional().describe('The minimum number of top-level sections the AI should aim to generate (default 5).'),
+  maxSubSectionsPerSection: z.number().optional().describe('The maximum depth of sub-section nesting the AI should generate (default 2). 0 means no sub-sections.'),
 });
 export type GenerateProjectOutlineInput = z.infer<typeof GenerateProjectOutlineInputSchema>;
 
@@ -40,12 +42,16 @@ const validateOutlineStructure = (sections: any[] | undefined): sections is Outl
             console.warn("Validation failed: Section missing name or is not an object:", section);
             return false;
         }
+        // Check 'subSections' property existence and type explicitly
         if (section.hasOwnProperty('subSections')) {
             if (!Array.isArray(section.subSections)) {
                 console.warn("Validation failed: subSections exists but is not an array:", section);
+                return false; // Fail if 'subSections' exists but isn't an array
+            }
+             // Recursively validate only if subSections is a non-empty array
+            if (section.subSections.length > 0 && !validateOutlineStructure(section.subSections)) {
                 return false;
             }
-            if (!validateOutlineStructure(section.subSections)) return false;
         }
         return true;
     });
@@ -67,10 +73,10 @@ const prompt = ai.definePrompt({
   output: {
     schema: GenerateProjectOutlineOutputSchema,
   },
-  // **Enhanced Prompt for Diagrams**
+  // **Enhanced Prompt for Diagrams, Limits, and JSON Structure**
   prompt: `You are an AI expert specializing in structuring academic and technical project reports.
 
-  **Task:** Generate a comprehensive and logically ordered HIERARCHICAL list of section names suitable for a project report, based on the provided title and context. Include standard sections and suggest relevant sub-sections. **Where appropriate, also include placeholders for diagrams or figures as specific sub-sections (e.g., "1.1.1 Diagram: System Flowchart", "Figure 3: Results Graph").**
+  **Task:** Generate a comprehensive and logically ordered HIERARCHICAL list of section names suitable for a project report, based on the provided title and context. Aim for at least {{minSections ?? 5}} top-level sections. Include standard sections and suggest relevant sub-sections. **Where appropriate, also include placeholders for diagrams or figures as specific sub-sections (e.g., "1.1.1 Diagram: System Flowchart", "Figure 3: Results Graph").** Limit the nesting depth of sub-sections to {{maxSubSectionsPerSection ?? 2}} levels.
 
   **Project Title:** {{{projectTitle}}}
   **Project Context:** {{{projectContext}}}
@@ -86,29 +92,32 @@ const prompt = ai.definePrompt({
           { "name": "1.1 Background" },
           {
             "name": "1.2 System Overview",
-            "subSections": [ // Example of diagram placeholder
+            "subSections": [ // Example of diagram placeholder at level 2 (if maxSubSectionsPerSection >= 2)
               { "name": "1.2.1 Diagram: High-Level Architecture" }
+              // No deeper nesting like 1.2.1.1 if maxSubSectionsPerSection is 2
             ]
           }
         ]
       },
-      { "name": "2. Methodology" },
-      // ... more sections, potentially with nested sub-sections and diagrams
+      { "name": "2. Methodology" }, // No subSections key if none exist
+      // ... more sections, potentially with nested sub-sections and diagrams up to the specified depth
     ]
   }
   \`\`\`
 
   **Critical Instructions:**
   1.  **JSON ONLY:** Output ONLY the JSON object. No extra text or markdown formatting.
-  2.  **Hierarchical Structure:** Adhere strictly to the schema. Use "subSections" for nesting (allow 2-3 levels). If a section has no sub-sections, OMIT the "subSections" key. If present, "subSections" MUST be an array (can be empty: \`[]\`).
-  3.  **Diagram Placeholders:** Intelligently insert diagram/figure placeholders as sub-sections where visuals would enhance understanding (e.g., for architecture, flowcharts, results). Use naming conventions like "Diagram: [Description]" or "Figure X: [Description]".
-  4.  **Standard Sections:** Include essential academic/technical sections.
-  5.  **Context is Key:** Tailor sections and sub-sections *specifically* to the project context.
-  6.  **Logical Flow:** Ensure sections follow a clear progression.
-  7.  **Naming:** Use clear, descriptive names. Include numbering (e.g., "1.", "1.1", "1.1.1") where appropriate.
-  8.  **Completeness:** Aim for a reasonably complete outline.
+  2.  **Hierarchical Structure:** Adhere strictly to the schema. Use "subSections" for nesting. Do not nest deeper than {{maxSubSectionsPerSection ?? 2}} levels (e.g., if max is 2, allow 1.1 and 1.1.1, but not 1.1.1.1).
+  3.  **OMIT EMPTY 'subSections':** If a section or sub-section has NO further sub-sections, COMPLETELY OMIT the "subSections" key for that object. Do NOT include \`"subSections": []\`.
+  4.  **Minimum Top-Level Sections:** Generate at least {{minSections ?? 5}} top-level sections if feasible based on the context.
+  5.  **Diagram Placeholders:** Intelligently insert diagram/figure placeholders as sub-sections where visuals would enhance understanding (e.g., for architecture, flowcharts, results). Use naming conventions like "Diagram: [Description]" or "Figure X: [Description]".
+  6.  **Standard Sections:** Include essential academic/technical sections.
+  7.  **Context is Key:** Tailor sections and sub-sections *specifically* to the project context.
+  8.  **Logical Flow:** Ensure sections follow a clear progression.
+  9.  **Naming:** Use clear, descriptive names. Include numbering (e.g., "1.", "1.1", "1.1.1") where appropriate, reflecting the hierarchy.
+  10. **Completeness:** Aim for a reasonably complete outline based on the input.
 
-  Now, generate the JSON output for the given Project Title and Context.
+  Now, generate the JSON output for the given Project Title and Context, respecting the section and depth limits.
   `,
 });
 
@@ -138,9 +147,15 @@ async input => {
         if (!output || typeof output !== 'object' || !validateOutlineStructure(output.sections)) {
             console.warn("AI did not return a valid hierarchical structure. Output:", JSON.stringify(output));
              try {
-                const parsed = GenerateProjectOutlineOutputSchema.parse(output);
-                console.log("Defensive parsing successful, using parsed output:", parsed);
-                return parsed;
+                 // Attempt to parse defensively even if validation failed, as it might be a minor issue
+                 const parsed = GenerateProjectOutlineOutputSchema.parse(output);
+                 console.log("Defensive parsing successful despite initial validation warning:", parsed);
+                 // Re-validate after parsing to be absolutely sure
+                 if (!validateOutlineStructure(parsed.sections)) {
+                     console.error("Defensive parsing succeeded but structure is still invalid.");
+                     return fallbackOutline;
+                 }
+                 return parsed;
              } catch (parseError) {
                  console.error("Defensive parsing also failed:", parseError);
                  return fallbackOutline;
@@ -159,3 +174,9 @@ async input => {
          return fallbackOutline;
     }
 });
+
+// Type definition for hierarchical structure used internally by the validation function
+interface OutlineSection {
+    name: string;
+    subSections?: OutlineSection[];
+}

@@ -101,8 +101,6 @@ export const STANDARD_REPORT_PAGES = [
   "List of Figures",
   "List of Tables",
   "Abbreviations",
-  // TOC is implicitly handled by the hierarchical section structure now for generated sections
-  // but we keep the constant for identifying the standard page if needed.
 ];
 
 export const STANDARD_PAGE_INDICES: { [key: string]: number } = {};

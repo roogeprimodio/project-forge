@@ -39,6 +39,8 @@ export interface Project {
   createdAt: Date | string;
   updatedAt: Date | string;
   storageType: 'local' | 'cloud';
+  minSections?: number; // Minimum sections AI should aim for
+  maxSubSectionsPerSection?: number; // Max depth of sub-sections AI should generate
 }
 
 // Constants for standard pages and their indices
@@ -53,7 +55,6 @@ export const STANDARD_REPORT_PAGES = [
   "List of Figures",
   "List of Tables",
   "Abbreviations",
-  // TOC_SECTION_NAME // TOC is implicitly handled, but constant is useful
 ];
 
 export const STANDARD_PAGE_INDICES: { [key: string]: number } = {};
