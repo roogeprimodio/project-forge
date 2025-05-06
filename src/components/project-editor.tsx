@@ -26,12 +26,13 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { v4 as uuidv4 } from 'uuid';
 import AiDiagramGenerator from '@/components/ai-diagram-generator';
 import MermaidDiagram from '@/components/mermaid-diagram';
-import { ProjectSidebarContent } from '@/components/project-sidebar-content'; // Correct import path
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // Import Tabs
-import { updateProject as updateProjectHelper } from '@/lib/project-utils'; // Import the helper function
+import { ProjectSidebarContent } from '@/components/project-sidebar-content';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { updateProject as updateProjectHelper } from '@/lib/project-utils';
 import MarkdownPreview from '@/components/markdown-preview';
 import { CombinedSectionPreview } from '@/components/combined-section-preview';
 import { StandardPagePreview } from '@/components/standard-page-preview';
+import { MarkdownToolbar } from '@/components/markdown-toolbar'; // Import the new toolbar
 
 
 // Recursive component to render the preview outline
@@ -48,7 +49,7 @@ const OutlinePreviewItem: React.FC<{ item: OutlineSection; level: number }> = ({
       {hasSubSections && (
         <div className="border-l border-muted/30 ml-2 pl-2">
           {item.subSections.map((subItem, index) => (
-            <OutlinePreviewItem key={`${item.name}-${index}`} item={subItem} level={level +1} /> // Increment level for sub-sections
+            <OutlinePreviewItem key={`${item.name}-${index}`} item={subItem} level={level +1} />
           ))}
         </div>
       )}
@@ -190,7 +191,6 @@ const CounterInput = ({ label, value, onChange, onBlur, min = 0, inputId }: {
         if (!isNaN(numValue)) {
             onChange(Math.max(min, numValue));
         } else if (e.target.value === '') {
-            // If input is cleared, reset to min or a sensible default, e.g., 0 or props.min
             onChange(min);
         }
     };
@@ -261,6 +261,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const dragOffset = useRef({ x: 0, y: 0 });
   const [isGeneratingDiagram, setIsGeneratingDiagram] = useState(false);
   const [sectionToDelete, setSectionToDelete] = useState<string | null>(null);
+  const contentTextAreaRef = useRef<HTMLTextAreaElement>(null);
 
   const [activeSubSectionId, setActiveSubSectionId] = useState<string | null>(null);
 
@@ -306,8 +307,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         setActiveSubSectionId(null);
         if (activeSectionId !== newActiveId) {
             setActiveSectionId(newActiveId);
-            if (newActiveId !== String(-1)) { // Project Details ID
-                setPreviewedOutline(null); // Clear outline preview when switching sections
+            if (newActiveId !== String(-1)) {
+                setPreviewedOutline(null);
             }
         }
         setIsMobileSheetOpen(false);
@@ -794,6 +795,19 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     toast({ title: 'Diagram Code Saved', description: `Mermaid code saved for "${subSection.name}".` });
   };
 
+  const handleApplyMarkdownFormat = (newContent: string, newCursorPosition?: number) => {
+     if (!project || !activeSubSectionId) return;
+     handleSectionContentChange(activeSubSectionId, newContent);
+     // Allow time for state to update before setting cursor
+     setTimeout(() => {
+       if (contentTextAreaRef.current && newCursorPosition !== undefined) {
+         contentTextAreaRef.current.focus();
+         contentTextAreaRef.current.setSelectionRange(newCursorPosition, newCursorPosition);
+       }
+     }, 0);
+     handleSectionContentBlur(); // Trigger history save
+  };
+
 
   const onFabMouseDown = (e: React.MouseEvent<HTMLButtonElement>) => {
     if (e.button !== 0) return;
@@ -877,7 +891,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
   const currentActiveMainSection = activeSectionId ? findSectionById(project.sections, activeSectionId) : null;
   const currentActiveSubSection = activeSubSectionId ? findSectionById(project.sections, activeSubSectionId) : null;
-  const isDiagramSection = currentActiveSubSection?.name.toLowerCase().startsWith("diagram:") || currentActiveSubSection?.name.toLowerCase().startsWith("figure");
+  const isDiagramSection = currentActiveSubSection?.name.toLowerCase().startsWith("diagram:") || currentActiveSubSection?.name.toLowerCase().startsWith("figure:");
 
     if (activeSectionId === String(-1)) {
       activeViewName = 'Project Details';
@@ -1041,13 +1055,22 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                          <CardDescription className="text-sm">Edit the content using Markdown and preview the output.</CardDescription>
                        </CardHeader>
                        <CardContent>
-                         <Tabs defaultValue="edit" className="w-full">
+                         <MarkdownToolbar textareaRef={contentTextAreaRef} onApplyFormat={handleApplyMarkdownFormat} />
+                         <Tabs defaultValue="edit" className="w-full mt-2">
                            <TabsList className="grid w-full grid-cols-2 mb-4">
                              <TabsTrigger value="edit">Edit</TabsTrigger>
                              <TabsTrigger value="preview">Preview</TabsTrigger>
                            </TabsList>
                            <TabsContent value="edit" className="space-y-4">
-                               <Textarea id={`section-content-${currentActiveSubSection.id}`} value={currentActiveSubSection.content} onChange={(e) => handleSectionContentChange(currentActiveSubSection.id, e.target.value)} onBlur={handleSectionContentBlur} placeholder={"Generated content appears here. Use Markdown for formatting..."} className="min-h-[300px] md:min-h-[400px] text-sm md:text-base focus-visible:glow-primary font-mono" />
+                               <Textarea
+                                   id={`section-content-${currentActiveSubSection.id}`}
+                                   ref={contentTextAreaRef}
+                                   value={currentActiveSubSection.content}
+                                   onChange={(e) => handleSectionContentChange(currentActiveSubSection.id, e.target.value)}
+                                   onBlur={handleSectionContentBlur}
+                                   placeholder={"Generated content appears here. Use Markdown for formatting..."}
+                                   className="min-h-[300px] md:min-h-[400px] text-sm md:text-base focus-visible:glow-primary font-mono"
+                                />
                            </TabsContent>
                            <TabsContent value="preview">
                                <MarkdownPreview content={currentActiveSubSection.content || ''} />
@@ -1110,6 +1133,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 updateProject={updateProject}
                 activeSectionId={activeSectionId}
                 setActiveSectionId={handleSetActiveSection}
+                activeSubSectionId={activeSubSectionId}
+                setActiveSubSectionId={setActiveSubSectionId}
                 handleGenerateTocClick={handleGenerateTocClick}
                 isGeneratingOutline={isGeneratingOutline}
                 isGenerating={isGenerating}
@@ -1123,8 +1148,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 onEditSectionName={handleEditSectionName}
                 onDeleteSection={handleDeleteSection}
                 handleAddNewSection={handleAddNewSection}
-                activeSubSectionId={activeSubSectionId}
-                setActiveSubSectionId={setActiveSubSectionId}
             />
         </div>
 
@@ -1138,6 +1161,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 updateProject={updateProject}
                 activeSectionId={activeSectionId}
                 setActiveSectionId={handleSetActiveSection}
+                activeSubSectionId={activeSubSectionId}
+                setActiveSubSectionId={setActiveSubSectionId}
                 handleGenerateTocClick={handleGenerateTocClick}
                 isGeneratingOutline={isGeneratingOutline}
                 isGenerating={isGenerating}
@@ -1152,8 +1177,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 onEditSectionName={handleEditSectionName}
                 onDeleteSection={handleDeleteSection}
                 handleAddNewSection={handleAddNewSection}
-                activeSubSectionId={activeSubSectionId}
-                setActiveSubSectionId={setActiveSubSectionId}
             />
         </SheetContent>
 
