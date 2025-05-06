@@ -57,7 +57,7 @@ const prompt = ai.definePrompt({
       *   Class and relationship definitions in class diagrams.
       *   State transitions in state diagrams.
   4.  **Clarity and Simplicity:** Keep the diagram relatively simple and clear, focusing on accurately representing the core elements and relationships described by the user. Avoid overly complex or cluttered diagrams unless specifically requested.
-  5.  **Handle Ambiguity:** If the description is ambiguous, make a reasonable interpretation. If critical information is missing that prevents diagram generation, output a simple error diagram like: \`graph TD\\nError[Description unclear or insufficient]\`.
+  5.  **Handle Ambiguity/Insufficient Input:** If the description is too short, unclear, or missing critical information that prevents diagram generation, output a simple error diagram like: \`graph TD\\nError[Description unclear or insufficient. Please provide more details.]\`. Do NOT attempt to generate a complex diagram from poor input.
   6.  **Output Structure:** Ensure the entire output is a single JSON object with one key: "mermaidCode", whose value is the string of Mermaid syntax.
 
   **Example of a VALID "mermaidCode" string for "flowchart showing A to B":**
@@ -68,7 +68,7 @@ const prompt = ai.definePrompt({
   OR
   \`Here is your diagram:\\nflowchart TD\\nA --> B\` (Contains extra text)
 
-  Generate the Mermaid code now based on the provided description.
+  Generate the Mermaid code now based on the provided description. If the description is insufficient, return the specified error diagram.
   `,
 });
 
@@ -81,57 +81,68 @@ const generateDiagramMermaidFlow = ai.defineFlow<
   outputSchema: GenerateDiagramMermaidOutputSchema,
 },
 async input => {
-  if (!input.description || input.description.trim().length < 10) {
-    console.warn("Diagram description is very short. AI might struggle.");
-    return { mermaidCode: `graph TD\nError[Description too short. Please provide more details.]` };
+  if (!input.description || input.description.trim().length < 10) { // Stricter input validation
+    console.warn("Diagram description is too short. AI might struggle or return error diagram.");
+    return { mermaidCode: `graph TD\nError[Description too short. Please provide more details to generate a diagram.]` };
   }
 
   let output: GenerateDiagramMermaidOutput | undefined;
   try {
     console.log("Calling AI for diagram generation with input:", input);
     const result = await prompt(input);
-    output = result.output; // Access the output from the result
+    output = result.output; 
 
     if (!output || !output.mermaidCode || typeof output.mermaidCode !== 'string') {
         console.error("AI returned invalid or empty output structure:", output);
-        throw new Error("AI returned an invalid output structure.");
+        throw new Error("AI returned an invalid output structure for Mermaid code.");
     }
 
     // Aggressively clean the mermaidCode
     let cleanedCode = output.mermaidCode.trim();
 
     // Remove potential markdown fences (multiline and case-insensitive)
-    cleanedCode = cleanedCode.replace(/^```(?:mermaid)?\s*[\r\n]+/im, ''); // Start fence with optional "mermaid" and newline
-    cleanedCode = cleanedCode.replace(/[\r\n]+\s*```$/im, '');             // End fence preceded by newline
+    // Matches ```mermaid (optional) ... ``` or ``` ... ```
+    cleanedCode = cleanedCode.replace(/^```(?:mermaid)?\s*[\r\n]+/, ''); 
+    cleanedCode = cleanedCode.replace(/[\r\n]+\s*```$/, '');           
 
-    // Final trim after fence removal
-    cleanedCode = cleanedCode.trim();
+    // Remove any leading/trailing non-Mermaid conversational text if AI includes it
+    // This is a heuristic; more sophisticated NLP might be needed for complex cases
+    const firstMermaidKeywordIndex = cleanedCode.search(/^(graph|flowchart|sequenceDiagram|classDiagram|stateDiagram|erDiagram|gantt|pie|mindmap|stateDiagram-v2|journey)/i);
+    if (firstMermaidKeywordIndex > 0) {
+        console.warn("AI output contained leading non-Mermaid text. Attempting to trim.");
+        cleanedCode = cleanedCode.substring(firstMermaidKeywordIndex);
+    } else if (firstMermaidKeywordIndex === -1 && cleanedCode.length > 0 && !cleanedCode.startsWith("graph TD\nError")) {
+        // If no keyword found and it's not our predefined error diagram, it's likely invalid.
+        console.warn(`Generated code "${cleanedCode.substring(0,50)}..." doesn't start with a known Mermaid type and is not a recognized error format. Returning error diagram.`);
+        return { mermaidCode: `graph TD\nError[AI generated invalid diagram start. Please check your description or try again.]` };
+    }
+    
+    cleanedCode = cleanedCode.trim(); // Final trim after all cleaning
 
     output.mermaidCode = cleanedCode;
 
   } catch (error) {
     console.error("Error during AI diagram generation or processing:", error);
     const errorMessage = error instanceof Error ? error.message : String(error);
-    // Return a more informative error diagram if AI call fails or processing fails
-    return { mermaidCode: `graph TD\n  Error[AI Generation Failed: ${errorMessage.substring(0,100)}${errorMessage.length > 100 ? '...' : ''}] --> CheckLogs` };
+    return { mermaidCode: `graph TD\nError[AI Generation Failed: ${errorMessage.replace(/"/g, "'").substring(0,100)}${errorMessage.length > 100 ? '...' : ''}] --> CheckLogs` };
   }
 
   // Validate that the cleaned code starts with a known Mermaid diagram type
   const knownTypes = ['flowchart', 'graph', 'sequenceDiagram', 'classDiagram', 'stateDiagram', 'erDiagram', 'gantt', 'pie', 'mindmap', 'stateDiagram-v2', 'journey'];
   const firstLine = output.mermaidCode.split(/[\r\n]+/)[0]?.trim()?.toLowerCase() || "";
 
-  if (!knownTypes.some(type => firstLine.startsWith(type))) {
-      console.warn(`Generated code "${firstLine.substring(0,30)}..." doesn't start with a known Mermaid type. This might cause rendering issues.`);
-      // Optionally, you could return an error diagram here too, or let it pass and see if Mermaid client handles it.
-      // For now, let's return the potentially problematic code with a warning in logs.
-      // return { mermaidCode: `graph TD\nError[Invalid diagram type or malformed code. First line: ${firstLine.substring(0,30)}...]` };
+  if (!output.mermaidCode) { // Check if code is empty after cleaning
+      console.warn("AI did not return any Mermaid code after cleaning, providing fallback error diagram.");
+      return { mermaidCode: `graph TD\nError[AI returned empty code. Please try again.]` };
   }
 
-  if (!output.mermaidCode) {
-      console.warn("AI did not return any Mermaid code after cleaning, providing fallback.");
-      return { mermaidCode: `graph TD\nA[Start] --> B{Error?};\nB -- Yes --> C[Handle Error];\nB -- No --> D[Success];` };
+  if (!knownTypes.some(type => firstLine.startsWith(type)) && !firstLine.startsWith("error[")) { // Allow "error[" for our custom error diagrams
+      console.warn(`Generated code "${firstLine.substring(0,30)}..." doesn't start with a known Mermaid type or error format. This might cause rendering issues.`);
+      // Return a specific error diagram for this case
+      return { mermaidCode: `graph TD\nError[Invalid diagram type or malformed code. First line: ${firstLine.substring(0,50)}...]` };
   }
 
   console.log("Cleaned AI Mermaid code output:", output.mermaidCode);
   return output;
 });
+
