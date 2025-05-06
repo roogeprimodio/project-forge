@@ -1,4 +1,3 @@
-
 // src/components/project-sidebar-content.tsx
 "use client";
 
@@ -7,14 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Settings, Undo, Lightbulb, Cloud, CloudOff, PlusCircle, FileText, Loader2, ChevronRight, ChevronDown, Edit3, Trash2 } from 'lucide-react';
+import { Settings, Undo, Lightbulb, Cloud, CloudOff, PlusCircle, FileText, Loader2, Edit3 } from 'lucide-react'; // Removed unused icons, kept Edit3
 import type { Project, SectionIdentifier, HierarchicalProjectSection } from '@/types/project';
-import { STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, findSectionById } from '@/lib/project-utils';
+import { STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, findSectionById, addSubSectionById } from '@/lib/project-utils'; // Use types/project for indices
 import { HierarchicalSectionItem } from './hierarchical-section-item';
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
 import { cn } from '@/lib/utils';
-import { addSubSectionById } from '@/lib/project-utils'; // Import the utility function
 
 // Props interface for ProjectSidebarContent
 export interface ProjectSidebarContentProps {
@@ -30,7 +28,7 @@ export interface ProjectSidebarContentProps {
     handleSaveOnline: () => void;
     canUndo: boolean;
     handleUndo: () => void;
-    onCloseSheet?: () => void;
+    onCloseSheet?: () => void; // Used to close the mobile Sheet
     isEditingSections: boolean;
     setIsEditingSections: (editing: boolean) => void;
     onEditSectionName: (id: string, newName: string) => void;
@@ -56,7 +54,7 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
     handleSaveOnline,
     canUndo,
     handleUndo,
-    onCloseSheet, // Used to close the mobile Sheet
+    onCloseSheet,
     isEditingSections,
     setIsEditingSections,
     onEditSectionName,
@@ -90,21 +88,22 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
      // Recursive function to render sections and sub-sections
      const renderSectionsRecursive = (sections: HierarchicalProjectSection[], level: number, parentNumbering: string = ''): React.ReactNode[] => {
         return sections.map((section, index) => {
+            // Correct hierarchical numbering (e.g., 1, 1.1, 1.1.1)
             const currentNumbering = parentNumbering ? `${parentNumbering}.${index + 1}` : `${index + 1}`;
             return (
                 <HierarchicalSectionItem
                     key={section.id} // Use unique section ID
                     section={section}
                     level={level}
-                    numbering={currentNumbering}
+                    numbering={currentNumbering} // Pass the full hierarchical number
                     activeSectionId={activeSectionId}
-                    setActiveSectionId={setActiveSectionId} // Pass setActiveSectionId
+                    setActiveSectionId={setActiveSectionId}
                     onEditSectionName={onEditSectionName}
                     onDeleteSection={onDeleteSection}
-                    onAddSubSection={handleAddNewSubSection} // Pass the correct handler
+                    onAddSubSection={handleAddNewSubSection} // Pass the sub-section handler
                     isEditing={isEditingSections}
-                    onCloseSheet={onCloseSheet} // Pass close handler
-                    renderSubSections={renderSectionsRecursive} // Pass down the recursive function itself
+                    onCloseSheet={onCloseSheet}
+                    renderSubSections={renderSectionsRecursive} // Pass down the recursive function
                 />
             );
         });
@@ -113,9 +112,9 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
 
      return (
         // Main container for sidebar content
-        <div className="flex flex-col h-full bg-card"> {/* Removed border-r */}
-            {/* Header */}
-            <div className="p-3 sm:p-4 border-b flex justify-between items-center flex-shrink-0">
+        <div className="flex flex-col h-full bg-card">
+            {/* Header - Uses project.title which updates when parent re-renders */}
+            <div className="p-4 border-b flex justify-between items-center flex-shrink-0">
                  <Input
                         id="projectTitleSidebar"
                         value={project.title}
@@ -129,7 +128,7 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                     size="icon"
                     onClick={handleUndo}
                     disabled={!canUndo}
-                    className="flex-shrink-0 h-8 w-8" // Consistent size
+                    className="flex-shrink-0 h-8 w-8"
                     title={canUndo ? "Undo last change" : "Nothing to undo"}
                 >
                     <Undo className="h-4 w-4" />
@@ -143,7 +142,7 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                     variant={activeSectionId === String(-1) ? "secondary" : "ghost"}
                     size="sm"
                     onClick={() => handleSectionClick(String(-1))}
-                    className="justify-start w-full text-left text-sm" // Ensure text size consistency
+                    className="justify-start w-full text-left text-sm hover:bg-muted/60 data-[variant=secondary]:bg-primary/10" // Improved hover/active
                     aria-current={activeSectionId === String(-1) ? "page" : undefined}
                 >
                     <Settings className="mr-2 h-4 w-4" />
@@ -153,19 +152,19 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
             <Separator className="my-0 flex-shrink-0" />
 
             {/* Standard Report Pages Section */}
-            <div className="px-2 py-2 flex-shrink-0">
-                <p className="px-2 text-xs font-semibold text-muted-foreground mb-1 text-left uppercase">Standard Pages</p>
-                <ScrollArea className="w-full whitespace-nowrap max-h-[150px] sm:max-h-[200px]"> {/* Adjusted max-height */}
+            <ScrollArea className="w-full flex-shrink-0 max-h-[250px]"> {/* Allow vertical scroll if needed */}
+                <div className="px-2 py-2">
+                    <p className="px-2 text-xs font-semibold text-muted-foreground mb-1 text-left uppercase">Standard Pages</p>
                     <nav className="flex flex-col gap-1 min-w-max text-left">
                         {STANDARD_REPORT_PAGES.map((pageName) => {
                             const pageId = String(STANDARD_PAGE_INDICES[pageName]);
                             return (
                                 <Button
-                                    key={pageId}
+                                    key={pageId} // Unique key
                                     variant={activeSectionId === pageId ? "secondary" : "ghost"}
                                     size="sm"
                                     onClick={() => handleSectionClick(STANDARD_PAGE_INDICES[pageName])}
-                                    className="justify-start text-left text-sm" // Consistent text size
+                                    className="justify-start text-left text-sm hover:bg-muted/60 data-[variant=secondary]:bg-primary/10" // Improved hover/active
                                     aria-current={activeSectionId === pageId ? "page" : undefined}
                                     title={pageName}
                                 >
@@ -175,15 +174,15 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                             );
                         })}
                     </nav>
-                     <ScrollBar orientation="horizontal" />
-                     <ScrollBar orientation="vertical" />
-                </ScrollArea>
-            </div>
+                </div>
+                <ScrollBar orientation="vertical" />
+                <ScrollBar orientation="horizontal" /> {/* Added horizontal scrollbar */}
+            </ScrollArea>
             <Separator className="my-0 flex-shrink-0" />
 
             {/* Report Sections Section - Takes remaining space */}
-            <div className="flex-1 flex flex-col min-h-0"> {/* Use flex-1 and min-h-0 */}
-                 <div className="flex justify-between items-center pl-2 pr-3 sm:pr-4 py-2 flex-shrink-0">
+            <div className="flex-1 flex flex-col min-h-0">
+                 <div className="flex justify-between items-center pl-2 pr-4 py-2 flex-shrink-0">
                     <p className="text-xs font-semibold text-muted-foreground text-left uppercase">Report Sections</p>
                     <Button
                         variant="ghost"
@@ -191,26 +190,25 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                         onClick={() => setIsEditingSections(!isEditingSections)}
                         className="text-xs h-auto py-0 px-1 text-primary hover:bg-primary/10"
                     >
-                        {isEditingSections ? 'Done' : 'Edit'}
+                         <Edit3 className="h-3 w-3 mr-1"/> {isEditingSections ? 'Done' : 'Edit'}
                     </Button>
                  </div>
-                 {/* ScrollArea for REPORT SECTIONS */}
-                 <ScrollArea className="flex-1 w-full"> {/* flex-1 to fill space, w-full */}
-                     <div className="px-2 pb-2"> {/* Reduced bottom padding */}
-                        <nav className="flex flex-col gap-0.5 min-w-max text-left whitespace-nowrap"> {/* Reduced gap */}
+                 <ScrollArea className="flex-1 w-full">
+                     <div className="px-2 pb-2">
+                        <nav className="flex flex-col gap-0.5 min-w-max text-left whitespace-nowrap">
+                            {/* ** Render the hierarchical sections ** */}
                            {project.sections?.length > 0 ? (
-                               renderSectionsRecursive(project.sections, 0, '')
+                               renderSectionsRecursive(project.sections, 0) // Start recursion
                            ) : (
-                             <p className="text-xs text-muted-foreground italic text-left px-2 py-1">Generate or add sections.</p>
+                             <p className="px-2 py-1 text-xs text-muted-foreground italic">Generate sections or add manually in edit mode.</p>
                            )}
-                           {/* Add New Top-Level Section Button */}
                            {isEditingSections && (
                                <Button
                                    key="add-new-top-level-section-button"
                                    variant="outline"
                                    size="sm"
                                    onClick={handleAddNewSection}
-                                   className="justify-start mt-2 text-muted-foreground hover:text-primary text-left text-sm" // Consistent text size
+                                   className="justify-start mt-2 text-muted-foreground hover:text-primary text-left text-sm"
                                    title="Add new top-level section"
                                >
                                    <PlusCircle className="mr-2 h-4 w-4" />
@@ -219,23 +217,23 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                            )}
                         </nav>
                      </div>
-                     <ScrollBar orientation="horizontal" />
                      <ScrollBar orientation="vertical" />
+                     <ScrollBar orientation="horizontal" /> {/* Added horizontal scrollbar */}
                  </ScrollArea>
              </div>
 
              {/* Footer */}
-             <div className="p-3 sm:p-4 border-t space-y-2 flex-shrink-0">
+             <div className="p-4 border-t space-y-2 flex-shrink-0">
                  <Button
                     variant="outline"
                     size="sm"
                     onClick={handleGenerateTocClick}
                     disabled={isGeneratingOutline || isGenerating || isSummarizing || isSuggesting || !project.projectContext?.trim()}
                     className="w-full hover:glow-accent focus-visible:glow-accent"
-                    title={!project.projectContext?.trim() ? "Add project context first" : "Generate sections"}
+                    title={!project.projectContext?.trim() ? "Add project context in Project Details first" : "Generate Table of Contents based on project context"}
                 >
                     {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
-                    {isGeneratingOutline ? 'Generating...' : 'Generate Sections'}
+                    {isGeneratingOutline ? 'Generating Sections...' : 'Generate/Update Sections'}
                 </Button>
                  <Button
                      variant="outline"
