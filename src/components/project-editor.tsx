@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, FileWarning, Eye, Projector, BrainCircuit, Plus, Minus, CheckCircle, Edit3 } from 'lucide-react'; // Added CheckCircle, Edit3
+import { Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, FileWarning, Eye, Projector, BrainCircuit, Plus, Minus, CheckCircle, Edit3, ChevronRight } from 'lucide-react'; // Added CheckCircle, Edit3 and ChevronRight
 import Link from 'next/link';
 import type { Project, HierarchicalProjectSection, GeneratedSectionOutline, SectionIdentifier, OutlineSection } from '@/types/project'; // Use hierarchical type
 import { findSectionById, updateSectionById, deleteSectionById, STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, TOC_SECTION_NAME, ensureDefaultSubSection, getSectionNumbering } from '@/lib/project-utils'; // Import functions and constants
@@ -1120,7 +1120,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                          <p className="text-sm">Go to <Button variant="link" className="p-0 h-auto text-base" onClick={() => handleSetActiveSection(String(-1))}>Project Details</Button>, provide context, then click "Generate Outline Preview".</p>
                         <Button variant="default" size="sm" onClick={handleGenerateTocClick} disabled={isGeneratingOutline || isGenerating || isSummarizing || isSuggesting || !project.projectContext?.trim()} className="hover:glow-primary focus-visible:glow-primary">
                           {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
-                          {isGeneratingOutline ? 'Generating...' : 'Generate Outline Preview'}
+                          {isGeneratingOutline ? 'Generating Outline...' : 'Generate Outline Preview'}
                         </Button>
                         <p className="text-xs text-muted-foreground mt-3">The AI will create a proposed outline based on your project context.</p>
                       </CardContent>
@@ -1133,6 +1133,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   return (
     <Sheet open={isMobileSheetOpen} onOpenChange={setIsMobileSheetOpen}>
       <div className="flex h-full relative">
+        {/* Mobile Sheet Content */}
         <SheetContent side="left" className="p-0 w-72 sm:w-80 bg-card md:hidden">
           <SheetHeader className="p-4 border-b">
             <SheetTitle>Project Menu</SheetTitle>
@@ -1162,6 +1163,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
           />
         </SheetContent>
 
+        {/* Desktop Sidebar */}
         <div className={cn(
              "hidden md:flex md:flex-col transition-all duration-300 ease-in-out overflow-y-auto overflow-x-hidden",
              "w-72 lg:w-80 border-r bg-card"
@@ -1189,8 +1191,17 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             />
         </div>
 
+        {/* Main Content Area */}
         <div className="flex-1 flex flex-col overflow-hidden">
           <header className="sticky top-0 z-10 flex h-14 items-center gap-2 sm:gap-4 border-b bg-background/95 backdrop-blur-sm px-3 sm:px-4 lg:px-6 flex-shrink-0">
+            {/* Mobile Sheet Trigger (button) */}
+            {/* <SheetTrigger asChild className="md:hidden">
+                <Button variant="ghost" size="icon">
+                    <Menu className="h-5 w-5" />
+                    <span className="sr-only">Open Project Menu</span>
+                </Button>
+            </SheetTrigger> */}
+
             <h1 className="flex-1 text-base sm:text-lg font-semibold md:text-xl text-primary truncate text-glow-primary">
                {activeViewName}
             </h1>
@@ -1209,6 +1220,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
           <ScrollArea className="flex-1 p-3 sm:p-4 md:p-6">
               {activeViewContent}
+             {/* AI Suggestions Section */}
              <Card className="shadow-md mt-6">
                  <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-lg md:text-xl text-primary text-glow-primary"><Sparkles className="w-5 h-5" /> AI Suggestions</CardTitle>
@@ -1234,6 +1246,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
           </ScrollArea>
         </div>
 
+        {/* Floating Action Button (FAB) for Mobile Project Menu */}
          <SheetTrigger asChild>
              <Button
                  ref={fabRef}
@@ -1241,11 +1254,12 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                  size="icon"
                  className={cn(
                      "fixed z-20 rounded-full shadow-lg w-12 h-12 sm:w-14 sm:h-14 hover:glow-primary focus-visible:glow-primary cursor-grab active:cursor-grabbing",
-                     "md:hidden"
+                     "md:hidden" // Hide on medium and larger screens
                  )}
                  style={{ left: `${fabPosition.x}px`, top: `${fabPosition.y}px`, position: 'fixed' }}
                  onMouseDown={onFabMouseDown}
                  onClick={(e) => {
+                     // Prevent sheet from opening if user was dragging
                      if (!isDraggingFab) {
                         setIsMobileSheetOpen(true);
                      }
@@ -1257,6 +1271,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
              </Button>
          </SheetTrigger>
 
+        {/* Alert Dialog for Outline Context Warning */}
         <AlertDialog open={showOutlineContextAlert} onOpenChange={setShowOutlineContextAlert}>
           <AlertDialogContent>
             <AlertDialogHeader> <AlertDialogTitle>Project Context May Be Limited</AlertDialogTitle> <AlertDialogDescription> The project context is short ({project?.projectContext?.trim().split(/\s+/).filter(Boolean).length || 0} words). Generating an accurate outline might be difficult. Consider adding more details. Proceed anyway? </AlertDialogDescription> </AlertDialogHeader>
@@ -1264,6 +1279,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
           </AlertDialogContent>
         </AlertDialog>
 
+        {/* Alert Dialog for Delete Section Confirmation */}
          <AlertDialog open={!!sectionToDelete} onOpenChange={(open) => !open && setSectionToDelete(null)}>
            <AlertDialogContent>
              <AlertDialogHeader> <AlertDialogTitle>Delete Section?</AlertDialogTitle> <AlertDialogDescription> Are you sure you want to delete "{sectionToDelete ? findSectionById(project.sections, sectionToDelete)?.name : ''}" and its sub-sections? This cannot be undone. </AlertDialogDescription> </AlertDialogHeader>
@@ -1275,6 +1291,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   );
 }
 
+// Helper function to validate the outline structure
 const validateOutlineStructure = (sections: any[] | undefined): sections is OutlineSection[] => {
     if (!Array.isArray(sections)) {
         console.warn("Validation failed: Main sections property is not an array.");
@@ -1285,12 +1302,14 @@ const validateOutlineStructure = (sections: any[] | undefined): sections is Outl
             console.warn("Validation failed: Section missing name or is not an object:", section);
             return false;
         }
+        // Check 'subSections' property existence and type explicitly
         if (section.hasOwnProperty('subSections')) {
             if (!Array.isArray(section.subSections)) {
                 console.warn("Validation failed: subSections exists but is not an array:", section);
-                return false;
+                return false; // Fail if 'subSections' exists but isn't an array
             }
-            if (!validateOutlineStructure(section.subSections)) {
+            // Recursively validate only if subSections is a non-empty array
+            if (section.subSections.length > 0 && !validateOutlineStructure(section.subSections)) {
                  console.warn("Validation failed: Invalid structure within subSections of:", section.name);
                  return false;
             }
