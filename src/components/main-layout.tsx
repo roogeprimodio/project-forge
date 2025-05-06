@@ -16,11 +16,11 @@ import {
   SidebarMenuButton,
   SidebarInset,
 } from '@/components/ui/sidebar';
-import { LayoutDashboard, User, Image as ImageIcon, Settings, LogIn, LogOut } from 'lucide-react';
+import { LayoutDashboard, User, Image as ImageIcon, Settings, LogIn, LogOut, GitGraph } from 'lucide-react'; // Added GitGraph
 import { Button } from '@/components/ui/button';
 import { usePathname } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { ThemeToggle } from '@/components/theme-toggle'; // Import ThemeToggle
+import { ThemeToggle } from '@/components/theme-toggle';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -30,51 +30,42 @@ export function MainLayout({ children }: MainLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { toast } = useToast();
-  const [isLoggedIn, setIsLoggedIn] = useState(false); // Placeholder login state
+  const [isLoggedIn, setIsLoggedIn] = useState(false); 
   const [hasMounted, setHasMounted] = useState(false);
 
   useEffect(() => {
     setHasMounted(true);
-    // Simulate checking login status - replace with actual auth check
-    // For now, assume logged in if not on login/register pages
     setIsLoggedIn(!(pathname === '/login' || pathname === '/register'));
   }, [pathname]);
 
   const handleLogout = () => {
-    // Simulate logout process
     console.log('Logging out...');
     setIsLoggedIn(false);
     toast({
         title: 'Logged Out',
         description: 'You have been successfully logged out.',
     });
-    router.push('/login'); // Redirect to login page
+    router.push('/login'); 
   };
 
   const handleLogin = () => {
      router.push('/login');
   }
 
-  // Determine if the sidebar should be shown based on route and mount status
   const showSidebar = !(pathname === '/login' || pathname === '/register') && hasMounted;
 
-  // Avoid rendering anything until mounted to prevent hydration mismatches
   if (!hasMounted) {
-      // Optionally return a simple loading state or null
-      return null; // Or a basic loading skeleton
+      return null; 
   }
 
-  // If sidebar shouldn't be shown (login/register), render children directly
   if (!showSidebar) {
       return <>{children}</>;
   }
 
-  // Main layout with sidebar
   return (
     <SidebarProvider defaultOpen={true}>
-      <div className="flex min-h-screen bg-background"> {/* Ensure background color */}
-        {/* Sidebar definition */}
-        <Sidebar side="left" collapsible="icon" className="border-r bg-sidebar text-sidebar-foreground hidden md:flex md:flex-col"> {/* Hide on mobile initially, flex-col added */}
+      <div className="flex min-h-screen bg-background"> 
+        <Sidebar side="left" collapsible="icon" className="border-r bg-sidebar text-sidebar-foreground hidden md:flex md:flex-col"> 
           <SidebarHeader className="p-4">
              <div className="flex items-center justify-between">
                 <Link href="/" passHref legacyBehavior>
@@ -82,15 +73,12 @@ export function MainLayout({ children }: MainLayoutProps) {
                     Project Forge
                   </a>
                 </Link>
-                {/* Desktop trigger - hidden when collapsed */}
                 <SidebarTrigger className="hidden group-data-[state=expanded]:flex text-sidebar-foreground" />
             </div>
           </SidebarHeader>
 
-          {/* Sidebar Content */}
-          <SidebarContent className="flex-1 flex flex-col"> {/* flex-1 needed */}
-            <SidebarMenu className="flex-1"> {/* flex-1 needed */}
-              {/* Dashboard Link */}
+          <SidebarContent className="flex-1 flex flex-col"> 
+            <SidebarMenu className="flex-1"> 
               <SidebarMenuItem>
                 <Link href="/" passHref legacyBehavior>
                     <SidebarMenuButton
@@ -103,7 +91,6 @@ export function MainLayout({ children }: MainLayoutProps) {
                     </SidebarMenuButton>
                 </Link>
               </SidebarMenuItem>
-              {/* Profile Link */}
               <SidebarMenuItem>
                  <Link href="/profile" passHref legacyBehavior>
                     <SidebarMenuButton
@@ -116,25 +103,34 @@ export function MainLayout({ children }: MainLayoutProps) {
                     </SidebarMenuButton>
                  </Link>
               </SidebarMenuItem>
-              {/* Canva Link */}
               <SidebarMenuItem>
                  <Link href="/canva" passHref legacyBehavior>
                     <SidebarMenuButton
                         isActive={pathname === '/canva'}
-                        tooltip="Canvas"
+                        tooltip="Canvas Editor"
                         className="text-sidebar-foreground hover:bg-sidebar-accent data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground"
                     >
                         <ImageIcon />
-                        <span className="group-data-[state=collapsed]:hidden">Canva</span>
+                        <span className="group-data-[state=collapsed]:hidden">Canva Editor</span>
+                    </SidebarMenuButton>
+                 </Link>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                 <Link href="/diagram-generator" passHref legacyBehavior>
+                    <SidebarMenuButton
+                        isActive={pathname === '/diagram-generator'}
+                        tooltip="Diagram Generator"
+                        className="text-sidebar-foreground hover:bg-sidebar-accent data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground"
+                    >
+                        <GitGraph />
+                        <span className="group-data-[state=collapsed]:hidden">Diagram Generator</span>
                     </SidebarMenuButton>
                  </Link>
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarContent>
 
-          {/* Sidebar Footer */}
            <SidebarFooter className="p-4 border-t border-sidebar-border space-y-2">
-                {/* Login/Logout Button */}
                 {isLoggedIn ? (
                     <Button variant="ghost" size="sm" onClick={handleLogout} className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-data-[state=collapsed]:justify-center group-data-[state=collapsed]:px-0 group-data-[state=collapsed]:aspect-square" title="Log Out">
                         <LogOut />
@@ -146,25 +142,18 @@ export function MainLayout({ children }: MainLayoutProps) {
                         <span className="group-data-[state=collapsed]:hidden ml-2">Log In</span>
                     </Button>
                  )}
-                 {/* Settings Button - Placeholder */}
                  <Button variant="ghost" size="sm" className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-data-[state=collapsed]:hidden">
                      <Settings className="mr-2"/> Settings
                  </Button>
-                 {/* Theme Toggle */}
                  <ThemeToggle />
            </SidebarFooter>
         </Sidebar>
 
-        {/* Main content area */}
-        <SidebarInset className="flex-1 flex flex-col bg-background"> {/* flex-1 needed */}
-           {/* Header for the main content area */}
+        <SidebarInset className="flex-1 flex flex-col bg-background"> 
            <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/95 backdrop-blur-sm px-4 lg:h-[60px] lg:px-6">
-               {/* Mobile trigger - always visible */}
-               <SidebarTrigger className="md:hidden text-foreground" /> {/* Show only on mobile */}
-               {/* You can add breadcrumbs, page title, or other header content here */}
+               <SidebarTrigger className="md:hidden text-foreground" /> 
            </header>
-           {/* The actual page content */}
-           <div className="flex-1 overflow-auto"> {/* flex-1 and overflow-auto */}
+           <div className="flex-1 overflow-auto"> 
                 {children}
            </div>
         </SidebarInset>
