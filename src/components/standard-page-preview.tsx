@@ -1,7 +1,6 @@
-// src/components/standard-page-preview.tsx
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import type { Project } from '@/types/project';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -169,11 +168,12 @@ export const StandardPagePreview: React.FC<StandardPagePreviewProps> = ({ pageNa
       }
 
       if (result && 'error' in result && result.error) {
-        throw new Error(result.error);
+          // Use a more specific error message
+          throw new Error(`AI generation failed for ${pageName}: ${result.error}`);
       }
       toast({ title: `${pageName} Content Generated`, description: "AI has generated the content for this page." });
 
-    } catch (err) {
+    } catch (err: any) {
       const errorMessage = err instanceof Error ? err.message : "An unknown error occurred.";
       setError(errorMessage);
       toast({ variant: "destructive", title: `Failed to Generate ${pageName}`, description: errorMessage });
@@ -242,3 +242,4 @@ export const StandardPagePreview: React.FC<StandardPagePreviewProps> = ({ pageNa
     </Card>
   );
 };
+""
