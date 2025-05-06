@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { LogIn, Mail, Lock, Eye, EyeOff, CheckSquare, PlayCircle } from 'lucide-react'; // Added Eye, EyeOff, CheckSquare, PlayCircle
+import { LogIn, Mail, Lock, Eye, EyeOff, CheckSquare, PlayCircle, Loader2 } from 'lucide-react'; // Added Loader2
 import { Separator } from '@/components/ui/separator';
 import Image from 'next/image';
 
@@ -182,3 +182,4 @@ export default function LoginPage() {
         </div>
     );
 }
+
