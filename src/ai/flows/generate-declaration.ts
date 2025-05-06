@@ -57,17 +57,17 @@ const prompt = ai.definePrompt({
   **Instructions:**
   1.  Output ONLY the Markdown and HTML content as per the structure below. Do not include any other text, explanations, or conversational elements.
   2.  Replace placeholders like \`{{{projectTitle}}}\` with the actual data.
-  3.  **Placeholder Usage:** If a piece of information is not provided or is an empty string, use the corresponding placeholder text from the list below within the generated HTML structure.
-      *   For Project Title: Use "[Project Title Placeholder]"
-      *   For Team Details (if {{{teamDetails}}} is empty and teamDetailsLines is empty/not provided): Use "[Team Member Names & Enrollment Numbers Placeholder]"
-      *   For Degree: Use "[Degree Placeholder]" (e.g., Bachelor of Engineering)
-      *   For Branch: Use "[Branch Placeholder]" (e.g., Computer Engineering)
-      *   For Institute Name: Use "[Institute Name Placeholder]"
-      *   For Submission Date: Use "[Submission Date Placeholder]"
-      *   For Place (City/Town): Use "[City/Town Placeholder]"
+  3.  **Placeholder Usage:** If a piece of information is not provided or is an empty string, **the system will provide a specific placeholder string for that field. Your task is to output *this exact placeholder string* as provided in the input if no actual data is available. Do not replace these system-provided placeholders with "N/A" or try to invent information.**
+      *   For Project Title: Use the value of \`{{{projectTitle}}}\`.
+      *   For Team Details: Use the value of \`{{{teamDetails}}}\` or the \`teamDetailsLines\`.
+      *   For Degree: Use the value of \`{{{degree}}}\`.
+      *   For Branch: Use the value of \`{{{branch}}}\`.
+      *   For Institute Name: Use the value of \`{{{instituteName}}}\`.
+      *   For Submission Date: Use the value of \`{{{submissionDate}}}\`.
+      *   For Place (City/Town): Always use "[City/Town Placeholder]" as this is not an input.
   4.  Use the determined pronoun ({{{pronoun}}}) for "We, the undersigned" or "I, the undersigned".
   5.  Ensure text alignment and formatting (bold, headings) match the provided HTML structure.
-  6.  Signature blocks should list student names and enrollment numbers as provided in \`teamDetailsLines\`.
+  6.  Signature blocks should list student names and enrollment numbers as provided in \`teamDetailsLines\` if available, otherwise from \`teamDetails\`.
 
   **Required Output Structure (Markdown with embedded HTML for layout):**
 
@@ -132,13 +132,14 @@ const generateDeclarationFlow = ai.defineFlow(
     outputSchema: GenerateDeclarationOutputSchema,
   },
   async (rawInput) => {
+    // Explicitly use placeholders if raw input fields are empty or just whitespace
     const input = {
-      projectTitle: rawInput.projectTitle || "[Project Title Placeholder]",
-      teamDetails: rawInput.teamDetails || "[Team Member Names & Enrollment Numbers Placeholder]",
-      degree: rawInput.degree || "[Degree Placeholder]",
-      branch: rawInput.branch || "[Branch Placeholder]",
-      instituteName: rawInput.instituteName || "[Institute Name Placeholder]",
-      submissionDate: rawInput.submissionDate || "[Submission Date Placeholder]",
+      projectTitle: rawInput.projectTitle?.trim() || "[Project Title Placeholder]",
+      teamDetails: rawInput.teamDetails?.trim() || "[Team Member Names & Enrollment Numbers Placeholder]",
+      degree: rawInput.degree?.trim() || "[Degree Placeholder]",
+      branch: rawInput.branch?.trim() || "[Branch Placeholder]",
+      instituteName: rawInput.instituteName?.trim() || "[Institute Name Placeholder]",
+      submissionDate: rawInput.submissionDate?.trim() || "[Submission Date Placeholder]",
     };
     
     const teamDetailsLines = input.teamDetails !== "[Team Member Names & Enrollment Numbers Placeholder]" ? input.teamDetails.split('\n').filter(line => line.trim() !== '') : [];
@@ -155,3 +156,4 @@ const generateDeclarationFlow = ai.defineFlow(
     return output!;
   }
 );
+

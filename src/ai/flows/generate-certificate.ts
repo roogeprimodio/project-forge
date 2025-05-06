@@ -61,18 +61,18 @@ const prompt = ai.definePrompt({
   **Instructions:**
   1.  Output ONLY the Markdown and HTML content as per the structure below. Do not include any other text, explanations, or conversational elements.
   2.  Replace placeholders like \`{{{projectTitle}}}\` with the actual data provided.
-  3.  **Placeholder Usage:** If a piece of information is not provided or is an empty string, use the corresponding placeholder text from the list below within the generated HTML structure.
-      *   For Project Title: Use "[Project Title Placeholder]"
-      *   For Team Details (if {{{teamDetails}}} is empty and teamDetailsLines is empty/not provided): Use "[Team Member Names & Enrollment Numbers Placeholder]"
-      *   For Degree: Use "[Degree Placeholder]" (e.g., Bachelor of Engineering)
-      *   For Branch: Use "[Branch Placeholder]" (e.g., Computer Engineering)
-      *   For Institute Name: Use "[Institute Name Placeholder]"
-      *   For Project Guide: Use "[Guide Name Placeholder]"
-      *   For Head of Department (if not provided): Use "[HOD Name Placeholder]" (already handled in template logic)
-      *   For Submission Year: Use "[Submission Year Placeholder]"
+  3.  **Placeholder Usage:** If a piece of information is not provided or is an empty string, **the system will provide a specific placeholder string for that field. Your task is to output *this exact placeholder string* as provided in the input if no actual data is available. Do not replace these system-provided placeholders with "N/A" or try to invent information.**
+      *   For Project Title: Use the value of \`{{{projectTitle}}}\` (which will be "[Project Title Placeholder]" if empty).
+      *   For Team Details: Use the value of \`{{{teamDetails}}}\` (which will be "[Team Member Names & Enrollment Numbers Placeholder]" if empty and no lines).
+      *   For Degree: Use the value of \`{{{degree}}}\`.
+      *   For Branch: Use the value of \`{{{branch}}}\`.
+      *   For Institute Name: Use the value of \`{{{instituteName}}}\`.
+      *   For Project Guide: Use the value of \`{{{guideName}}}\`.
+      *   For Head of Department: Use the value of \`{{{hodName}}}\` or "[HOD Name Placeholder]" if \`hodName\` is not provided.
+      *   For Submission Year: Use the value of \`{{{submissionYear}}}\`.
   4.  If a college logo URL is provided, embed it using Markdown image syntax (\`![Alt text](URL)\`) within a centered div. If not provided, omit the img tag.
   5.  Ensure text alignment and formatting (bold, headings) match the provided HTML structure.
-  6.  Signature blocks should use \`div\`s with appropriate styling for alignment. For team members, list them from \`teamDetailsLines\`.
+  6.  Signature blocks should use \`div\`s with appropriate styling for alignment. For team members, list them from \`teamDetailsLines\` if available, otherwise from \`teamDetails\`.
 
   **Required Output Structure (Markdown with embedded HTML for layout):**
 
@@ -143,15 +143,16 @@ const generateCertificateFlow = ai.defineFlow(
     outputSchema: GenerateCertificateOutputSchema,
   },
   async (rawInput) => {
+    // Explicitly use placeholders if raw input fields are empty or just whitespace
     const input = {
-      projectTitle: rawInput.projectTitle || "[Project Title Placeholder]",
-      teamDetails: rawInput.teamDetails || "[Team Member Names & Enrollment Numbers Placeholder]",
-      degree: rawInput.degree || "[Degree Placeholder]",
-      branch: rawInput.branch || "[Branch Placeholder]",
-      instituteName: rawInput.instituteName || "[Institute Name Placeholder]",
-      guideName: rawInput.guideName || "[Guide Name Placeholder]",
-      hodName: rawInput.hodName || undefined, // Let template handle placeholder if undefined
-      submissionYear: rawInput.submissionYear || "[Submission Year Placeholder]",
+      projectTitle: rawInput.projectTitle?.trim() || "[Project Title Placeholder]",
+      teamDetails: rawInput.teamDetails?.trim() || "[Team Member Names & Enrollment Numbers Placeholder]",
+      degree: rawInput.degree?.trim() || "[Degree Placeholder]",
+      branch: rawInput.branch?.trim() || "[Branch Placeholder]",
+      instituteName: rawInput.instituteName?.trim() || "[Institute Name Placeholder]",
+      guideName: rawInput.guideName?.trim() || "[Guide Name Placeholder]",
+      hodName: rawInput.hodName?.trim() || undefined, // Let template handle placeholder if undefined
+      submissionYear: rawInput.submissionYear?.trim() || "[Submission Year Placeholder]",
       collegeLogoUrl: rawInput.collegeLogoUrl,
     };
 
@@ -166,3 +167,4 @@ const generateCertificateFlow = ai.defineFlow(
     return output!;
   }
 );
+

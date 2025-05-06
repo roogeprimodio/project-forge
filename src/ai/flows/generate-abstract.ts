@@ -48,9 +48,9 @@ const prompt = ai.definePrompt({
   8.  Avoid jargon where possible, or explain it briefly if necessary.
   9.  Ensure the abstract is self-contained and accurately reflects the project context.
   10. **Placeholder Usage:**
-      *   If projectContext is too short or insufficient (e.g., less than 50 characters), the main abstract content should be: "[Abstract content cannot be generated due to insufficient project context. Please provide more details.]"
-      *   If projectTitle is missing, use "[Project Title Placeholder]" in relevant places if needed, though the main abstract might still be generated if context is good.
-      *   Keywords suggestion should be "[Keywords placeholder - add 3-5 relevant keywords]" if the AI cannot reasonably infer them.
+      *   If \`projectContext\` is the system-provided placeholder "[Abstract content cannot be generated due to insufficient project context. Please provide more details.]", then the main abstract content should be exactly that placeholder.
+      *   If \`projectTitle\` is the system-provided placeholder "[Project Title Placeholder]", use it as is.
+      *   Keywords suggestion should be "[Keywords placeholder - add 3-5 relevant keywords]" if the AI cannot reasonably infer them or if context is insufficient.
   11. Output ONLY the Markdown and HTML. No extra text or explanations.
 
   **Required Output Structure (Markdown with embedded HTML for layout):**
@@ -61,7 +61,7 @@ const prompt = ai.definePrompt({
   {{#if (isSufficientContext projectContext)}}
     [Generated Abstract Paragraph(s) Here - This text should be replaced by the AI-generated abstract based on the instructions above. Ensure it's a continuous block of text formatted as Markdown paragraphs within this HTML paragraph tag.]
   {{else}}
-    [Abstract content cannot be generated due to insufficient project context. Please provide more details.]
+    {{{projectContext}}} <!-- This will output the insufficient context placeholder passed from the flow -->
   {{/if}}
   </p>
   <br><br>
@@ -73,8 +73,9 @@ const prompt = ai.definePrompt({
   Fill in the "[Generated Abstract Paragraph(s) Here]" and "[Suggest 3-5 relevant keywords...]" parts, or use placeholders as instructed.
   `,
   helpers: {
+    // Helper to check if context is not the specific placeholder string
     isSufficientContext: (context: string | undefined) => {
-      return context && context.trim().length >= 50;
+      return context !== "[Abstract content cannot be generated due to insufficient project context. Please provide more details.]";
     }
   }
 });
@@ -86,22 +87,21 @@ const generateAbstractFlow = ai.defineFlow(
     outputSchema: GenerateAbstractOutputSchema,
   },
   async (rawInput) => {
-    // Apply placeholders at the input processing stage if values are empty strings
-    // The prompt's helper will handle the "insufficient context" placeholder logic
+    let processedProjectContext = rawInput.projectContext?.trim() || "";
+    const insufficientContextPlaceholder = "[Abstract content cannot be generated due to insufficient project context. Please provide more details.]";
+
+    if (processedProjectContext.length < 50) {
+        processedProjectContext = insufficientContextPlaceholder;
+    }
+
     const input = {
-      projectTitle: rawInput.projectTitle || "[Project Title Placeholder]",
-      projectContext: rawInput.projectContext || "", // Pass empty string if undefined, helper will check length
+      projectTitle: rawInput.projectTitle?.trim() || "[Project Title Placeholder]",
+      projectContext: processedProjectContext,
       keyFindings: rawInput.keyFindings,
     };
-
-    // The check for projectContext length is now primarily handled by the prompt's helper.
-    // Server-side validation for critical missing info can still exist if needed before calling AI.
-    if (!input.projectContext || input.projectContext.trim().length < 10) { // Looser check here, prompt handles stricter one
-        // This early return could be for a more generic error if the prompt isn't robust enough
-        // but the prompt's "isSufficientContext" is preferred for conditional content.
-    }
 
     const { output } = await prompt(input);
     return output!;
   }
 );
+

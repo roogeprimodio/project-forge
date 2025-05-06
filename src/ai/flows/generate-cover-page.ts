@@ -61,14 +61,14 @@ const prompt = ai.definePrompt({
   **Instructions:**
   1.  Output ONLY the Markdown and HTML content as per the structure below. Do NOT include any other text, explanations, or conversational elements.
   2.  Replace dynamic placeholders like \`{{{projectTitle}}}\`, \`{{{teamDetails}}}\`, etc., with the actual data provided for those fields.
-  3.  **Placeholder Usage for Dynamic Fields:** If a dynamic piece of information is not provided or is an empty string, use the corresponding placeholder text from the list below within the generated HTML structure.
-      *   For Project Title: Use "[Project Title Placeholder]"
-      *   For Team Details (if \`teamDetails\` is empty and \`teamDetailsLines\` is empty/not provided): Use "[Team Member Names & Enrollment Numbers Placeholder]"
-      *   For Degree: Use "[Degree Placeholder]" (e.g., Bachelor of Engineering)
-      *   For Branch: Use "[Branch Placeholder]" (e.g., Computer Engineering)
-      *   For Institute Name: Use "[Institute Name Placeholder]"
-      *   For University Name (if applicable and input is empty): Use "[University Name Placeholder]"
-      *   For Submission Date: Use "[Submission Date Placeholder]"
+  3.  **Placeholder Usage for Dynamic Fields:** If a dynamic piece of information is not provided or is an empty string, **the system will provide a specific placeholder string for that field (e.g., \`[Team Member Names & Enrollment Numbers Placeholder]\`). Your task is to output *this exact placeholder string* as provided in the input if no actual data is available. Do not replace these system-provided placeholders with "N/A" or try to invent information.**
+      *   For Project Title: Use "[Project Title Placeholder]" if input \`projectTitle\` is that value.
+      *   For Team Details: If input \`teamDetails\` is "[Team Member Names & Enrollment Numbers Placeholder]", output that exact string.
+      *   For Degree: Use "[Degree Placeholder]" if input \`degree\` is that value.
+      *   For Branch: Use "[Branch Placeholder]" if input \`branch\` is that value.
+      *   For Institute Name: Use "[Institute Name Placeholder]" if input \`instituteName\` is that value.
+      *   For University Name (if applicable): Use "[University Name Placeholder]" if input \`universityName\` is that value.
+      *   For Submission Date: Use "[Submission Date Placeholder]" if input \`submissionDate\` is that value.
   4.  If a logo URL (universityLogoUrl or collegeLogoUrl) is provided, embed it using Markdown image syntax (\`![Alt text](URL)\`) within a centered div. If not provided, omit the img tag entirely.
   5.  Ensure all text is properly centered or aligned as indicated in the HTML structure.
 
@@ -133,27 +133,26 @@ const generateCoverPageFlow = ai.defineFlow(
     outputSchema: GenerateCoverPageOutputSchema,
   },
   async (rawInput) => {
+    // Explicitly use placeholders if raw input fields are empty or just whitespace
     const input = {
-      projectTitle: rawInput.projectTitle || "[Project Title Placeholder]",
-      teamDetails: rawInput.teamDetails || "[Team Member Names & Enrollment Numbers Placeholder]",
-      degree: rawInput.degree || "[Degree Placeholder]",
-      branch: rawInput.branch || "[Branch Placeholder]",
-      instituteName: rawInput.instituteName || "[Institute Name Placeholder]",
-      universityName: rawInput.universityName || undefined, 
-      submissionDate: rawInput.submissionDate || "[Submission Date Placeholder]",
-      universityLogoUrl: rawInput.universityLogoUrl, 
+      projectTitle: rawInput.projectTitle?.trim() || "[Project Title Placeholder]",
+      teamDetails: rawInput.teamDetails?.trim() || "[Team Member Names & Enrollment Numbers Placeholder]",
+      degree: rawInput.degree?.trim() || "[Degree Placeholder]",
+      branch: rawInput.branch?.trim() || "[Branch Placeholder]",
+      instituteName: rawInput.instituteName?.trim() || "[Institute Name Placeholder]",
+      universityName: rawInput.universityName?.trim() || undefined, // Keep undefined if empty, Handlebars will omit
+      submissionDate: rawInput.submissionDate?.trim() || "[Submission Date Placeholder]",
+      universityLogoUrl: rawInput.universityLogoUrl,
       collegeLogoUrl: rawInput.collegeLogoUrl,
     };
-    
-    const teamDetailsLines = input.teamDetails !== "[Team Member Names & Enrollment Numbers Placeholder]" 
-      ? input.teamDetails.split('\\n').filter(line => line.trim() !== '') 
+
+    const teamDetailsLines = input.teamDetails !== "[Team Member Names & Enrollment Numbers Placeholder]"
+      ? input.teamDetails.split('\\n').filter(line => line.trim() !== '')
       : [];
-    
+
     const processedInput = {
       ...input,
       teamDetailsLines: teamDetailsLines.length > 0 ? teamDetailsLines : undefined,
-      // If teamDetailsLines is populated, pass it and undefine teamDetails to prefer lines.
-      // Otherwise, pass the original teamDetails string.
       teamDetails: teamDetailsLines.length > 0 ? undefined : input.teamDetails,
     };
 

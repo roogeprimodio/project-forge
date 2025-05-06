@@ -59,13 +59,13 @@ const prompt = ai.definePrompt({
   **Instructions for Generating the Acknowledgement:**
   1.  Output ONLY the Markdown and HTML content as per the structure below. Do not include any other text, explanations, or conversational elements.
   2.  Replace placeholders like \`{{{guideName}}}\` with the actual data.
-  3.  **Placeholder Usage:** If a piece of information is not provided or is an empty string, use the corresponding placeholder text from the list below within the generated HTML structure.
-      *   For Project Guide: Use "[Guide Name Placeholder]"
-      *   For Institute Name: Use "[Institute Name Placeholder]"
-      *   For Branch/Department: Use "[Branch/Department Placeholder]"
-      *   For Head of Department (if hodName is empty/not provided and you are supposed to thank HOD): Use "[HOD Name Placeholder]" (template has logic for this)
-      *   For Team Members (if teamDetailsLines and teamDetails are empty): Use "[Team Member Name(s) & Enrollment Placeholder(s)]"
-      *   For additional thanks section (if additionalThanks is empty): Omit the paragraph.
+  3.  **Placeholder Usage:** If a piece of information is not provided or is an empty string, **the system will provide a specific placeholder string for that field. Your task is to output *this exact placeholder string* as provided in the input if no actual data is available. Do not replace these system-provided placeholders with "N/A" or try to invent information.**
+      *   For Project Guide: Use the value of \`{{{guideName}}}\`.
+      *   For Institute Name: Use the value of \`{{{instituteName}}}\`.
+      *   For Branch/Department: Use the value of \`{{{branch}}}\`.
+      *   For Head of Department: Use the value of \`{{{hodName}}}\` or "[HOD Name Placeholder]" if HOD name not provided.
+      *   For Team Members: Use the value of \`{{{teamDetails}}}\` or \`teamDetailsLines\`.
+      *   For additional thanks section (if \`additionalThanks\` is empty/undefined): Omit the paragraph.
   4.  Use a sincere, appreciative, and formal tone.
   5.  Start with a general statement about the effort and support received, using {{{pronoun}}} and {{{possessivePronoun}}} appropriately.
   6.  Specifically thank the project guide, **{{{guideName}}}**, for their guidance, support, and mentorship.
@@ -142,13 +142,14 @@ const generateAcknowledgementFlow = ai.defineFlow(
     outputSchema: GenerateAcknowledgementOutputSchema,
   },
   async (rawInput) => {
+     // Explicitly use placeholders if raw input fields are empty or just whitespace
      const input = {
-      projectTitle: rawInput.projectTitle || "[Project Title Placeholder]", // Should always have a title from project context
-      guideName: rawInput.guideName || "[Guide Name Placeholder]",
-      instituteName: rawInput.instituteName || "[Institute Name Placeholder]",
-      branch: rawInput.branch || "[Branch/Department Placeholder]",
-      hodName: rawInput.hodName || undefined, // Let template handle placeholder if undefined and needed
-      teamDetails: rawInput.teamDetails || "[Team Member Name(s) & Enrollment Placeholder(s)]",
+      projectTitle: rawInput.projectTitle?.trim() || "[Project Title Placeholder]",
+      guideName: rawInput.guideName?.trim() || "[Guide Name Placeholder]",
+      instituteName: rawInput.instituteName?.trim() || "[Institute Name Placeholder]",
+      branch: rawInput.branch?.trim() || "[Branch/Department Placeholder]",
+      hodName: rawInput.hodName?.trim() || undefined, // Let template handle placeholder if undefined and needed
+      teamDetails: rawInput.teamDetails?.trim() || "[Team Member Name(s) & Enrollment Placeholder(s)]",
       additionalThanks: rawInput.additionalThanks, // Optional, template handles if missing
     };
 
@@ -167,3 +168,4 @@ const generateAcknowledgementFlow = ai.defineFlow(
     return output!;
   }
 );
+
