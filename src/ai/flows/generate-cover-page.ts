@@ -40,6 +40,19 @@ const prompt = ai.definePrompt({
 
   **Project Details (Use these to customize the template):**
   - Project Title: {{{projectTitle}}}
+  - Team Details:
+    {{#if teamDetailsLines.length}}
+      {{#each teamDetailsLines}}
+      - {{this}}
+      {{/each}}
+    {{else if teamDetails}}
+      {{{teamDetails}}}
+    {{else}}
+      [Team Member Names & Enrollment Numbers Placeholder]
+    {{/if}}
+  - Degree: {{{degree}}}
+  - Branch: {{{branch}}}
+  - Institute: {{{instituteName}}}
   - Submission Date: {{{submissionDate}}}
   {{#if universityLogoUrl}}- University Logo (use if provided): {{universityLogoUrl}} {{/if}}
   {{#if collegeLogoUrl}}- College Logo (use if provided): {{collegeLogoUrl}} {{/if}}
@@ -47,14 +60,17 @@ const prompt = ai.definePrompt({
 
   **Instructions:**
   1.  Output ONLY the Markdown and HTML content as per the structure below. Do NOT include any other text, explanations, or conversational elements.
-  2.  Replace dynamic placeholders like \`{{{projectTitle}}}\`, \`{{{submissionDate}}}\`, etc., with the actual data provided for those fields.
-  3.  **Placeholder Usage for Dynamic Fields:** If a dynamic piece of information (like Project Title, Submission Date) is not provided or is an empty string, use the corresponding placeholder text from the list below within the generated HTML structure.
+  2.  Replace dynamic placeholders like \`{{{projectTitle}}}\`, \`{{{teamDetails}}}\`, etc., with the actual data provided for those fields.
+  3.  **Placeholder Usage for Dynamic Fields:** If a dynamic piece of information is not provided or is an empty string, use the corresponding placeholder text from the list below within the generated HTML structure.
       *   For Project Title: Use "[Project Title Placeholder]"
-      *   For Submission Date: Use "[Submission Date Placeholder]"
+      *   For Team Details (if \`teamDetails\` is empty and \`teamDetailsLines\` is empty/not provided): Use "[Team Member Names & Enrollment Numbers Placeholder]"
+      *   For Degree: Use "[Degree Placeholder]" (e.g., Bachelor of Engineering)
+      *   For Branch: Use "[Branch Placeholder]" (e.g., Computer Engineering)
+      *   For Institute Name: Use "[Institute Name Placeholder]"
       *   For University Name (if applicable and input is empty): Use "[University Name Placeholder]"
+      *   For Submission Date: Use "[Submission Date Placeholder]"
   4.  If a logo URL (universityLogoUrl or collegeLogoUrl) is provided, embed it using Markdown image syntax (\`![Alt text](URL)\`) within a centered div. If not provided, omit the img tag entirely.
   5.  Ensure all text is properly centered or aligned as indicated in the HTML structure.
-  6.  The "Submitted By", "Degree", "Branch", and "Institute" sections are now using fixed content as specified in the template.
 
   **Required Output Structure (Markdown with embedded HTML for layout):**
 
@@ -77,14 +93,22 @@ const prompt = ai.definePrompt({
 
     <p style="font-size: 12pt; margin-bottom: 5px;"><em>A Project Report Submitted By</em></p>
     <div style="font-size: 14pt; font-weight: bold; margin-bottom: 20px;">
-      N/A<br>
+    {{#if teamDetailsLines.length}}
+      {{#each teamDetailsLines}}
+      {{this}}<br>
+      {{/each}}
+    {{else if teamDetails}}
+      {{{teamDetails}}}
+    {{else}}
+      [Team Member Names & Enrollment Numbers Placeholder]
+    {{/if}}
     </div>
     <p style="font-size: 12pt; margin-bottom: 5px;"><em>In partial fulfillment for the award of the degree of</em></p>
-    <p style="font-size: 16pt; font-weight: bold; margin-bottom: 5px;">Bachelor of Engineering</p>
+    <p style="font-size: 16pt; font-weight: bold; margin-bottom: 5px;">{{{degree}}}</p>
     <p style="font-size: 12pt; margin-bottom: 5px;"><em>In</em></p>
-    <p style="font-size: 14pt; font-weight: bold; margin-bottom: 20px;">computer eng</p>
+    <p style="font-size: 14pt; font-weight: bold; margin-bottom: 20px;">{{{branch}}}</p>
     <p style="font-size: 12pt; margin-bottom: 5px;"><em>At</em></p>
-    <p style="font-size: 14pt; font-weight: bold;">k.j.i.e.t</p>
+    <p style="font-size: 14pt; font-weight: bold;">{{{instituteName}}}</p>
     {{#if universityName}}
     <p style="font-size: 12pt; margin-bottom: 30px;">(Affiliated to {{{universityName}}})</p>
     {{else}}
@@ -109,27 +133,28 @@ const generateCoverPageFlow = ai.defineFlow(
     outputSchema: GenerateCoverPageOutputSchema,
   },
   async (rawInput) => {
-    // Apply placeholders at the input processing stage if values are empty strings
     const input = {
       projectTitle: rawInput.projectTitle || "[Project Title Placeholder]",
-      // Static fields are now in the template, so no need to pass them or their placeholders from here
-      teamDetails: rawInput.teamDetails, // Still needed if template were to use it, but current template overrides
-      degree: rawInput.degree, // Same as teamDetails
-      branch: rawInput.branch, // Same as teamDetails
-      instituteName: rawInput.instituteName, // Same as teamDetails
+      teamDetails: rawInput.teamDetails || "[Team Member Names & Enrollment Numbers Placeholder]",
+      degree: rawInput.degree || "[Degree Placeholder]",
+      branch: rawInput.branch || "[Branch Placeholder]",
+      instituteName: rawInput.instituteName || "[Institute Name Placeholder]",
       universityName: rawInput.universityName || undefined, 
       submissionDate: rawInput.submissionDate || "[Submission Date Placeholder]",
       universityLogoUrl: rawInput.universityLogoUrl, 
       collegeLogoUrl: rawInput.collegeLogoUrl,
     };
     
-    // teamDetailsLines is no longer used by the modified template for the main content part
-    // const teamDetailsLines = input.teamDetails !== "[Team Member Names & Enrollment Numbers Placeholder]" ? input.teamDetails.split('\n').filter(line => line.trim() !== '') : [];
+    const teamDetailsLines = input.teamDetails !== "[Team Member Names & Enrollment Numbers Placeholder]" 
+      ? input.teamDetails.split('\\n').filter(line => line.trim() !== '') 
+      : [];
     
     const processedInput = {
       ...input,
-      // teamDetailsLines: teamDetailsLines.length > 0 ? teamDetailsLines : undefined,
-      // teamDetails: teamDetailsLines.length > 0 ? undefined : input.teamDetails,
+      teamDetailsLines: teamDetailsLines.length > 0 ? teamDetailsLines : undefined,
+      // If teamDetailsLines is populated, pass it and undefine teamDetails to prefer lines.
+      // Otherwise, pass the original teamDetails string.
+      teamDetails: teamDetailsLines.length > 0 ? undefined : input.teamDetails,
     };
 
     const { output } = await prompt(processedInput);
