@@ -8,3 +8,4 @@ import '@/ai/flows/generate-certificate.ts';
 import '@/ai/flows/generate-declaration.ts';
 import '@/ai/flows/generate-abstract.ts';
 import '@/ai/flows/generate-acknowledgement.ts';
+import '@/ai/flows/explain-concept-flow.ts'; // Register the new concept explainer flow

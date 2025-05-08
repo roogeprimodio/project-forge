@@ -50,6 +50,21 @@ export interface Project {
   maxSubSectionsPerSection?: number; // Max depth of sub-sections AI should generate
 }
 
+// AI Concept Explainer Types
+export interface ExplanationSlide {
+  title?: string;
+  content: string; // Markdown formatted text for the slide's main body
+  mermaidDiagram?: string; // Optional Mermaid.js code for a diagram on this slide
+  // Future enhancements:
+  // imagePrompt?: string; // Prompt for AI to generate an image for this slide
+  // animationHint?: string; // Textual hint for a type of simple CSS animation or Lottie file idea
+}
+
+export interface ExplainConceptOutput {
+  slides: ExplanationSlide[];
+  conceptTitle: string; // The concept being explained
+}
+
 // Constants for standard pages and their indices
 export const TOC_SECTION_NAME = "Table of Contents";
 

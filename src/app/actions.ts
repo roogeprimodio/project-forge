@@ -18,6 +18,10 @@ import { generateDeclaration, GenerateDeclarationInput, GenerateDeclarationOutpu
 import { generateAbstract, GenerateAbstractInput, GenerateAbstractOutput } from '@/ai/flows/generate-abstract';
 import { generateAcknowledgement, GenerateAcknowledgementInput, GenerateAcknowledgementOutput } from '@/ai/flows/generate-acknowledgement';
 
+// Import new flow for concept explanation
+import { explainConcept, ExplainConceptInput } from '@/ai/flows/explain-concept-flow';
+import type { ExplainConceptOutput } from '@/types/project';
+
 
 /**
  * Server action to generate a report section using the AI flow.
@@ -189,4 +193,23 @@ export async function generateAcknowledgementAction(input: GenerateAcknowledgeme
         console.error("Error in generateAcknowledgementAction:", error);
         return { error: `Failed to generate Acknowledgement: ${error instanceof Error ? error.message : "Unknown AI error."}` };
     }
+}
+
+/**
+ * Server action to explain a concept using the AI flow.
+ */
+export async function explainConceptAction(input: ExplainConceptInput): Promise<ExplainConceptOutput | { error: string }> {
+  try {
+    console.log("Explaining concept with input:", { concept: input.concept, projectContextLength: input.projectContext?.length });
+    if (!input.concept.trim()) {
+      return { error: "Concept to explain cannot be empty." };
+    }
+    const result = await explainConcept(input);
+    console.log("Concept explanation result:", { title: result.conceptTitle, slidesCount: result.slides.length });
+    return result;
+  } catch (error) {
+    console.error("Error in explainConceptAction:", error);
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred during concept explanation.";
+    return { error: `AI Concept Explanation Failed: ${errorMessage}` };
+  }
 }

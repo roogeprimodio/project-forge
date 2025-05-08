@@ -1,4 +1,5 @@
-"use client"; // Keep this if ProjectEditor uses client hooks like useState, useEffect
+// src/components/project-editor.tsx
+"use client"; 
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
@@ -8,19 +9,19 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, Eye, Projector, BrainCircuit, Plus, Minus, CheckCircle, Edit3, ChevronRight, BookOpen } from 'lucide-react';
+import { Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, Eye, Projector, BrainCircuit, Plus, Minus, CheckCircle, Edit3, ChevronRight, BookOpen, HelpCircle } from 'lucide-react';
 import Link from 'next/link';
-import type { Project, HierarchicalProjectSection, GeneratedSectionOutline, SectionIdentifier, OutlineSection } from '@/types/project'; // Use hierarchical type
+import type { Project, HierarchicalProjectSection, GeneratedSectionOutline, SectionIdentifier, OutlineSection, ExplainConceptOutput } from '@/types/project'; // Use hierarchical type
 import { findSectionById, updateSectionById, deleteSectionById, STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, TOC_SECTION_NAME, ensureDefaultSubSection, getSectionNumbering } from '@/lib/project-utils';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { useToast } from '@/hooks/use-toast';
-import { generateSectionAction, summarizeSectionAction, generateOutlineAction, suggestImprovementsAction, generateDiagramAction } from '@/app/actions';
+import { generateSectionAction, summarizeSectionAction, generateOutlineAction, suggestImprovementsAction, generateDiagramAction, explainConceptAction } from '@/app/actions';
 import type { GenerateDiagramMermaidInput } from '@/ai/flows/generate-diagram-mermaid';
+import { ExplainConceptInput } from '@/ai/flows/explain-concept-flow';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { marked } from 'marked';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { v4 as uuidv4 } from 'uuid';
 import AiDiagramGenerator from '@/components/ai-diagram-generator';
@@ -32,7 +33,7 @@ import MarkdownPreview from '@/components/markdown-preview';
 import { CombinedSectionPreview } from '@/components/combined-section-preview';
 import { StandardPagePreview } from '@/components/standard-page-preview';
 import { MarkdownToolbar } from '@/components/markdown-toolbar';
-
+import { AiConceptExplainer } from './ai-concept-explainer'; // Import the new component
 
 // Recursive component to render the preview outline
 const OutlinePreviewItem: React.FC<{ item: OutlineSection; level: number }> = ({ item, level }) => {
@@ -258,11 +259,17 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const [isDraggingFab, setIsDraggingFab] = useState(false);
   const fabRef = useRef<HTMLButtonElement>(null);
   const dragOffset = useRef({ x: 0, y: 0 });
-    const [isGeneratingDiagram, setIsGeneratingDiagram] = useState(false);
-    const [sectionToDelete, setSectionToDelete] = useState<string | null>(null);
+  const [isGeneratingDiagram, setIsGeneratingDiagram] = useState(false);
+  const [sectionToDelete, setSectionToDelete] = useState<string | null>(null);
   const contentTextAreaRef = useRef<HTMLTextAreaElement>(null);
-
   const [activeSubSectionId, setActiveSubSectionId] = useState<string | null>(null);
+
+  // State for AI Concept Explainer
+  const [isExplainerOpen, setIsExplainerOpen] = useState(false);
+  const [conceptToExplain, setConceptToExplain] = useState('');
+  const [explanationOutput, setExplanationOutput] = useState<ExplainConceptOutput | null>(null);
+  const [isExplainingConcept, setIsExplainingConcept] = useState(false);
+
 
   useEffect(() => {
     setHasMounted(true);
@@ -374,11 +381,11 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
        updateProject(prev => ({ ...prev }), true);
    };
 
-  const handleSectionPromptChange = (id: string, prompt: string) => {
+  const handleSectionPromptChange = (id: string, promptText: string) => {
     if (!project) return;
      updateProject(prev => ({
          ...prev,
-         sections: updateSectionById(prev.sections, id, { prompt }),
+         sections: updateSectionById(prev.sections, id, { prompt: promptText }),
      }), false);
   }
 
@@ -389,7 +396,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
   const handleProjectDetailChange = (field: keyof Project, value: string | number) => {
     if (!project) return;
-    const validStringFields: (keyof Project)[] = ['title', 'projectContext', 'teamDetails', 'instituteName', 'collegeInfo', 'teamId', 'subject', 'semester', 'branch', 'guideName', 'hodName'];
+    const validStringFields: (keyof Project)[] = ['title', 'projectContext', 'teamDetails', 'instituteName', 'collegeInfo', 'teamId', 'subject', 'semester', 'branch', 'guideName', 'hodName', 'universityName', 'degree', 'submissionDate', 'submissionYear', 'keyFindings', 'additionalThanks'];
     const validNumberFields: (keyof Project)[] = ['minSections', 'maxSubSectionsPerSection'];
 
     if (validStringFields.includes(field) && typeof value === 'string') {
@@ -425,7 +432,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         toast({ variant: 'destructive', title: 'Invalid File Type', description: 'Please upload an image file.' });
         return;
     }
-    const maxSizeInBytes = 2 * 1024 * 1024;
+    const maxSizeInBytes = 2 * 1024 * 1024; // 2MB
     if (file.size > maxSizeInBytes) {
          toast({ variant: 'destructive', title: 'File Too Large', description: `Image must be smaller than ${maxSizeInBytes / (1024 * 1024)}MB.` });
         return;
@@ -864,6 +871,61 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     };
   }, [onFabMouseMove, onFabMouseUp, isDraggingFab]);
 
+
+  // AI Concept Explainer Logic
+  const handleOpenExplainer = () => {
+      const selection = window.getSelection()?.toString().trim();
+      if (selection && selection.length > 2 && selection.length < 100) { // Basic validation
+          setConceptToExplain(selection);
+          setExplanationOutput(null); // Clear previous explanation
+          setIsExplainerOpen(true);
+          handleFetchExplanation(selection);
+      } else {
+          toast({
+              variant: "destructive",
+              title: "Select Text to Explain",
+              description: "Please select a word or short phrase (3-100 characters) in the content area to get an explanation."
+          });
+      }
+  };
+
+  const handleFetchExplanation = async (concept?: string) => {
+      const term = concept || conceptToExplain;
+      if (!project || !term) return;
+
+      setIsExplainingConcept(true);
+      setExplanationOutput(null);
+      try {
+          const input: ExplainConceptInput = {
+              concept: term,
+              projectContext: project.projectContext || undefined,
+              // Potentially add complexity level from a user setting in the future
+          };
+          const result = await explainConceptAction(input);
+          if (result && 'error' in result) {
+              throw new Error(result.error);
+          }
+          setExplanationOutput(result as ExplainConceptOutput);
+      } catch (error) {
+          console.error("Concept explanation failed:", error);
+          toast({
+              variant: "destructive",
+              title: "Explanation Failed",
+              description: error instanceof Error ? error.message : "Could not explain the concept."
+          });
+          setExplanationOutput({ conceptTitle: term, slides: [{ title: "Error", content: `Failed to explain "${term}".`}] });
+      } finally {
+          setIsExplainingConcept(false);
+      }
+  };
+
+  const handleRegenerateExplanation = () => {
+      if (conceptToExplain) {
+          handleFetchExplanation(conceptToExplain);
+      }
+  };
+
+
   if (!hasMounted || isProjectFound === null) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,60px))] text-center p-4">
@@ -1008,7 +1070,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                      </CardHeader>
                      <CardContent className="space-y-4">
                        <p className="text-sm text-muted-foreground">Use the AI generator below to create the diagram content. The generated Mermaid code will be stored.</p>
-                       <AiDiagramGenerator onDiagramGenerated={handleDiagramGeneratedInSection} />
+                       <AiDiagramGenerator onDiagramGenerated={handleDiagramGeneratedInSection} projectContext={project.projectContext}/>
                        <Button onClick={() => handleGenerateSection(currentActiveSubSection.id)} disabled={isGeneratingDiagram || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting} className="hover:glow-primary focus-visible:glow-primary mt-2">
                          {isGeneratingDiagram ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BrainCircuit className="mr-2 h-4 w-4" />}
                          {isGeneratingDiagram ? 'Generating Diagram...' : 'Generate/Update Diagram with AI'}
@@ -1076,7 +1138,10 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                            </TabsContent>
                          </Tabs>
                        </CardContent>
-                       <CardFooter className="flex justify-end">
+                       <CardFooter className="flex justify-between items-center">
+                          <Button variant="outline" size="sm" onClick={handleOpenExplainer} className="hover:glow-accent focus-visible:glow-accent text-xs px-2 sm:px-3">
+                             <HelpCircle className="mr-1 h-3 w-3 sm:h-4 sm:w-4" /> Explain Selected Text
+                          </Button>
                          <Button variant="outline" size="sm" onClick={() => handleSummarizeSection(currentActiveSubSection.id)} disabled={isSummarizing || isGenerating || isGeneratingOutline || isSuggesting || !currentActiveSubSection.content?.trim()} className="hover:glow-accent focus-visible:glow-accent">
                            {isSummarizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ScrollText className="mr-2 h-4 w-4" />}
                            {isSummarizing ? 'Summarizing...' : 'Summarize'}
@@ -1261,6 +1326,14 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
              <AlertDialogFooter> <AlertDialogCancel onClick={cancelDeleteSection}>Cancel</AlertDialogCancel> <AlertDialogAction onClick={confirmDeleteSection} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction> </AlertDialogFooter>
            </AlertDialogContent>
          </AlertDialog>
+
+         <AiConceptExplainer
+            isOpen={isExplainerOpen}
+            onOpenChange={setIsExplainerOpen}
+            explanation={explanationOutput}
+            isLoading={isExplainingConcept}
+            onRegenerate={handleRegenerateExplanation}
+         />
       </div>
     </Sheet>
   );
