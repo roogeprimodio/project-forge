@@ -1,23 +1,24 @@
+// src/components/ai-concept-explainer.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ChevronLeft, ChevronRight, Lightbulb, Loader2, X, Image as ImageIconLucide, Video, Zap } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Lightbulb, Loader2, X, Image as ImageIconLucide, Video, Zap, RotateCcw } from 'lucide-react';
 import type { ExplanationSlide, ExplainConceptOutput } from '@/types/project';
 import MarkdownPreview from './markdown-preview';
 import MermaidDiagram from './mermaid-diagram';
 import { cn } from '@/lib/utils';
-import { generateImageForSlideAction } from '@/app/actions'; // Import the new action
+import { generateImageForSlideAction } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
 
 interface AiConceptExplainerProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   explanation: ExplainConceptOutput | null;
-  isLoading: boolean;
+  isLoading: boolean; // Global loading state for the initial explanation
   onRegenerate?: () => void;
 }
 
@@ -38,22 +39,23 @@ export const AiConceptExplainer: React.FC<AiConceptExplainerProps> = ({
   const { toast } = useToast();
 
   useEffect(() => {
-    setCurrentSlideIndex(0);
+    setCurrentSlideIndex(0); // Reset to first slide when explanation changes or dialog opens
     if (explanation && explanation.slides) {
-      setSlidesWithImageState(explanation.slides.map(slide => ({ ...slide, isImageLoading: false, imageError: null })));
+      // Initialize slides with image loading state
+      setSlidesWithImageState(
+        explanation.slides.map(slide => ({
+          ...slide,
+          isImageLoading: false, // Reset loading state
+          imageError: null,     // Reset error state
+          // Keep existing generatedImageUrl if present from a previous generation in the same session
+        }))
+      );
     } else {
       setSlidesWithImageState([]);
     }
-  }, [explanation, isOpen]);
+  }, [explanation, isOpen]); // Rerun this effect if explanation or isOpen changes
 
-  useEffect(() => {
-    const currentFullSlide = slidesWithImageState[currentSlideIndex];
-    if (currentFullSlide && currentFullSlide.imagePromptForGeneration && !currentFullSlide.generatedImageUrl && !currentFullSlide.isImageLoading && !currentFullSlide.imageError) {
-      handleGenerateImageForSlide(currentSlideIndex, currentFullSlide.imagePromptForGeneration);
-    }
-  }, [currentSlideIndex, slidesWithImageState]); // Added slidesWithImageState to dependencies
-
-  const handleGenerateImageForSlide = async (slideIndex: number, prompt: string) => {
+  const handleGenerateImageForSlide = useCallback(async (slideIndex: number, prompt: string) => {
     setSlidesWithImageState(prevSlides =>
       prevSlides.map((s, i) => (i === slideIndex ? { ...s, isImageLoading: true, imageError: null } : s))
     );
@@ -67,9 +69,9 @@ export const AiConceptExplainer: React.FC<AiConceptExplainerProps> = ({
         setSlidesWithImageState(prevSlides =>
           prevSlides.map((s, i) => (i === slideIndex ? { ...s, generatedImageUrl: result.generatedImageUrl, isImageLoading: false } : s))
         );
-        toast({ title: "Image Generated", description: `Image for slide "${slidesWithImageState[slideIndex]?.title || slideIndex + 1}" created.`});
+        toast({ title: "Image Generated", description: `Image for slide "${slidesWithImageState[slideIndex]?.title || slideIndex + 1}" created.` });
       } else {
-           throw new Error("AI did not return an image URL.");
+        throw new Error("AI did not return an image URL.");
       }
     } catch (error) {
       console.error("Image generation for slide failed:", error);
@@ -79,7 +81,14 @@ export const AiConceptExplainer: React.FC<AiConceptExplainerProps> = ({
       );
       toast({ variant: "destructive", title: "Image Generation Failed", description: errorMessage });
     }
-  };
+  }, [toast, slidesWithImageState]); // slidesWithImageState for title access in toast
+
+  useEffect(() => {
+    const currentFullSlide = slidesWithImageState[currentSlideIndex];
+    if (currentFullSlide && currentFullSlide.imagePromptForGeneration && !currentFullSlide.generatedImageUrl && !currentFullSlide.isImageLoading && !currentFullSlide.imageError) {
+      handleGenerateImageForSlide(currentSlideIndex, currentFullSlide.imagePromptForGeneration);
+    }
+  }, [currentSlideIndex, slidesWithImageState, handleGenerateImageForSlide]);
 
 
   if (!isOpen) {
@@ -122,7 +131,7 @@ export const AiConceptExplainer: React.FC<AiConceptExplainerProps> = ({
               <p className="text-sm sm:text-base">No explanation available or AI failed to generate content.</p>
               {onRegenerate && (
                 <Button onClick={onRegenerate} variant="outline" className="mt-4">
-                  Try Again
+                  <RotateCcw className="mr-2 h-4 w-4" /> Try Again
                 </Button>
               )}
             </div>
@@ -150,20 +159,35 @@ export const AiConceptExplainer: React.FC<AiConceptExplainerProps> = ({
                   </div>
                 )}
 
-                {currentSlide.imageError && (
+                {currentSlide.imageError && !currentSlide.isImageLoading && (
                   <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t text-center text-destructive">
                     <p className="text-sm">Error generating image: {currentSlide.imageError}</p>
+                    {currentSlide.imagePromptForGeneration && (
+                       <Button variant="outline" size="sm" onClick={() => handleGenerateImageForSlide(currentSlideIndex, currentSlide.imagePromptForGeneration!)} className="mt-2">
+                           Try Generating Image Again
+                       </Button>
+                    )}
                   </div>
                 )}
                 
                 {currentSlide.generatedImageUrl && !currentSlide.isImageLoading && (
                   <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t">
                     <h4 className="text-xs sm:text-sm font-medium text-muted-foreground mb-1 sm:mb-2">Generated Image:</h4>
-                    <div className="relative w-full aspect-video rounded-md overflow-hidden border bg-background">
+                    <div className="relative w-full max-w-md mx-auto aspect-video rounded-md overflow-hidden border bg-background">
                        <Image src={currentSlide.generatedImageUrl} alt={`AI generated image for ${currentSlide.title || 'slide'}`} layout="fill" objectFit="contain" />
                     </div>
                   </div>
                 )}
+
+                {!currentSlide.generatedImageUrl && currentSlide.imagePromptForGeneration && !currentSlide.isImageLoading && !currentSlide.imageError && (
+                    <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t text-center">
+                        <Button variant="outline" size="sm" onClick={() => handleGenerateImageForSlide(currentSlideIndex, currentSlide.imagePromptForGeneration!)}>
+                           <ImageIconLucide className="mr-2 h-4 w-4"/> Generate Image for this Slide
+                       </Button>
+                       <p className="text-xs text-muted-foreground mt-1">Prompt: "{currentSlide.imagePromptForGeneration}"</p>
+                    </div>
+                )}
+
 
                 {currentSlide.videoPlaceholderText && (
                     <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t flex items-start gap-2 text-muted-foreground">
@@ -191,30 +215,41 @@ export const AiConceptExplainer: React.FC<AiConceptExplainerProps> = ({
         </div>
 
         {!isLoading && slidesWithImageState.length > 0 && (
-          <DialogFooter className="p-4 sm:p-6 border-t flex-shrink-0 flex flex-row justify-between items-center w-full">
-            <div className="text-xs sm:text-sm text-muted-foreground">
-              Slide {currentSlideIndex + 1} of {slidesWithImageState.length}
+          <DialogFooter className="p-4 sm:p-6 border-t flex-shrink-0 flex flex-col sm:flex-row justify-between items-center w-full gap-2">
+            <div className="flex items-center gap-2">
+                <Button
+                    variant="outline"
+                    onClick={goToPreviousSlide}
+                    disabled={currentSlideIndex === 0}
+                    size="sm"
+                    className="h-8 sm:h-9"
+                >
+                    <ChevronLeft className="mr-1 h-4 w-4" /> Previous
+                </Button>
+                <div className="text-xs sm:text-sm text-muted-foreground">
+                    Slide {currentSlideIndex + 1} of {slidesWithImageState.length}
+                </div>
+                <Button
+                    variant="default"
+                    onClick={goToNextSlide}
+                    disabled={currentSlideIndex === slidesWithImageState.length - 1}
+                    size="sm"
+                    className="h-8 sm:h-9"
+                >
+                    Next <ChevronRight className="ml-1 h-4 w-4" />
+                </Button>
             </div>
-            <div className="flex gap-2">
+            {onRegenerate && (
               <Button
                 variant="outline"
-                onClick={goToPreviousSlide}
-                disabled={currentSlideIndex === 0}
+                onClick={onRegenerate}
+                disabled={isLoading} // Disable if main explanation is loading
                 size="sm"
                 className="h-8 sm:h-9"
               >
-                <ChevronLeft className="mr-1 h-4 w-4" /> Previous
+                <RotateCcw className="mr-2 h-4 w-4" /> Regenerate Explanation
               </Button>
-              <Button
-                variant="default"
-                onClick={goToNextSlide}
-                disabled={currentSlideIndex === slidesWithImageState.length - 1}
-                size="sm"
-                 className="h-8 sm:h-9"
-              >
-                Next <ChevronRight className="ml-1 h-4 w-4" />
-              </Button>
-            </div>
+            )}
           </DialogFooter>
         )}
          <Button

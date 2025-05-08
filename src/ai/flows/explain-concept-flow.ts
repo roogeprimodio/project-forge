@@ -23,11 +23,11 @@ export type ExplainConceptInput = z.infer<typeof ExplainConceptInputSchema>;
 const ExplanationSlideSchema = z.object({
   title: z.string().optional().describe('A concise title for the slide.'),
   content: z.string().describe('The main textual explanation for this slide, formatted in Markdown. Should be clear and easy to understand.'),
-  mermaidDiagram: z.string().optional().describe('Optional: Valid Mermaid.js code for a diagram relevant to this slide. Only include if a diagram significantly aids understanding. Keep diagrams simple.'),
-  imagePromptForGeneration: z.string().optional().describe('Optional: A descriptive text prompt suitable for an AI image generation model if an image would significantly enhance this slide. E.g., "A futuristic cityscape with flying cars."'),
+  mermaidDiagram: z.string().optional().describe('Optional: Valid Mermaid.js code for a diagram relevant to this slide. Only include if a diagram significantly aids understanding. Keep diagrams simple. Output ONLY Mermaid syntax, no markdown fences.'),
+  imagePromptForGeneration: z.string().optional().describe('Optional: A descriptive text prompt suitable for an AI image generation model if an image would significantly enhance this slide. E.g., "A futuristic cityscape with flying cars." This prompt will be used by the client to trigger image generation.'),
+  generatedImageUrl: z.string().optional().describe('This field is for storing the URL of an image generated later by the client-side component. DO NOT POPULATE THIS YOURSELF.'),
   videoPlaceholderText: z.string().optional().describe('Optional: A brief description of a short video (e.g., "Short animation of the water cycle") that could illustrate the point of this slide. Do not provide video URLs, just the descriptive placeholder text.'),
   interactiveElementPlaceholderText: z.string().optional().describe('Optional: A brief description of a simple interactive element (e.g., "Quiz: What are the three states of matter?", "Clickable diagram of a plant cell") that could make this slide more engaging. Provide just the descriptive text.'),
-  generatedImageUrl: z.string().optional().describe('This field is for storing the URL of an image generated later, do not populate it yourself.'), // AI should not populate this.
 });
 
 // Define Zod schema for the overall output
@@ -63,15 +63,15 @@ Your task is to explain the given concept: "{{{concept}}}".
     *   If a simple diagram clarifies a point, provide valid \`mermaidDiagram\` code (e.g., \`flowchart TD\`, \`graph LR\`).
     *   Output ONLY Mermaid syntax, no markdown fences. Only use if truly beneficial.
 5.  **Immersive Media Suggestions (Optional):**
-    *   **Images:** If an image would significantly aid understanding, provide an \`imagePromptForGeneration\`. This should be a detailed text prompt for an AI image generator (e.g., "A detailed illustration of a neuron firing an action potential, showing synaptic vesicles."). Do NOT generate the image itself.
+    *   **Images:** If an image would significantly aid understanding, provide an \`imagePromptForGeneration\`. This should be a detailed text prompt for an AI image generator (e.g., "A detailed illustration of a neuron firing an action potential, showing synaptic vesicles."). Do NOT generate the image itself, just the prompt. The client application will handle actual image generation.
     *   **Videos:** If a short video (15-30 seconds) could effectively demonstrate a process or concept, provide \`videoPlaceholderText\` (e.g., "Short animation showing DNA replication process."). Do not provide video URLs.
     *   **Interactive Elements:** If a simple interactive element (like a quiz question or a basic clickable demo) could enhance engagement, provide \`interactiveElementPlaceholderText\` (e.g., "Quiz: What is the main function of mitochondria?").
     *   Use these immersive suggestions sparingly, only when they add significant value. Not every slide needs them.
-6.  **DO NOT populate \`generatedImageUrl\` yourself.** This field is reserved for future use.
+6.  **DO NOT populate \`generatedImageUrl\` yourself.** This field is reserved for the client application to populate after generating an image.
 7.  **Overall Flow:** Ensure slides progress logically.
 8.  **Output Format:** A single JSON object matching 'ExplainConceptOutputSchema'.
 
-**Example of a single slide object within the 'slides' array:**
+**Example of a single slide object within the 'slides' array (YOU SHOULD NOT INCLUDE generatedImageUrl):**
 \`\`\`json
 {
   "title": "What is a Variable?",
@@ -83,7 +83,7 @@ Your task is to explain the given concept: "{{{concept}}}".
 }
 \`\`\`
 
-Explain "{{{concept}}}" now, adhering to all instructions and the JSON output format.
+Explain "{{{concept}}}" now, adhering to all instructions and the JSON output format. Ensure \`generatedImageUrl\` is NEVER populated by you.
 `,
 });
 
@@ -94,7 +94,6 @@ const explainConceptFlow = ai.defineFlow(
     outputSchema: ExplainConceptOutputSchema,
   },
   async (input) => {
-    // Ensure defaults are applied if not present in input
     const processedInput = {
         ...input,
         complexityLevel: input.complexityLevel || 'simple',
@@ -102,7 +101,6 @@ const explainConceptFlow = ai.defineFlow(
     };
     const { output } = await prompt(processedInput);
 
-    // Basic validation of the output structure
     if (!output || !Array.isArray(output.slides) || typeof output.conceptTitle !== 'string') {
       console.error("AI returned an invalid structure for concept explanation:", output);
       return {
@@ -113,13 +111,14 @@ const explainConceptFlow = ai.defineFlow(
         }]
       };
     }
-    // Ensure generatedImageUrl is not populated by AI, remove if it is
+
+    // Validate and ensure generatedImageUrl is not populated by the AI
     const validatedSlides = output.slides.map(slide => {
         const { generatedImageUrl, ...restOfSlide } = slide;
-        if (generatedImageUrl) {
-            console.warn(`AI incorrectly populated generatedImageUrl for slide: ${slide.title}. Removing.`);
+        if (generatedImageUrl !== undefined && generatedImageUrl !== null && generatedImageUrl !== '') {
+            console.warn(`AI incorrectly populated generatedImageUrl for slide: "${slide.title || 'Untitled'}". Removing.`);
         }
-        return restOfSlide;
+        return { ...restOfSlide, generatedImageUrl: undefined }; // Explicitly set to undefined
     });
 
     return { ...output, slides: validatedSlides };

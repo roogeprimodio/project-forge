@@ -1,7 +1,7 @@
 // src/app/ai-tools/concept-explainer/page.tsx
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,17 +10,31 @@ import { Loader2, BookOpen, Wand2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { explainConceptAction } from '@/app/actions';
 import type { ExplainConceptInput, ExplainConceptOutput } from '@/types/project';
-import { AiConceptExplainer } from '@/components/ai-concept-explainer'; // Re-use the modal
+import { AiConceptExplainer } from '@/components/ai-concept-explainer';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useLocalStorage } from '@/hooks/use-local-storage'; // Import useLocalStorage
 
 export default function AiConceptExplainerPage() {
   const [conceptInput, setConceptInput] = useState('');
   const [complexityLevel, setComplexityLevel] = useState<ExplainConceptInput['complexityLevel']>('simple');
   const [maxSlides, setMaxSlides] = useState<number>(5);
-  const [explanationResult, setExplanationResult] = useState<ExplainConceptOutput | null>(null);
+  
+  // Use useLocalStorage for explanationResult
+  const [explanationResult, setExplanationResult] = useLocalStorage<ExplainConceptOutput | null>('lastConceptExplanation', null);
+  
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const { toast } = useToast();
+
+  // Effect to potentially open modal if there's a stored explanation from a previous session
+  // This might not be desired UX, but demonstrates local storage loading.
+  // Typically, user would still initiate an action.
+  useEffect(() => {
+    if (explanationResult && explanationResult.slides.length > 0 && !isGenerating) {
+      // setIsModalOpen(true); // Decide if you want to auto-open on load
+    }
+  }, [explanationResult, isGenerating]);
+
 
   const handleExplainConcept = async () => {
     if (!conceptInput.trim()) {
@@ -28,34 +42,39 @@ export default function AiConceptExplainerPage() {
       return;
     }
     setIsGenerating(true);
-    setExplanationResult(null);
+    // Do not clear explanationResult immediately if you want to show the old one while loading
+    // setExplanationResult(null); // Clears previous result from local storage and state before new fetch
     try {
       const result = await explainConceptAction({
         concept: conceptInput,
         complexityLevel: complexityLevel,
         maxSlides: maxSlides,
-        // projectContext: undefined, // For general use, no specific project context
       });
 
       if (result && 'error' in result) {
         throw new Error(result.error);
       }
-      setExplanationResult(result as ExplainConceptOutput);
+      setExplanationResult(result as ExplainConceptOutput); // This will save to local storage
       setIsModalOpen(true);
     } catch (error) {
       console.error("Concept explanation failed:", error);
       toast({ variant: 'destructive', title: 'Explanation Failed', description: error instanceof Error ? error.message : 'Could not explain the concept.' });
       setExplanationResult({ conceptTitle: conceptInput, slides: [{ title: "Error", content: `Failed to explain "${conceptInput}".`}] });
-      setIsModalOpen(true); // Still open modal to show error
+      setIsModalOpen(true); 
     } finally {
       setIsGenerating(false);
     }
   };
 
   const handleRegenerateFromModal = () => {
-    // This could re-trigger handleExplainConcept if conceptInput is still relevant
     if(conceptInput) {
         handleExplainConcept();
+    } else if (explanationResult?.conceptTitle) {
+        // If no current input, but there was a previous explanation, re-explain that.
+        setConceptInput(explanationResult.conceptTitle); // Set input to previous concept
+        handleExplainConcept();
+    } else {
+        toast({ variant: 'destructive', title: 'Cannot Regenerate', description: 'No concept to regenerate. Please enter a concept.'});
     }
   };
 
@@ -70,7 +89,7 @@ export default function AiConceptExplainerPage() {
             </CardTitle>
           </div>
           <CardDescription className="text-sm md:text-base">
-            Enter a concept, term, or phrase, and the AI will break it down into easy-to-understand slides.
+            Enter a concept, term, or phrase, and the AI will break it down into easy-to-understand slides with visuals.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -110,7 +129,7 @@ export default function AiConceptExplainerPage() {
                     onChange={(e) => {
                         const val = parseInt(e.target.value);
                         if(val >= 1 && val <=10) setMaxSlides(val);
-                        else if (e.target.value === "") setMaxSlides(1); // Or some default like 5
+                        else if (e.target.value === "") setMaxSlides(1);
                     }}
                     min="1"
                     max="10"
@@ -119,14 +138,13 @@ export default function AiConceptExplainerPage() {
             </div>
           </div>
 
-
           <Button onClick={handleExplainConcept} disabled={isGenerating} className="w-full md:w-auto hover:glow-primary focus-visible:glow-primary text-sm md:text-base py-2.5 md:py-3">
             {isGenerating ? <Loader2 className="mr-2 h-4 w-4 md:h-5 md:w-5 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4 md:h-5 md:w-5" />}
             {isGenerating ? 'Explaining...' : 'Explain Concept'}
           </Button>
         </CardContent>
         <CardFooter>
-            <p className="text-xs text-muted-foreground">AI explanations are for informational purposes and may require verification.</p>
+            <p className="text-xs text-muted-foreground">AI explanations are for informational purposes and may require verification. Images are AI-generated.</p>
         </CardFooter>
       </Card>
 

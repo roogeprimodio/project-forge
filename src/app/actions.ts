@@ -208,7 +208,9 @@ export async function explainConceptAction(input: ExplainConceptInput): Promise<
       return { error: "Concept to explain cannot be empty." };
     }
     const result = await explainConcept(input);
-    console.log("Concept explanation result:", { title: result.conceptTitle, slidesCount: result.slides.length });
+    // The explainConcept flow itself now handles initial slide generation.
+    // It provides prompts for images, but doesn't generate them directly.
+    console.log("Concept explanation (text & diagram prompts) result:", { title: result.conceptTitle, slidesCount: result.slides.length });
     return result;
   } catch (error) {
     console.error("Error in explainConceptAction:", error);
@@ -219,6 +221,7 @@ export async function explainConceptAction(input: ExplainConceptInput): Promise<
 
 /**
  * Server action to generate an image for a slide using the AI flow.
+ * This is called by the client component (AiConceptExplainer) when an image needs to be generated for a specific slide.
  */
 export async function generateImageForSlideAction(input: GenerateImageFromPromptInput): Promise<GenerateImageFromPromptOutput> {
     try {
@@ -226,6 +229,7 @@ export async function generateImageForSlideAction(input: GenerateImageFromPrompt
         if (!input.prompt?.trim()) {
             return { generatedImageUrl: '', error: "Image prompt cannot be empty." };
         }
+        // Use the dedicated image generation flow
         const result = await generateImageFromPrompt(input);
         return result; // This already includes an error field if one occurred
     } catch (error) {
