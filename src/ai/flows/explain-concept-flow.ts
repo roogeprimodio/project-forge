@@ -1,7 +1,6 @@
-
 'use server';
 /**
- * @fileOverview AI agent to explain a concept in a structured, slide-like format.
+ * @fileOverview AI agent to explain a concept in a structured, slide-like format, with suggestions for immersive media.
  *
  * - explainConcept - Generates a series of "slides" to explain a given concept.
  * - ExplainConceptInput - Input type for the explanation flow.
@@ -25,6 +24,10 @@ const ExplanationSlideSchema = z.object({
   title: z.string().optional().describe('A concise title for the slide.'),
   content: z.string().describe('The main textual explanation for this slide, formatted in Markdown. Should be clear and easy to understand.'),
   mermaidDiagram: z.string().optional().describe('Optional: Valid Mermaid.js code for a diagram relevant to this slide. Only include if a diagram significantly aids understanding. Keep diagrams simple.'),
+  imagePromptForGeneration: z.string().optional().describe('Optional: A descriptive text prompt suitable for an AI image generation model if an image would significantly enhance this slide. E.g., "A futuristic cityscape with flying cars."'),
+  videoPlaceholderText: z.string().optional().describe('Optional: A brief description of a short video (e.g., "Short animation of the water cycle") that could illustrate the point of this slide. Do not provide video URLs, just the descriptive placeholder text.'),
+  interactiveElementPlaceholderText: z.string().optional().describe('Optional: A brief description of a simple interactive element (e.g., "Quiz: What are the three states of matter?", "Clickable diagram of a plant cell") that could make this slide more engaging. Provide just the descriptive text.'),
+  generatedImageUrl: z.string().optional().describe('This field is for storing the URL of an image generated later, do not populate it yourself.'), // AI should not populate this.
 });
 
 // Define Zod schema for the overall output
@@ -41,7 +44,7 @@ const prompt = ai.definePrompt({
   name: 'explainConceptPrompt',
   input: { schema: ExplainConceptInputSchema },
   output: { schema: ExplainConceptOutputSchema },
-  prompt: `You are an AI assistant specialized in breaking down complex topics into easy-to-understand, slide-like explanations.
+  prompt: `You are an AI assistant specialized in breaking down complex topics into engaging, slide-like explanations.
 Your task is to explain the given concept: "{{{concept}}}".
 
 **Context & Constraints:**
@@ -50,31 +53,37 @@ Your task is to explain the given concept: "{{{concept}}}".
 - Maximum Number of Slides: {{{maxSlides}}}
 
 **Instructions for Generating Explanation Slides:**
-1.  **Understand the Concept:** First, fully grasp the core meaning of "{{{concept}}}". If project context is provided, tailor the explanation to that context.
-2.  **Structure into Slides:** Break down the explanation into a logical sequence of up to {{{maxSlides}}} "slides". Each slide should cover a distinct aspect or build upon the previous one.
+1.  **Understand the Concept:** Fully grasp "{{{concept}}}". Tailor explanations to '{{{projectContext}}}' if provided.
+2.  **Structure into Slides:** Create up to {{{maxSlides}}} logical slides.
 3.  **Slide Content (Markdown):** For each slide:
-    *   Provide a \`title\` (optional, but recommended for clarity).
-    *   Write clear, concise \`content\` in Markdown. Use bullet points, bold text, and simple language appropriate for the '{{{complexityLevel}}}' level.
-    *   Avoid overly long paragraphs. Aim for scannable information.
+    *   Provide a \`title\` (optional, recommended).
+    *   Write clear, concise \`content\` in Markdown (use bullet points, bold text, simple language for '{{{complexityLevel}}}').
+    *   Aim for scannable information.
 4.  **Diagrams (Optional Mermaid Code):**
-    *   If a simple diagram would significantly clarify a point on a slide, provide \`mermaidDiagram\` code for it.
-    *   Use basic Mermaid types like \`flowchart TD\`, \`graph LR\`, or simple \`sequenceDiagram\`.
-    *   Keep diagrams focused and uncluttered. Do NOT include a diagram for every slide; only when truly beneficial.
-    *   Ensure the Mermaid code is valid and directly renderable. Output ONLY the Mermaid syntax, no markdown fences (\`\`\`mermaid ... \`\`\`).
-5.  **Overall Flow:** Ensure the slides progress logically, from basic introduction to more specific details or examples, depending on the complexity.
-6.  **Output Format:** The final output MUST be a single JSON object matching the 'ExplainConceptOutputSchema', containing a 'slides' array and the 'conceptTitle'.
+    *   If a simple diagram clarifies a point, provide valid \`mermaidDiagram\` code (e.g., \`flowchart TD\`, \`graph LR\`).
+    *   Output ONLY Mermaid syntax, no markdown fences. Only use if truly beneficial.
+5.  **Immersive Media Suggestions (Optional):**
+    *   **Images:** If an image would significantly aid understanding, provide an \`imagePromptForGeneration\`. This should be a detailed text prompt for an AI image generator (e.g., "A detailed illustration of a neuron firing an action potential, showing synaptic vesicles."). Do NOT generate the image itself.
+    *   **Videos:** If a short video (15-30 seconds) could effectively demonstrate a process or concept, provide \`videoPlaceholderText\` (e.g., "Short animation showing DNA replication process."). Do not provide video URLs.
+    *   **Interactive Elements:** If a simple interactive element (like a quiz question or a basic clickable demo) could enhance engagement, provide \`interactiveElementPlaceholderText\` (e.g., "Quiz: What is the main function of mitochondria?").
+    *   Use these immersive suggestions sparingly, only when they add significant value. Not every slide needs them.
+6.  **DO NOT populate \`generatedImageUrl\` yourself.** This field is reserved for future use.
+7.  **Overall Flow:** Ensure slides progress logically.
+8.  **Output Format:** A single JSON object matching 'ExplainConceptOutputSchema'.
 
 **Example of a single slide object within the 'slides' array:**
 \`\`\`json
 {
   "title": "What is a Variable?",
-  "content": "- A variable is like a container that stores information.\\n- It has a name (e.g., 'userAge') and can hold different values (e.g., 25, 'hello').\\n- Values can change during program execution.",
-  "mermaidDiagram": "graph LR\\nA[Container] -- holds --> B(Value);"
+  "content": "- A variable is like a container that stores information.\\n- It has a name and can hold different values.\\n- Values can change during program execution.",
+  "mermaidDiagram": "graph LR\\nA[Container] -- holds --> B(Value);",
+  "imagePromptForGeneration": "A colorful illustration of a treasure chest labeled 'Variable' containing different jewels representing 'Values'.",
+  "videoPlaceholderText": "Short animation of a box (variable) where different items (values like numbers, text) are placed inside and taken out.",
+  "interactiveElementPlaceholderText": "Interactive: Drag and drop values (number 5, text 'hello') into a box labeled 'myVariable'."
 }
 \`\`\`
 
-Explain the concept "{{{concept}}}" now, adhering to all instructions and the JSON output format.
-The output should be the concept title and an array of slide objects.
+Explain "{{{concept}}}" now, adhering to all instructions and the JSON output format.
 `,
 });
 
@@ -96,7 +105,6 @@ const explainConceptFlow = ai.defineFlow(
     // Basic validation of the output structure
     if (!output || !Array.isArray(output.slides) || typeof output.conceptTitle !== 'string') {
       console.error("AI returned an invalid structure for concept explanation:", output);
-      // Return a fallback or throw an error
       return {
         conceptTitle: input.concept,
         slides: [{
@@ -105,6 +113,15 @@ const explainConceptFlow = ai.defineFlow(
         }]
       };
     }
-    return output!;
+    // Ensure generatedImageUrl is not populated by AI, remove if it is
+    const validatedSlides = output.slides.map(slide => {
+        const { generatedImageUrl, ...restOfSlide } = slide;
+        if (generatedImageUrl) {
+            console.warn(`AI incorrectly populated generatedImageUrl for slide: ${slide.title}. Removing.`);
+        }
+        return restOfSlide;
+    });
+
+    return { ...output, slides: validatedSlides };
   }
 );

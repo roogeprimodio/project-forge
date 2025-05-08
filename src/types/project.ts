@@ -55,9 +55,10 @@ export interface ExplanationSlide {
   title?: string;
   content: string; // Markdown formatted text for the slide's main body
   mermaidDiagram?: string; // Optional Mermaid.js code for a diagram on this slide
-  // Future enhancements:
-  // imagePrompt?: string; // Prompt for AI to generate an image for this slide
-  // animationHint?: string; // Textual hint for a type of simple CSS animation or Lottie file idea
+  imagePromptForGeneration?: string; // Optional: A text prompt for an AI to generate an image for this slide.
+  generatedImageUrl?: string; // Optional: The data URI of an AI-generated image.
+  videoPlaceholderText?: string; // Optional: A description of a video that could enhance this slide.
+  interactiveElementPlaceholderText?: string; // Optional: A description of an interactive element (e.g., quiz, demo).
 }
 
 export interface ExplainConceptOutput {

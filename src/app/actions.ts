@@ -6,10 +6,10 @@ import { summarizeReportSection, SummarizeReportSectionInput } from '@/ai/flows/
 import type { SummarizeReportSectionOutput } from '@/ai/flows/summarize-report-section';
 import { generateProjectOutline, GenerateProjectOutlineInput } from '@/ai/flows/generate-project-outline';
 import type { GenerateProjectOutlineOutput } from '@/ai/flows/generate-project-outline';
-import { suggestImprovements, SuggestImprovementsInput } from '@/ai/flows/suggest-improvements'; // Type SuggestImprovementsInput is already imported
+import { suggestImprovements, SuggestImprovementsInput } from '@/ai/flows/suggest-improvements';
 import type { SuggestImprovementsOutput } from '@/ai/flows/suggest-improvements';
-import { generateDiagramMermaid, GenerateDiagramMermaidInput } from '@/ai/flows/generate-diagram-mermaid'; // Import diagram flow
-import type { GenerateDiagramMermaidOutput } from '@/ai/flows/generate-diagram-mermaid'; // Import diagram flow types
+import { generateDiagramMermaid, GenerateDiagramMermaidInput } from '@/ai/flows/generate-diagram-mermaid';
+import type { GenerateDiagramMermaidOutput } from '@/ai/flows/generate-diagram-mermaid';
 
 // Import new flows for standard pages
 import { generateCoverPage, GenerateCoverPageInput, GenerateCoverPageOutput } from '@/ai/flows/generate-cover-page';
@@ -21,6 +21,9 @@ import { generateAcknowledgement, GenerateAcknowledgementInput, GenerateAcknowle
 // Import new flow for concept explanation
 import { explainConcept, ExplainConceptInput } from '@/ai/flows/explain-concept-flow';
 import type { ExplainConceptOutput } from '@/types/project';
+
+// Import new flow for image generation
+import { generateImageFromPrompt, GenerateImageFromPromptInput, GenerateImageFromPromptOutput } from '@/ai/flows/generate-image-from-prompt-flow';
 
 
 /**
@@ -212,4 +215,22 @@ export async function explainConceptAction(input: ExplainConceptInput): Promise<
     const errorMessage = error instanceof Error ? error.message : "An unknown error occurred during concept explanation.";
     return { error: `AI Concept Explanation Failed: ${errorMessage}` };
   }
+}
+
+/**
+ * Server action to generate an image for a slide using the AI flow.
+ */
+export async function generateImageForSlideAction(input: GenerateImageFromPromptInput): Promise<GenerateImageFromPromptOutput> {
+    try {
+        console.log("Generating image for slide with prompt:", input.prompt);
+        if (!input.prompt?.trim()) {
+            return { generatedImageUrl: '', error: "Image prompt cannot be empty." };
+        }
+        const result = await generateImageFromPrompt(input);
+        return result; // This already includes an error field if one occurred
+    } catch (error) {
+        console.error("Error in generateImageForSlideAction:", error);
+        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred during image generation for slide.";
+        return { generatedImageUrl: '', error: `AI Image Generation Failed: ${errorMessage}` };
+    }
 }
