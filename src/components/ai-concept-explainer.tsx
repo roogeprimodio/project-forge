@@ -182,7 +182,14 @@ export const AiConceptExplainer: React.FC<AiConceptExplainerProps> = ({
                 
                 {currentSlide.generatedImageUrl && !currentSlide.isImageLoading && (
                   <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t">
-                    <h4 className="text-xs sm:text-sm font-medium text-muted-foreground mb-1 sm:mb-2">Generated Image:</h4>
+                    <div className="flex justify-between items-center mb-1 sm:mb-2">
+                        <h4 className="text-xs sm:text-sm font-medium text-muted-foreground">Generated Image:</h4>
+                        {currentSlide.imagePromptForGeneration && (
+                            <Button variant="outline" size="xs" onClick={() => handleGenerateImageForSlide(currentSlideIndex, currentSlide.imagePromptForGeneration!)} className="hover:glow-accent focus-visible:glow-accent">
+                                <RefreshCw className="mr-1 h-3 w-3"/> Regenerate
+                            </Button>
+                        )}
+                    </div>
                     <div className="relative w-full max-w-md mx-auto aspect-video rounded-md overflow-hidden border bg-background">
                        <Image src={currentSlide.generatedImageUrl} alt={`AI generated image for ${currentSlide.title || 'slide'}`} layout="fill" objectFit="contain" data-ai-hint="concept illustration" />
                     </div>
