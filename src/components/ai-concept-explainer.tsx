@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ChevronLeft, ChevronRight, Lightbulb, Loader2, X, Image as ImageIconLucide, Video, Zap, RotateCcw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Lightbulb, Loader2, X, Image as ImageIconLucide, Video, Zap, RotateCcw, RefreshCw } from 'lucide-react';
 import type { ExplanationSlide, ExplainConceptOutput } from '@/types/project';
 import MarkdownPreview from './markdown-preview';
 import MermaidDiagram from './mermaid-diagram';
@@ -39,25 +39,30 @@ export const AiConceptExplainer: React.FC<AiConceptExplainerProps> = ({
   const { toast } = useToast();
 
   useEffect(() => {
-    setCurrentSlideIndex(0); // Reset to first slide when explanation changes or dialog opens
-    if (explanation && explanation.slides) {
-      // Initialize slides with image loading state
-      setSlidesWithImageState(
-        explanation.slides.map(slide => ({
-          ...slide,
-          isImageLoading: false, // Reset loading state
-          imageError: null,     // Reset error state
-          // Keep existing generatedImageUrl if present from a previous generation in the same session
-        }))
-      );
-    } else {
-      setSlidesWithImageState([]);
+    if (isOpen) { // Only reset/initialize when dialog opens
+      setCurrentSlideIndex(0); 
+      if (explanation && explanation.slides) {
+        // Initialize slides with image loading state, preserving previously generated URLs if component reopens for the same explanation
+        setSlidesWithImageState(prevSlides => {
+          return explanation.slides.map(newSlide => {
+            const existingSlide = prevSlides.find(s => s.title === newSlide.title && s.content === newSlide.content); // Crude check, might need better ID
+            return {
+              ...newSlide,
+              generatedImageUrl: existingSlide?.generatedImageUrl || newSlide.generatedImageUrl, // Keep if exists
+              isImageLoading: false, 
+              imageError: null,     
+            };
+          });
+        });
+      } else {
+        setSlidesWithImageState([]);
+      }
     }
-  }, [explanation, isOpen]); // Rerun this effect if explanation or isOpen changes
+  }, [explanation, isOpen]);
 
   const handleGenerateImageForSlide = useCallback(async (slideIndex: number, prompt: string) => {
     setSlidesWithImageState(prevSlides =>
-      prevSlides.map((s, i) => (i === slideIndex ? { ...s, isImageLoading: true, imageError: null } : s))
+      prevSlides.map((s, i) => (i === slideIndex ? { ...s, isImageLoading: true, imageError: null, generatedImageUrl: undefined } : s)) // Clear previous image on retry
     );
 
     try {
@@ -81,14 +86,17 @@ export const AiConceptExplainer: React.FC<AiConceptExplainerProps> = ({
       );
       toast({ variant: "destructive", title: "Image Generation Failed", description: errorMessage });
     }
-  }, [toast, slidesWithImageState]); // slidesWithImageState for title access in toast
+  }, [toast, slidesWithImageState]); // slidesWithImageState is needed to access title for toast
 
+  // Auto-generate image if prompt exists, not already generated, not loading, and no error
   useEffect(() => {
+    if (!isOpen) return; // Only run if dialog is open
+
     const currentFullSlide = slidesWithImageState[currentSlideIndex];
     if (currentFullSlide && currentFullSlide.imagePromptForGeneration && !currentFullSlide.generatedImageUrl && !currentFullSlide.isImageLoading && !currentFullSlide.imageError) {
       handleGenerateImageForSlide(currentSlideIndex, currentFullSlide.imagePromptForGeneration);
     }
-  }, [currentSlideIndex, slidesWithImageState, handleGenerateImageForSlide]);
+  }, [currentSlideIndex, slidesWithImageState, handleGenerateImageForSlide, isOpen]);
 
 
   if (!isOpen) {
@@ -131,7 +139,7 @@ export const AiConceptExplainer: React.FC<AiConceptExplainerProps> = ({
               <p className="text-sm sm:text-base">No explanation available or AI failed to generate content.</p>
               {onRegenerate && (
                 <Button onClick={onRegenerate} variant="outline" className="mt-4">
-                  <RotateCcw className="mr-2 h-4 w-4" /> Try Again
+                  <RotateCcw className="mr-2 h-4 w-4" /> Re-explain Concept
                 </Button>
               )}
             </div>
@@ -155,7 +163,7 @@ export const AiConceptExplainer: React.FC<AiConceptExplainerProps> = ({
                 {currentSlide.isImageLoading && (
                   <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t text-center">
                     <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
-                    <p className="text-sm text-muted-foreground mt-2">Generating image...</p>
+                    <p className="text-sm text-muted-foreground mt-2">Generating image for this slide...</p>
                   </div>
                 )}
 
@@ -164,7 +172,7 @@ export const AiConceptExplainer: React.FC<AiConceptExplainerProps> = ({
                     <p className="text-sm">Error generating image: {currentSlide.imageError}</p>
                     {currentSlide.imagePromptForGeneration && (
                        <Button variant="outline" size="sm" onClick={() => handleGenerateImageForSlide(currentSlideIndex, currentSlide.imagePromptForGeneration!)} className="mt-2">
-                           Try Generating Image Again
+                           <RefreshCw className="mr-2 h-3 w-3"/> Try Generating Image Again
                        </Button>
                     )}
                   </div>
@@ -195,6 +203,7 @@ export const AiConceptExplainer: React.FC<AiConceptExplainerProps> = ({
                         <div>
                             <h4 className="text-xs sm:text-sm font-medium">Video Suggestion:</h4>
                             <p className="text-xs italic">{currentSlide.videoPlaceholderText}</p>
+                            <p className="text-xs text-muted-foreground/70">(Actual video/animation generation is not implemented)</p>
                         </div>
                     </div>
                 )}
@@ -205,6 +214,7 @@ export const AiConceptExplainer: React.FC<AiConceptExplainerProps> = ({
                         <div>
                             <h4 className="text-xs sm:text-sm font-medium">Interactive Suggestion:</h4>
                             <p className="text-xs italic">{currentSlide.interactiveElementPlaceholderText}</p>
+                            <p className="text-xs text-muted-foreground/70">(Actual interactive element generation is not implemented)</p>
                         </div>
                     </div>
                 )}
@@ -243,11 +253,11 @@ export const AiConceptExplainer: React.FC<AiConceptExplainerProps> = ({
               <Button
                 variant="outline"
                 onClick={onRegenerate}
-                disabled={isLoading} // Disable if main explanation is loading
+                disabled={isLoading || isGenerating} // Disable if main explanation or current slide image is loading
                 size="sm"
                 className="h-8 sm:h-9"
               >
-                <RotateCcw className="mr-2 h-4 w-4" /> Regenerate Explanation
+                <RotateCcw className="mr-2 h-4 w-4" /> Re-explain Concept
               </Button>
             )}
           </DialogFooter>

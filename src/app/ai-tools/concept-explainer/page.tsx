@@ -6,20 +6,19 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Loader2, BookOpen, Wand2 } from 'lucide-react';
+import { Loader2, BookOpen, Wand2, RotateCcw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { explainConceptAction } from '@/app/actions';
 import type { ExplainConceptInput, ExplainConceptOutput } from '@/types/project';
 import { AiConceptExplainer } from '@/components/ai-concept-explainer';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useLocalStorage } from '@/hooks/use-local-storage'; // Import useLocalStorage
+import { useLocalStorage } from '@/hooks/use-local-storage';
 
 export default function AiConceptExplainerPage() {
   const [conceptInput, setConceptInput] = useState('');
   const [complexityLevel, setComplexityLevel] = useState<ExplainConceptInput['complexityLevel']>('simple');
-  const [maxSlides, setMaxSlides] = useState<number>(5);
+  // maxSlides state removed
   
-  // Use useLocalStorage for explanationResult
   const [explanationResult, setExplanationResult] = useLocalStorage<ExplainConceptOutput | null>('lastConceptExplanation', null);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -27,39 +26,38 @@ export default function AiConceptExplainerPage() {
   const { toast } = useToast();
 
   // Effect to potentially open modal if there's a stored explanation from a previous session
-  // This might not be desired UX, but demonstrates local storage loading.
-  // Typically, user would still initiate an action.
   useEffect(() => {
-    if (explanationResult && explanationResult.slides.length > 0 && !isGenerating) {
-      // setIsModalOpen(true); // Decide if you want to auto-open on load
+    if (explanationResult && explanationResult.slides.length > 0 && !isGenerating && explanationResult.conceptTitle === conceptInput) {
+       // Only auto-open if the current input matches the stored concept, preventing opening unrelated old explanations.
+      // setIsModalOpen(true); // User can decide if this UX is desired
     }
-  }, [explanationResult, isGenerating]);
+  }, [explanationResult, isGenerating, conceptInput]);
 
 
-  const handleExplainConcept = async () => {
-    if (!conceptInput.trim()) {
+  const handleExplainConcept = async (conceptToExplain: string) => {
+    if (!conceptToExplain.trim()) {
       toast({ variant: 'destructive', title: 'Error', description: 'Please enter a concept to explain.' });
       return;
     }
     setIsGenerating(true);
-    // Do not clear explanationResult immediately if you want to show the old one while loading
-    // setExplanationResult(null); // Clears previous result from local storage and state before new fetch
+    // Optional: Clear previous result if you want to start fresh before new fetch
+    // setExplanationResult(null); 
     try {
       const result = await explainConceptAction({
-        concept: conceptInput,
+        concept: conceptToExplain,
         complexityLevel: complexityLevel,
-        maxSlides: maxSlides,
+        // maxSlides removed from input
       });
 
       if (result && 'error' in result) {
         throw new Error(result.error);
       }
-      setExplanationResult(result as ExplainConceptOutput); // This will save to local storage
+      setExplanationResult(result as ExplainConceptOutput);
       setIsModalOpen(true);
     } catch (error) {
       console.error("Concept explanation failed:", error);
       toast({ variant: 'destructive', title: 'Explanation Failed', description: error instanceof Error ? error.message : 'Could not explain the concept.' });
-      setExplanationResult({ conceptTitle: conceptInput, slides: [{ title: "Error", content: `Failed to explain "${conceptInput}".`}] });
+      setExplanationResult({ conceptTitle: conceptToExplain, slides: [{ title: "Error", content: `Failed to explain "${conceptToExplain}".`}] });
       setIsModalOpen(true); 
     } finally {
       setIsGenerating(false);
@@ -67,12 +65,14 @@ export default function AiConceptExplainerPage() {
   };
 
   const handleRegenerateFromModal = () => {
-    if(conceptInput) {
-        handleExplainConcept();
-    } else if (explanationResult?.conceptTitle) {
-        // If no current input, but there was a previous explanation, re-explain that.
-        setConceptInput(explanationResult.conceptTitle); // Set input to previous concept
-        handleExplainConcept();
+    let conceptForRegeneration = conceptInput.trim(); // Prioritize current input
+    if (!conceptForRegeneration && explanationResult?.conceptTitle) {
+        conceptForRegeneration = explanationResult.conceptTitle; // Fallback to last explained concept
+        setConceptInput(conceptForRegeneration); // Update input field if using fallback
+    }
+
+    if (conceptForRegeneration) {
+        handleExplainConcept(conceptForRegeneration);
     } else {
         toast({ variant: 'destructive', title: 'Cannot Regenerate', description: 'No concept to regenerate. Please enter a concept.'});
     }
@@ -103,42 +103,26 @@ export default function AiConceptExplainerPage() {
               onChange={(e) => setConceptInput(e.target.value)}
               placeholder="e.g., 'Machine Learning', 'Quantum Entanglement', 'Photosynthesis'"
               className="h-10 md:h-11 text-sm md:text-base focus-visible:glow-primary"
+              onKeyDown={(e) => { if (e.key === 'Enter') handleExplainConcept(conceptInput); }}
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-                <Label htmlFor="complexity-select">Complexity Level</Label>
-                <Select value={complexityLevel} onValueChange={(value: ExplainConceptInput['complexityLevel']) => setComplexityLevel(value)}>
-                    <SelectTrigger id="complexity-select" className="h-10 md:h-11">
-                        <SelectValue placeholder="Select complexity" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="simple">Simple</SelectItem>
-                        <SelectItem value="detailed">Detailed</SelectItem>
-                        <SelectItem value="expert">Expert</SelectItem>
-                    </SelectContent>
-                </Select>
-            </div>
-            <div className="space-y-2">
-                <Label htmlFor="max-slides-input">Max Slides (1-10)</Label>
-                <Input
-                    id="max-slides-input"
-                    type="number"
-                    value={maxSlides}
-                    onChange={(e) => {
-                        const val = parseInt(e.target.value);
-                        if(val >= 1 && val <=10) setMaxSlides(val);
-                        else if (e.target.value === "") setMaxSlides(1);
-                    }}
-                    min="1"
-                    max="10"
-                    className="h-10 md:h-11"
-                />
-            </div>
+          <div className="space-y-2"> {/* Changed from grid to simple stack as maxSlides is removed */}
+            <Label htmlFor="complexity-select">Complexity Level</Label>
+            <Select value={complexityLevel} onValueChange={(value: ExplainConceptInput['complexityLevel']) => setComplexityLevel(value)}>
+                <SelectTrigger id="complexity-select" className="h-10 md:h-11">
+                    <SelectValue placeholder="Select complexity" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="simple">Simple</SelectItem>
+                    <SelectItem value="detailed">Detailed</SelectItem>
+                    <SelectItem value="expert">Expert</SelectItem>
+                </SelectContent>
+            </Select>
           </div>
+          {/* Max Slides input removed */}
 
-          <Button onClick={handleExplainConcept} disabled={isGenerating} className="w-full md:w-auto hover:glow-primary focus-visible:glow-primary text-sm md:text-base py-2.5 md:py-3">
+          <Button onClick={() => handleExplainConcept(conceptInput)} disabled={isGenerating} className="w-full md:w-auto hover:glow-primary focus-visible:glow-primary text-sm md:text-base py-2.5 md:py-3">
             {isGenerating ? <Loader2 className="mr-2 h-4 w-4 md:h-5 md:w-5 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4 md:h-5 md:w-5" />}
             {isGenerating ? 'Explaining...' : 'Explain Concept'}
           </Button>
