@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -16,7 +15,7 @@ import {
   SidebarMenuButton,
   SidebarInset,
 } from '@/components/ui/sidebar';
-import { LayoutDashboard, User, Image as ImageIcon, Settings, LogIn, LogOut, GitGraph } from 'lucide-react'; // Added GitGraph
+import { LayoutDashboard, User, Image as ImageIcon, Settings, LogIn, LogOut, GitGraph, BookOpen } from 'lucide-react'; // Added GitGraph, BookOpen
 import { Button } from '@/components/ui/button';
 import { usePathname } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
@@ -124,6 +123,18 @@ export function MainLayout({ children }: MainLayoutProps) {
                     >
                         <GitGraph />
                         <span className="group-data-[state=collapsed]:hidden">Diagram Generator</span>
+                    </SidebarMenuButton>
+                 </Link>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                 <Link href="/ai-tools/concept-explainer" passHref legacyBehavior>
+                    <SidebarMenuButton
+                        isActive={pathname === '/ai-tools/concept-explainer'}
+                        tooltip="AI Concept Explainer"
+                        className="text-sidebar-foreground hover:bg-sidebar-accent data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground"
+                    >
+                        <BookOpen />
+                        <span className="group-data-[state=collapsed]:hidden">Concept Explainer</span>
                     </SidebarMenuButton>
                  </Link>
               </SidebarMenuItem>
