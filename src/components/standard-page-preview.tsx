@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useState } from 'react';
@@ -44,7 +43,7 @@ const getStaticPlaceholderContent = (pageName: string, project: Project): string
               ${(project.teamDetails?.split('\n').filter(Boolean).map(line => `${line}<br>`).join('')) || '[Team Member Names & Enrollment Numbers Placeholder]'}
             </div>
             <p style="font-size: 12pt; margin-bottom: 5px;"><em>In partial fulfillment for the award of the degree of</em></p>
-            <p style="font-size: 16pt; font-weight: bold; margin-bottom: 5px;">${project.degree || 'Bachelor of Engineering'}</p>
+            <p style="font-size: 16pt; font-weight: bold; margin-bottom: 5px;">${project.degree || '[Degree Placeholder]'}</p>
             <p style="font-size: 12pt; margin-bottom: 5px;"><em>In</em></p>
             <p style="font-size: 14pt; font-weight: bold; margin-bottom: 20px;">${project.branch || '[Branch Placeholder]'}</p>
             <p style="font-size: 12pt; margin-bottom: 5px;"><em>At</em></p>
@@ -52,7 +51,7 @@ const getStaticPlaceholderContent = (pageName: string, project: Project): string
             ${project.universityName ? `<p style="font-size: 12pt; margin-bottom: 30px;">(Affiliated to ${project.universityName})</p>` : '<div style="margin-bottom: 30px;"></div>'}
           </div>
           <div style="margin-top: auto;">
-            <p style="font-size: 12pt;">${project.submissionDate || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+            <p style="font-size: 12pt;">${project.submissionDate || '[Submission Date Placeholder]'}</p>
           </div>
         </div>
       `;
@@ -69,7 +68,7 @@ const getStaticPlaceholderContent = (pageName: string, project: Project): string
           <div style="font-size: 12pt; font-weight: bold; margin-bottom: 20px; text-align: center;">
             ${(project.teamDetails?.split('\n').filter(Boolean).map(line => `${line}<br>`).join('')) || '[Team Member Names & Enrollment Numbers Placeholder]'}
           </div>
-          <p style="font-size: 12pt; line-height: 1.6; text-align: justify; margin-bottom: 30px;">in partial fulfillment of the requirements for the award of the degree of <strong>${project.degree || 'Bachelor of Engineering'}</strong> in <strong>${project.branch || '[Branch Placeholder]'}</strong> during the academic year ${project.submissionYear || new Date().getFullYear().toString()}.</p>
+          <p style="font-size: 12pt; line-height: 1.6; text-align: justify; margin-bottom: 30px;">in partial fulfillment of the requirements for the award of the degree of <strong>${project.degree || '[Degree Placeholder]'}</strong> in <strong>${project.branch || '[Branch Placeholder]'}</strong> during the academic year ${project.submissionYear || '[Submission Year Placeholder]'}.</p>
           <div style="display: flex; justify-content: space-between; margin-top: 70px; font-size: 12pt;">
             <div style="text-align: left;">
               <div style="height: 30px;"></div><hr style="border-top: 1px solid #000; width: 150px; margin-bottom: 5px;">
@@ -82,6 +81,74 @@ const getStaticPlaceholderContent = (pageName: string, project: Project): string
           </div>
         </div>
       `;
+     case 'Declaration':
+        const teamMembers = project.teamDetails?.split('\n').filter(Boolean) || [];
+        const pronoun = teamMembers.length > 1 ? "We" : "I";
+        const objectPronoun = teamMembers.length > 1 ? "us" : "me";
+        return `
+            <div style="font-family: 'Times New Roman', serif; padding: 20px; margin: 20px; page-break-after: always;">
+            <h1 style="text-align: center; font-size: 20pt; font-weight: bold; margin-bottom: 40px; text-decoration: underline;">DECLARATION</h1>
+            <p style="font-size: 12pt; line-height: 1.8; text-align: justify; margin-bottom: 20px;">
+            ${pronoun}, the undersigned, hereby declare that the project report entitled
+            </p>
+            <p style="font-size: 14pt; font-weight: bold; text-align: center; margin-bottom: 20px;">
+            "${project.title || '[Project Title Placeholder]'}"
+            </p>
+            <p style="font-size: 12pt; line-height: 1.8; text-align: justify; margin-bottom: 20px;">
+            submitted for the degree of <strong>${project.degree || '[Degree Placeholder]'}</strong> in <strong>${project.branch || '[Branch Placeholder]'}</strong> at <strong>${project.instituteName || '[Institute Name Placeholder]'}</strong>, is a record of original work done by ${objectPronoun}. This work has not been submitted in part or full for any other degree or diploma of any university or institution.
+            </p>
+            <br><br><br>
+            <div style="font-size: 12pt; margin-top: 50px;">
+            ${teamMembers.length > 0 ? teamMembers.map(member => `<div style="margin-bottom: 30px; display: flex; justify-content: space-between; align-items: flex-end;"><span style="min-width: 250px;">${member}</span><span style="border-bottom: 1px solid #000; width: 200px; text-align: right; padding-bottom: 2px;">(Signature)</span></div>`).join('') : `<div style="margin-bottom: 30px; display: flex; justify-content: space-between; align-items: flex-end;"><span style="min-width: 250px;">[Team Member Name & Enrollment Placeholder]</span><span style="border-bottom: 1px solid #000; width: 200px; text-align: right; padding-bottom: 2px;">(Signature)</span></div>`}
+            </div>
+            <br>
+            <p style="font-size: 12pt; margin-top: 30px; text-align: left;">Date: ${project.submissionDate || '[Submission Date Placeholder]'}</p>
+            <p style="font-size: 12pt; text-align: left;">Place: [City/Town Placeholder]</p>
+            </div>
+        `;
+    case 'Abstract':
+        return `
+          <div style="font-family: 'Times New Roman', serif; padding: 20px; margin: 20px; page-break-after: always;">
+          <h1 style="text-align: center; font-size: 20pt; font-weight: bold; margin-bottom: 30px; text-decoration: underline;">ABSTRACT</h1>
+          <p style="font-size: 12pt; line-height: 1.8; text-align: justify; text-indent: 30px;">
+            ${project.projectContext && project.projectContext.length >= 50 ? '[Abstract content will be generated by AI. Please click "Generate with AI".]' : '[Abstract content cannot be generated due to insufficient project context. Please provide more details in Project Details section.]'}
+          </p>
+          <br><br>
+          <p style="font-size: 12pt; font-weight: bold;">Keywords: <span style="font-weight: normal;">${project.projectContext && project.projectContext.length >= 50 ? '[Keywords will be suggested by AI]' : '[Keywords placeholder - add 3-5 relevant keywords]'}</span></p>
+          </div>
+        `;
+    case 'Acknowledgement':
+        const ackTeamMembers = project.teamDetails?.split('\n').filter(Boolean) || [];
+        const ackPronoun = ackTeamMembers.length > 1 ? "We" : "I";
+        const ackPossessivePronoun = ackTeamMembers.length > 1 ? "our" : "my";
+        const ackVerbOwe = ackTeamMembers.length > 1 ? "owe" : "owe"; // "I owe" / "We owe" - simple case
+        const ackVerbAm = ackTeamMembers.length > 1 ? "are" : "am";
+        const ackVerbWish = ackTeamMembers.length > 1 ? "wish" : "wish";
+
+
+        return `
+            <div style="font-family: 'Times New Roman', serif; padding: 20px; margin: 20px; page-break-after: always;">
+            <h1 style="text-align: center; font-size: 20pt; font-weight: bold; margin-bottom: 30px; text-decoration: underline;">ACKNOWLEDGEMENT</h1>
+            <p style="font-size: 12pt; line-height: 1.8; text-align: justify; text-indent: 30px; margin-bottom: 15px;">
+            ${ackPronoun} would like to express ${ackPossessivePronoun} sincere gratitude to all those who have helped ${ackPronoun} in the successful completion of this project. This project has taken a lot of time and work on ${ackPossessivePronoun} part. However, it would not have been possible without the kind support and cooperation of many individuals and organizations.
+            </p>
+            <p style="font-size: 12pt; line-height: 1.8; text-align: justify; text-indent: 30px; margin-bottom: 15px;">
+            ${ackPronoun} ${ackVerbOwe} a lot to ${project.guideName || '[Guide Name Placeholder]'} for ${ackPossessivePronoun} guidance and constant supervision, as well as for providing important project specifics and invaluable support throughout the course of this project.
+            </p>
+            <p style="font-size: 12pt; line-height: 1.8; text-align: justify; text-indent: 30px; margin-bottom: 15px;">
+            ${ackPronoun} ${ackVerbAm} thankful to the <strong>${project.instituteName || '[Institute Name Placeholder]'}</strong> and the Department of <strong>${project.branch || '[Branch Placeholder]'}</strong> for providing all the necessary facilities and a conducive environment for the project work.
+            ${project.hodName ? `To the Head of the Department, Prof. ${project.hodName}, ${ackPronoun} would like to express ${ackPossessivePronoun} gratitude for his/her cordial collaboration and support in ${ackPossessivePronoun} endeavor.` : ''}
+            </p>
+            ${project.additionalThanks ? `<p style="font-size: 12pt; line-height: 1.8; text-align: justify; text-indent: 30px; margin-bottom: 15px;">${ackPronoun} would also like to extend ${ackPossessivePronoun} thanks to ${project.additionalThanks}.</p>` : ''}
+            <p style="font-size: 12pt; line-height: 1.8; text-align: justify; text-indent: 30px; margin-bottom: 15px;">
+            Finally, ${ackPronoun} ${ackVerbWish} to thank ${ackPossessivePronoun} friends and family for their encouragement and support.
+            </p>
+            <br><br>
+            <div style="font-size: 12pt; margin-top: 40px; text-align: right;">
+            ${ackTeamMembers.length > 0 ? ackTeamMembers.map(member => `<div style="margin-bottom: 5px;"><strong>${member}</strong></div>`).join('') : `<div style="margin-bottom: 5px;"><strong>[Team Member Name(s) & Enrollment Placeholder(s)]</strong></div>`}
+            </div>
+            </div>
+        `;
     default:
       return `
         <div class="flex flex-col items-center justify-center text-center text-muted-foreground p-4 h-full">
@@ -105,7 +172,7 @@ export const StandardPagePreview: React.FC<StandardPagePreviewProps> = ({ pageNa
   useEffect(() => {
     setGeneratedContent(null);
     setError(null);
-  }, [pageName, project.title, project.projectContext, project.teamDetails, project.instituteName, project.branch, project.guideName, project.hodName, project.universityLogoUrl, project.collegeLogoUrl]);
+  }, [pageName, project.title, project.projectContext, project.teamDetails, project.instituteName, project.branch, project.guideName, project.hodName, project.universityLogoUrl, project.collegeLogoUrl, project.degree, project.submissionDate, project.submissionYear, project.keyFindings, project.additionalThanks, project.universityName]);
 
   const aiGeneratablePages = ["Cover Page", "Certificate", "Declaration", "Abstract", "Acknowledgement"];
   const canAiGenerate = aiGeneratablePages.includes(pageName);
@@ -122,13 +189,13 @@ export const StandardPagePreview: React.FC<StandardPagePreviewProps> = ({ pageNa
           result = await generateCoverPageAction({
             projectTitle: project.title,
             teamDetails: project.teamDetails || "",
+            degree: project.degree || "Bachelor of Engineering",
             branch: project.branch || "",
             instituteName: project.instituteName || "",
+            universityName: project.universityName,
+            submissionDate: project.submissionDate || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
             universityLogoUrl: project.universityLogoUrl,
             collegeLogoUrl: project.collegeLogoUrl,
-            degree: project.degree || "Bachelor of Engineering",
-            submissionDate: project.submissionDate || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
-            universityName: project.universityName
           });
           if (result && result.coverPageMarkdown) setGeneratedContent(result.coverPageMarkdown);
           break;
@@ -136,13 +203,13 @@ export const StandardPagePreview: React.FC<StandardPagePreviewProps> = ({ pageNa
           result = await generateCertificateAction({
             projectTitle: project.title,
             teamDetails: project.teamDetails || "",
+            degree: project.degree || "Bachelor of Engineering",
             branch: project.branch || "",
             instituteName: project.instituteName || "",
-            guideName: project.guideName || "[Guide Name]",
-            hodName: project.hodName,
-            collegeLogoUrl: project.collegeLogoUrl,
-            degree: project.degree || "Bachelor of Engineering",
+            guideName: project.guideName || "[Guide Name Placeholder]",
+            hodName: project.hodName, // Pass hodName, flow handles placeholder if undefined
             submissionYear: project.submissionYear || new Date().getFullYear().toString(),
+            collegeLogoUrl: project.collegeLogoUrl,
           });
           if (result && result.certificateMarkdown) setGeneratedContent(result.certificateMarkdown);
           break;
@@ -150,33 +217,30 @@ export const StandardPagePreview: React.FC<StandardPagePreviewProps> = ({ pageNa
           result = await generateDeclarationAction({
             projectTitle: project.title,
             teamDetails: project.teamDetails || "",
+            degree: project.degree || "Bachelor of Engineering",
             branch: project.branch || "",
             instituteName: project.instituteName || "",
-            degree: project.degree || "Bachelor of Engineering",
             submissionDate: project.submissionDate || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
           });
           if (result && result.declarationMarkdown) setGeneratedContent(result.declarationMarkdown);
           break;
         case "Abstract":
-          if (!project.projectContext?.trim()) {
-            throw new Error("Project context is required to generate an abstract.");
-          }
           result = await generateAbstractAction({
             projectTitle: project.title,
-            projectContext: project.projectContext,
-            keyFindings: project.keyFindings // Assuming project type has keyFindings
+            projectContext: project.projectContext || "", // Pass empty if undefined
+            keyFindings: project.keyFindings
           });
           if (result && result.abstractMarkdown) setGeneratedContent(result.abstractMarkdown);
           break;
         case "Acknowledgement":
           result = await generateAcknowledgementAction({
             projectTitle: project.title,
-            guideName: project.guideName || "[Guide Name]",
+            guideName: project.guideName || "[Guide Name Placeholder]",
             instituteName: project.instituteName || "",
             branch: project.branch || "",
             hodName: project.hodName,
             teamDetails: project.teamDetails || "",
-            additionalThanks: project.additionalThanks // Assuming project type has additionalThanks
+            additionalThanks: project.additionalThanks
           });
           if (result && result.acknowledgementMarkdown) setGeneratedContent(result.acknowledgementMarkdown);
           break;
@@ -185,7 +249,7 @@ export const StandardPagePreview: React.FC<StandardPagePreviewProps> = ({ pageNa
       }
 
       if (result && result.error) {
-          throw new Error(result.error);
+          throw new Error(result.error); // Throw the error message from the server action
       }
       toast({ title: `${pageName} Content Generated`, description: "AI has generated the content for this page." });
 
@@ -213,8 +277,7 @@ export const StandardPagePreview: React.FC<StandardPagePreviewProps> = ({ pageNa
           </div>
           {canAiGenerate && (
             <Button onClick={handleGenerateWithAi} disabled={isLoading} size="sm" className="hover:glow-primary focus-visible:glow-primary w-full sm:w-auto mt-2 sm:mt-0">
-              {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
-              {isLoading ? `Generating ${pageName}...` : `Generate ${pageName} with AI`}
+              {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> AI is preparing {pageName.toLowerCase()}...</> : <><Wand2 className="mr-2 h-4 w-4" /> Generate {pageName} with AI</>}
             </Button>
           )}
         </div>

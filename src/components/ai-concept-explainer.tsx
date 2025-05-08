@@ -120,7 +120,7 @@ export const AiConceptExplainer: React.FC<AiConceptExplainerProps> = ({
       <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl h-[80vh] sm:h-[85vh] flex flex-col p-0">
         <DialogHeader className="p-4 sm:p-6 border-b flex-shrink-0">
           <DialogTitle className="text-lg sm:text-xl md:text-2xl text-primary">
-            {isLoading ? 'Generating Explanation...' : `AI Explanation: ${explanation?.conceptTitle || 'Concept'}`}
+            {isLoading ? 'AI is explaining...' : `AI Explanation: ${explanation?.conceptTitle || 'Concept'}`}
           </DialogTitle>
           {!isLoading && explanation && (
             <DialogDescription className="text-xs sm:text-sm">
@@ -133,7 +133,7 @@ export const AiConceptExplainer: React.FC<AiConceptExplainerProps> = ({
           {isLoading ? (
             <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
               <Loader2 className="w-12 h-12 sm:w-16 sm:w-16 animate-spin text-primary mb-4" />
-              <p className="text-sm sm:text-base">AI is thinking... Please wait.</p>
+              <p className="text-sm sm:text-base">AI is crafting the explanation... Please wait.</p>
             </div>
           ) : !explanation || totalSlides === 0 || !currentSlide ? (
             <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
@@ -165,7 +165,7 @@ export const AiConceptExplainer: React.FC<AiConceptExplainerProps> = ({
                 {currentSlide.isImageLoading && (
                   <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t text-center">
                     <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
-                    <p className="text-sm text-muted-foreground mt-2">Generating image for this slide...</p>
+                    <p className="text-sm text-muted-foreground mt-2">AI is generating image for this slide...</p>
                   </div>
                 )}
 

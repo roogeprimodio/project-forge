@@ -11,17 +11,18 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, Eye, Projector, BrainCircuit, Plus, Minus, CheckCircle, Edit3, ChevronRight, BookOpen, HelpCircle } from 'lucide-react';
 import Link from 'next/link';
-import type { Project, HierarchicalProjectSection, GeneratedSectionOutline, SectionIdentifier, OutlineSection, ExplainConceptOutput } from '@/types/project'; // Use hierarchical type
+import type { Project, HierarchicalProjectSection, GeneratedSectionOutline, SectionIdentifier, OutlineSection, ExplainConceptOutput } from '@/types/project';
 import { findSectionById, updateSectionById, deleteSectionById, STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, TOC_SECTION_NAME, ensureDefaultSubSection, getSectionNumbering } from '@/lib/project-utils';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { useToast } from '@/hooks/use-toast';
 import { generateSectionAction, summarizeSectionAction, generateOutlineAction, suggestImprovementsAction, generateDiagramAction, explainConceptAction } from '@/app/actions';
 import type { GenerateDiagramMermaidInput } from '@/ai/flows/generate-diagram-mermaid';
-import { ExplainConceptInput } from '@/ai/flows/explain-concept-flow';
+import type { ExplainConceptInput } from '@/ai/flows/explain-concept-flow';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { marked } from 'marked';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { v4 as uuidv4 } from 'uuid';
 import AiDiagramGenerator from '@/components/ai-diagram-generator';
@@ -33,7 +34,9 @@ import MarkdownPreview from '@/components/markdown-preview';
 import { CombinedSectionPreview } from '@/components/combined-section-preview';
 import { StandardPagePreview } from '@/components/standard-page-preview';
 import { MarkdownToolbar } from '@/components/markdown-toolbar';
-import { AiConceptExplainer } from './ai-concept-explainer'; // Import the new component
+import { AiConceptExplainer } from '@/components/ai-concept-explainer';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
 
 // Recursive component to render the preview outline
 const OutlinePreviewItem: React.FC<{ item: OutlineSection; level: number }> = ({ item, level }) => {
@@ -175,13 +178,14 @@ const LogoUpload = ({
     );
 };
 
-const CounterInput = ({ label, value, onChange, onBlur, min = 0, inputId }: {
+const CounterInput = ({ label, value, onChange, onBlur, min = 0, inputId, tooltipText }: {
     label: string;
     value: number;
     onChange: (value: number) => void;
     onBlur?: () => void;
     min?: number;
     inputId: string;
+    tooltipText?: string;
 }) => {
     const handleIncrement = () => onChange(value + 1);
     const handleDecrement = () => onChange(Math.max(min, value - 1));
@@ -195,9 +199,21 @@ const CounterInput = ({ label, value, onChange, onBlur, min = 0, inputId }: {
         }
     };
 
-    return (
+    const content = (
         <div>
-            <Label htmlFor={inputId}>{label}</Label>
+            <Label htmlFor={inputId} className="flex items-center gap-1">
+                {label}
+                {tooltipText && (
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-xs">
+                            <p>{tooltipText}</p>
+                        </TooltipContent>
+                    </Tooltip>
+                )}
+            </Label>
             <div className="flex items-center gap-1 mt-1">
                 <Button
                     type="button"
@@ -231,6 +247,8 @@ const CounterInput = ({ label, value, onChange, onBlur, min = 0, inputId }: {
             </div>
         </div>
     );
+    
+    return tooltipText ? <TooltipProvider>{content}</TooltipProvider> : content;
 };
 
 
@@ -259,17 +277,17 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const [isDraggingFab, setIsDraggingFab] = useState(false);
   const fabRef = useRef<HTMLButtonElement>(null);
   const dragOffset = useRef({ x: 0, y: 0 });
-  const [isGeneratingDiagram, setIsGeneratingDiagram] = useState(false);
-  const [sectionToDelete, setSectionToDelete] = useState<string | null>(null);
+    const [isGeneratingDiagram, setIsGeneratingDiagram] = useState(false);
+    const [sectionToDelete, setSectionToDelete] = useState<string | null>(null);
   const contentTextAreaRef = useRef<HTMLTextAreaElement>(null);
+
   const [activeSubSectionId, setActiveSubSectionId] = useState<string | null>(null);
 
-  // State for AI Concept Explainer
+    // State for AI Concept Explainer
   const [isExplainerOpen, setIsExplainerOpen] = useState(false);
   const [conceptToExplain, setConceptToExplain] = useState('');
   const [explanationOutput, setExplanationOutput] = useState<ExplainConceptOutput | null>(null);
   const [isExplainingConcept, setIsExplainingConcept] = useState(false);
-
 
   useEffect(() => {
     setHasMounted(true);
@@ -432,7 +450,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         toast({ variant: 'destructive', title: 'Invalid File Type', description: 'Please upload an image file.' });
         return;
     }
-    const maxSizeInBytes = 2 * 1024 * 1024; // 2MB
+    const maxSizeInBytes = 2 * 1024 * 1024;
     if (file.size > maxSizeInBytes) {
          toast({ variant: 'destructive', title: 'File Too Large', description: `Image must be smaller than ${maxSizeInBytes / (1024 * 1024)}MB.` });
         return;
@@ -987,6 +1005,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                              onBlur={handleProjectDetailBlur}
                              min={1}
                              inputId="min-sections-counter"
+                             tooltipText="Minimum number of top-level sections the AI should generate for the outline."
                          />
                          <CounterInput
                              label="Max Sub-Section Depth"
@@ -995,9 +1014,10 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                              onBlur={handleProjectDetailBlur}
                              min={0}
                              inputId="max-subsection-depth-counter"
+                             tooltipText="Maximum nesting level for sub-sections (e.g., 2 means up to 1.1.1)."
                          />
                      </div>
-                     <p className="text-xs text-muted-foreground -mt-4">Control AI outline generation limits. Min sections aims for at least this many top-level sections. Max depth limits sub-section nesting (0=none, 1=1.1, 2=1.1.1).</p>
+                     <p className="text-xs text-muted-foreground -mt-4">Control AI outline generation limits.</p>
 
                     <div className="grid grid-cols-2 gap-4 md:gap-6">
                         <LogoUpload label="University Logo" logoUrl={project.universityLogoUrl} field="universityLogoUrl" onUpload={handleLogoUpload} onRemove={handleRemoveLogo} isUploading={isUploadingLogo.universityLogoUrl} />
@@ -1023,8 +1043,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 </CardContent>
                 <CardFooter className="flex flex-col items-start gap-4">
                      <Button variant="default" size="sm" onClick={handleGenerateTocClick} disabled={isGeneratingOutline || isGenerating || isSummarizing || isSuggesting || !project.projectContext?.trim()} className="hover:glow-primary focus-visible:glow-primary">
-                        {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
-                        {isGeneratingOutline ? 'Generating Outline...' : 'Generate Outline Preview'}
+                        {isGeneratingOutline ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> AI is outlining sections...</> : <><Lightbulb className="mr-2 h-4 w-4" /> Generate Outline Preview</>}
                      </Button>
                      {previewedOutline && (
                          <div className="w-full p-4 border rounded-md bg-muted/30 space-y-3">
@@ -1070,10 +1089,9 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                      </CardHeader>
                      <CardContent className="space-y-4">
                        <p className="text-sm text-muted-foreground">Use the AI generator below to create the diagram content. The generated Mermaid code will be stored.</p>
-                       <AiDiagramGenerator onDiagramGenerated={handleDiagramGeneratedInSection} projectContext={project.projectContext}/>
+                       <AiDiagramGenerator onDiagramGenerated={handleDiagramGeneratedInSection} />
                        <Button onClick={() => handleGenerateSection(currentActiveSubSection.id)} disabled={isGeneratingDiagram || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting} className="hover:glow-primary focus-visible:glow-primary mt-2">
-                         {isGeneratingDiagram ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BrainCircuit className="mr-2 h-4 w-4" />}
-                         {isGeneratingDiagram ? 'Generating Diagram...' : 'Generate/Update Diagram with AI'}
+                         {isGeneratingDiagram ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> AI is generating diagram...</> : <><BrainCircuit className="mr-2 h-4 w-4" /> Generate/Update Diagram with AI</>}
                        </Button>
                         {currentActiveSubSection.content && (
                            <div className="mt-4 space-y-2">
@@ -1105,8 +1123,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                           <Textarea id={`section-prompt-${currentActiveSubSection.id}`} value={currentActiveSubSection.prompt} onChange={(e) => handleSectionPromptChange(currentActiveSubSection.id, e.target.value)} onBlur={handleSectionPromptBlur} placeholder="Instructions for the AI to generate content for this sub-section..." className="mt-1 min-h-[100px] font-mono text-sm focus-visible:glow-primary" />
                         </div>
                         <Button onClick={() => handleGenerateSection(currentActiveSubSection.id)} disabled={isGenerating || isSummarizing || isGeneratingOutline || isSuggesting || isGeneratingDiagram} className="hover:glow-primary focus-visible:glow-primary">
-                          {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
-                          {isGenerating ? 'Generating...' : 'Generate Content'}
+                          {isGenerating ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> AI is writing...</> : <><Wand2 className="mr-2 h-4 w-4" /> Generate Content</>}
                         </Button>
                       </CardContent>
                     </Card>
@@ -1143,8 +1160,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                              <HelpCircle className="mr-1 h-3 w-3 sm:h-4 sm:w-4" /> Explain Selected Text
                           </Button>
                          <Button variant="outline" size="sm" onClick={() => handleSummarizeSection(currentActiveSubSection.id)} disabled={isSummarizing || isGenerating || isGeneratingOutline || isSuggesting || !currentActiveSubSection.content?.trim()} className="hover:glow-accent focus-visible:glow-accent">
-                           {isSummarizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ScrollText className="mr-2 h-4 w-4" />}
-                           {isSummarizing ? 'Summarizing...' : 'Summarize'}
+                           {isSummarizing ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> AI is summarizing...</> : <><ScrollText className="mr-2 h-4 w-4" /> Summarize</>}
                          </Button>
                        </CardFooter>
                     </Card>
@@ -1174,8 +1190,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                       <CardContent className="mt-4 space-y-4">
                          <p className="text-sm">Go to <Button variant="link" className="p-0 h-auto text-base" onClick={() => handleSetActiveSection(String(-1))}>Project Details</Button>, provide context, then click "Generate Outline Preview".</p>
                         <Button variant="default" size="sm" onClick={handleGenerateTocClick} disabled={isGeneratingOutline || isGenerating || isSummarizing || isSuggesting || !project.projectContext?.trim()} className="hover:glow-primary focus-visible:glow-primary">
-                          {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
-                          {isGeneratingOutline ? 'Generating Outline...' : 'Generate Outline Preview'}
+                          {isGeneratingOutline ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> AI is outlining sections...</> : <><Lightbulb className="mr-2 h-4 w-4" /> Generate Outline Preview</>}
                         </Button>
                         <p className="text-xs text-muted-foreground mt-3">The AI will create a proposed outline based on your project context.</p>
                       </CardContent>
@@ -1276,8 +1291,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                         <Input id="suggestion-input" value={suggestionInput} onChange={(e) => setSuggestionInput(e.target.value)} placeholder="e.g., Improve flow, Check clarity, Add technical details..." className="mt-1 focus-visible:glow-primary" />
                     </div>
                     <Button onClick={handleGetSuggestions} disabled={isSuggesting || isGenerating || isSummarizing || isGeneratingOutline || isGeneratingDiagram} className="hover:glow-primary focus-visible:glow-primary">
-                        {isSuggesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquareQuote className="mr-2 h-4 w-4" />}
-                        {isSuggesting ? 'Getting Suggestions...' : 'Get Suggestions'}
+                        {isSuggesting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> AI is providing suggestions...</> : <><MessageSquareQuote className="mr-2 h-4 w-4" /> Get Suggestions</>}
                     </Button>
                     {suggestions && (
                         <div className="mt-4 p-4 border rounded-md bg-muted/30">
