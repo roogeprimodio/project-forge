@@ -45,7 +45,7 @@ export const AiConceptExplainer: React.FC<AiConceptExplainerProps> = ({
         // Initialize slides with image loading state, preserving previously generated URLs if component reopens for the same explanation
         setSlidesWithImageState(prevSlides => {
           return explanation.slides.map(newSlide => {
-            const existingSlide = prevSlides.find(s => s.title === newSlide.title && s.content === newSlide.content); // Crude check, might need better ID
+            const existingSlide = prevSlides.find(s => s.title === newSlide.title && s.content === newSlide.content && explanation.conceptTitle === s.title); // Crude check, might need better ID
             return {
               ...newSlide,
               generatedImageUrl: existingSlide?.generatedImageUrl || newSlide.generatedImageUrl, // Keep if exists
@@ -113,6 +113,8 @@ export const AiConceptExplainer: React.FC<AiConceptExplainerProps> = ({
     setCurrentSlideIndex((prevIndex) => Math.max(prevIndex - 1, 0));
   };
 
+  const totalSlides = slidesWithImageState.length;
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl h-[80vh] sm:h-[85vh] flex flex-col p-0">
@@ -133,7 +135,7 @@ export const AiConceptExplainer: React.FC<AiConceptExplainerProps> = ({
               <Loader2 className="w-12 h-12 sm:w-16 sm:w-16 animate-spin text-primary mb-4" />
               <p className="text-sm sm:text-base">AI is thinking... Please wait.</p>
             </div>
-          ) : !explanation || slidesWithImageState.length === 0 || !currentSlide ? (
+          ) : !explanation || totalSlides === 0 || !currentSlide ? (
             <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
               <Lightbulb className="w-12 h-12 sm:w-16 sm:w-16 opacity-50 mb-4" />
               <p className="text-sm sm:text-base">No explanation available or AI failed to generate content.</p>
@@ -182,7 +184,7 @@ export const AiConceptExplainer: React.FC<AiConceptExplainerProps> = ({
                   <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t">
                     <h4 className="text-xs sm:text-sm font-medium text-muted-foreground mb-1 sm:mb-2">Generated Image:</h4>
                     <div className="relative w-full max-w-md mx-auto aspect-video rounded-md overflow-hidden border bg-background">
-                       <Image src={currentSlide.generatedImageUrl} alt={`AI generated image for ${currentSlide.title || 'slide'}`} layout="fill" objectFit="contain" />
+                       <Image src={currentSlide.generatedImageUrl} alt={`AI generated image for ${currentSlide.title || 'slide'}`} layout="fill" objectFit="contain" data-ai-hint="concept illustration" />
                     </div>
                   </div>
                 )}
@@ -224,7 +226,7 @@ export const AiConceptExplainer: React.FC<AiConceptExplainerProps> = ({
           )}
         </div>
 
-        {!isLoading && slidesWithImageState.length > 0 && (
+        {!isLoading && totalSlides > 0 && (
           <DialogFooter className="p-4 sm:p-6 border-t flex-shrink-0 flex flex-col sm:flex-row justify-between items-center w-full gap-2">
             <div className="flex items-center gap-2">
                 <Button
@@ -237,12 +239,12 @@ export const AiConceptExplainer: React.FC<AiConceptExplainerProps> = ({
                     <ChevronLeft className="mr-1 h-4 w-4" /> Previous
                 </Button>
                 <div className="text-xs sm:text-sm text-muted-foreground">
-                    Slide {currentSlideIndex + 1} of {slidesWithImageState.length}
+                    Slide {currentSlideIndex + 1} of {totalSlides}
                 </div>
                 <Button
                     variant="default"
                     onClick={goToNextSlide}
-                    disabled={currentSlideIndex === slidesWithImageState.length - 1}
+                    disabled={currentSlideIndex === totalSlides - 1}
                     size="sm"
                     className="h-8 sm:h-9"
                 >
@@ -253,7 +255,7 @@ export const AiConceptExplainer: React.FC<AiConceptExplainerProps> = ({
               <Button
                 variant="outline"
                 onClick={onRegenerate}
-                disabled={isLoading || isGenerating} // Disable if main explanation or current slide image is loading
+                disabled={isLoading || (slidesWithImageState[currentSlideIndex]?.isImageLoading)} // Disable if main explanation or current slide image is loading
                 size="sm"
                 className="h-8 sm:h-9"
               >
