@@ -1,3 +1,4 @@
+
 // src/lib/project-utils.ts
 import type { Project, HierarchicalProjectSection, OutlineSection } from '@/types/project';
 import type React from 'react';
@@ -60,18 +61,18 @@ export const getSectionNumbering = (sections: HierarchicalProjectSection[], targ
 
 
 // Function to ensure a section has a default sub-section if it's meant to hold content but has no explicit sub-sections
-// This logic needs to be smarter: only add a default "Content" sub-section if no other content-bearing sub-sections exist.
-// Diagram/Figure/Table sections are content-bearing.
+// This function is now less relevant as the AI prompt is designed to create rich sub-sections.
+// It might still be useful if a user manually adds a section that should have content.
 export function ensureDefaultSubSection(section: HierarchicalProjectSection, baseNumbering: string): HierarchicalProjectSection {
-    const isContainerSection = !(
+    const isSpecializedItem =
         section.name.toLowerCase().startsWith("diagram:") ||
         section.name.toLowerCase().startsWith("figure:") ||
-        section.name.toLowerCase().startsWith("table:")
-    );
+        section.name.toLowerCase().startsWith("table:") ||
+        section.name.toLowerCase().startsWith("flowchart:");
 
-    // If it's a container and has no subSections, or all its subSections are also containers (unlikely but possible), add a default content sub-section.
-    if (isContainerSection && (!section.subSections || section.subSections.length === 0 || section.subSections.every(ss => !ss.name.match(/^(Diagram:|Figure \d+:|Table \d+:)/i)))) {
-        const defaultSubSectionName = `${baseNumbering ? baseNumbering + ".1" : "1"} ${section.name} - Overview`; // Changed naming
+    // If it's not a specialized item and has no subSections, add a default "Overview" child.
+    if (!isSpecializedItem && (!section.subSections || section.subSections.length === 0)) {
+        const defaultSubSectionName = `${baseNumbering}.1 Overview`;
         return {
             ...section,
             subSections: [
@@ -83,7 +84,6 @@ export function ensureDefaultSubSection(section: HierarchicalProjectSection, bas
                     subSections: [], // Default sub-sections are leaves
                     lastGenerated: undefined,
                 },
-                ...(section.subSections || []), // Append existing non-content subSections if any (though logic above filters this out)
             ],
         };
     }
@@ -105,18 +105,12 @@ export function addSubSectionById(
             let subSectionToAdd: HierarchicalProjectSection = {
                 ...newSubSectionData,
                 id: newSubSectionId,
-                subSections: [],
+                subSections: [], // New sub-items start with no children of their own
                 prompt: newSubSectionData.prompt || `Generate content for ${newSubSectionData.name} as part of ${section.name}.`,
             };
 
-            // If the new sub-section is NOT a diagram/figure/table, ensure it gets a default content part.
-            const isSpecialItem = newSubSectionData.name.toLowerCase().startsWith("diagram:") ||
-                                  newSubSectionData.name.toLowerCase().startsWith("figure:") ||
-                                  newSubSectionData.name.toLowerCase().startsWith("table:");
-            if (!isSpecialItem) {
-                subSectionToAdd = ensureDefaultSubSection(subSectionToAdd, `${currentNumbering}.${(section.subSections || []).length + 1}`);
-            }
-
+            // No longer call ensureDefaultSubSection here when adding.
+            // The user/AI will decide if this new item needs further children.
 
             return {
                 ...section,
@@ -208,18 +202,24 @@ export const updateProject = (
         if (currentProjectIndex !== -1) {
             projectToUpdate = currentProjectsArray[currentProjectIndex];
         } else if (currentProjectState) {
+            // This case might occur if history is ahead of the main 'projects' list
             projectToUpdate = currentProjectState;
         }
+
 
         if (!projectToUpdate) {
             console.error("Project not found in setProjects during update");
             requestAnimationFrame(() => { isUpdatingHistory.current = false; });
             return currentProjectsArray;
         }
-
-        const newProjectState = typeof updatedData === 'function'
+        
+        const newProjectData = typeof updatedData === 'function'
             ? updatedData(projectToUpdate)
-            : { ...projectToUpdate, ...updatedData, updatedAt: new Date().toISOString() };
+            : { ...projectToUpdate, ...updatedData };
+
+        // Always set a new updatedAt timestamp for any meaningful change
+        const newProjectState = { ...newProjectData, updatedAt: new Date().toISOString() };
+
 
         if (saveToHistory) {
             setHistory(prevHistory => {
@@ -230,16 +230,22 @@ export const updateProject = (
                     setHistoryIndex(finalHistory.length - 1);
                     return finalHistory;
                 }
-                setHistoryIndex(newHistorySlice.length - 1); // Ensure index is correct even if no new state added
+                // If the new state is identical to the current history top, don't add a duplicate
+                setHistoryIndex(newHistorySlice.length - 1); 
                 return newHistorySlice;
             });
         } else {
+            // If not saving to history (e.g., intermediate typing), update the current history state
             setHistory(prevHistory => {
                 const newHistory = [...prevHistory];
                 if (historyIndex >= 0 && historyIndex < newHistory.length) {
+                     // Only update if different to avoid re-renders
                     if (JSON.stringify(newHistory[historyIndex]) !== JSON.stringify(newProjectState)) {
                         newHistory[historyIndex] = newProjectState;
                     }
+                } else if (newHistory.length === 0) { // Handle empty history
+                    newHistory.push(newProjectState);
+                    setHistoryIndex(0);
                 }
                 return newHistory;
             });
@@ -247,18 +253,21 @@ export const updateProject = (
 
         const updatedProjectsArray = [...currentProjectsArray];
         if (currentProjectIndex !== -1) {
+             // Only update if different to avoid re-renders
             if (JSON.stringify(updatedProjectsArray[currentProjectIndex]) !== JSON.stringify(newProjectState)) {
-                updatedProjectsArray[currentProjectIndex] = newProjectState;
+                 updatedProjectsArray[currentProjectIndex] = newProjectState;
                 return updatedProjectsArray;
             }
-        } else if (currentProjectState && saveToHistory) {
-             if (!updatedProjectsArray.some(p => p.id === projectId)) {
+        } else if (currentProjectState && saveToHistory) { // Project might not be in 'projects' if coming from history
+             if (!updatedProjectsArray.some(p => p.id === projectId)) { // Add if not present
                 updatedProjectsArray.push(newProjectState);
                 return updatedProjectsArray;
              }
         }
-        return currentProjectsArray; // Return original if no changes to the array itself
+        return currentProjectsArray; 
     });
 
     requestAnimationFrame(() => { isUpdatingHistory.current = false; });
 };
+
+      

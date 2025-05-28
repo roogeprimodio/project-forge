@@ -1,5 +1,5 @@
-// src/components/project-editor.tsx
-"use client";
+
+"use client"; // Keep this if ProjectEditor uses client hooks like useState, useEffect
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
@@ -11,7 +11,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, Eye, Projector, BrainCircuit, Plus, Minus, CheckCircle, Edit3, ChevronRight, BookOpen, HelpCircle, ImageIcon, Table as TableIcon } from 'lucide-react';
 import Link from 'next/link';
-import type { Project, HierarchicalProjectSection, GeneratedSectionOutline, SectionIdentifier, OutlineSection, ExplainConceptOutput } from '@/types/project';
+import type { Project, HierarchicalProjectSection, GeneratedSectionOutline, SectionIdentifier, OutlineSection, ExplainConceptOutput } from '@/types/project'; // Use hierarchical type
 import { findSectionById, updateSectionById, deleteSectionById, STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, TOC_SECTION_NAME, ensureDefaultSubSection, getSectionNumbering, addSubSectionById as addSubSectionUtil } from '@/lib/project-utils';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { useToast } from '@/hooks/use-toast';
@@ -43,7 +43,7 @@ import Image from 'next/image';
 // Recursive component to render the preview outline
 const OutlinePreviewItem: React.FC<{ item: OutlineSection; level: number }> = ({ item, level }) => {
   const hasSubSections = item.subSections && item.subSections.length > 0;
-  const isDiagram = item.name.toLowerCase().startsWith("diagram:") || item.name.toLowerCase().startsWith("figure:") || item.name.toLowerCase().startsWith("table:");
+  const isDiagram = item.name.toLowerCase().startsWith("diagram:") || item.name.toLowerCase().startsWith("figure:") || item.name.toLowerCase().startsWith("table:") || item.name.toLowerCase().startsWith("flowchart:");
 
   return (
     <div className="text-sm">
@@ -511,6 +511,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                  const isDiagram = nameLower.startsWith("diagram:");
                  const isFigure = nameLower.startsWith("figure "); 
                  const isTable = nameLower.startsWith("table:");
+                 const isFlowchart = nameLower.startsWith("flowchart ");
 
                  let promptText = `Generate content for the "${outlineSection.name.trim()}" section.`;
                  if (isDiagram) {
@@ -518,13 +519,17 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                  } else if (isFigure) {
                      promptText = `Provide a detailed description or prompt for an AI to generate an image for: ${outlineSection.name.replace(/^Figure \d+:\s*/i, '').trim()}`;
                  } else if (isTable) {
-                     promptText = `Generate Markdown table data for: ${outlineSection.name.replace(/^Table:\s*/i, '').trim()}`;
-                 } else {
-                     promptText = `Generate the ${outlineSection.name.trim()} section for the project titled "${project.title}". Context: ${project.projectContext || '[No context provided by user]'}. This section is ${currentNumber}.`;
+                     promptText = `Generate Markdown table data for: ${outlineSection.name.replace(/^Table \d+:\s*/i, '').trim()}`;
+                 }  else if (isFlowchart) {
+                    promptText = `Generate Mermaid code for a flowchart: ${outlineSection.name.replace(/^Flowchart \d+:\s*/i, '').trim()}`;
+                } else {
+                     // General content prompt
+                     promptText = `Generate the content for the section titled "${outlineSection.name.trim()}" which is numbered ${currentNumber}. This section is part of the project "${project.title}". The overall project context is: "${project.projectContext || '[No specific context provided by user for the project.]'}". Focus on providing relevant, well-structured information for this specific section.`;
                  }
 
 
                  let subSections: HierarchicalProjectSection[] = [];
+                 // Only create sub-sections if allowed by constraints (if enabled) and if AI provided them
                  if (outlineSection.subSections && (project.isAiOutlineConstrained === false || level < (project.maxSubSectionsPerSection ?? 2))) {
                      subSections = convertOutlineToSections(outlineSection.subSections, level + 1, currentNumber);
                  } else if (outlineSection.subSections) {
@@ -540,7 +545,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                      subSections: subSections,
                  };
 
-
                  return baseSection;
              });
          };
@@ -555,7 +559,12 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         toast({ title: "Sections Updated", description: `Project sections updated with the generated outline. You can now edit individual sections.`, duration: 7000 });
         setPreviewedOutline(null);
 
-        handleSetActiveSection(String(-1));
+        // Reset active section to project details or first section if available
+        if (newSections.length > 0) {
+            handleSetActiveSection(String(-1)); // Or newSections[0].id if preferred
+        } else {
+            handleSetActiveSection(String(-1));
+        }
         setIsMobileSheetOpen(false);
     }, [project, updateProject, toast, handleSetActiveSection, previewedOutline]);
 
@@ -569,11 +578,11 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 projectTitle: project.title,
                 projectContext: project.projectContext || '',
             };
-            if (isAiOutlineConstrained) { // Use current state of the toggle
+            // Only pass constraints if the toggle is ON
+            if (isAiOutlineConstrained) {
                 outlineInput.minSections = project.minSections ?? 5;
                 outlineInput.maxSubSectionsPerSection = project.maxSubSectionsPerSection ?? 2;
             }
-            // If not constrained, minSections and maxSubSectionsPerSection remain undefined, giving AI freedom
 
 
             const result = await generateOutlineAction(outlineInput);
@@ -625,7 +634,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
       if (!project || !targetSection || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting || isGeneratingDiagram || isGeneratingImage) return;
 
         const nameLower = targetSection.name.toLowerCase();
-        const isDiagram = nameLower.startsWith("diagram:");
+        const isDiagram = nameLower.startsWith("diagram:") || nameLower.startsWith("flowchart:");
         const isFigure = nameLower.startsWith("figure ");
         const isTable = nameLower.startsWith("table:");
 
@@ -633,7 +642,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             setIsGeneratingDiagram(true);
             try {
                 const diagramInput: GenerateDiagramMermaidInput = {
-                    description: targetSection.prompt || `Diagram for ${targetSection.name.replace(/^Diagram:\s*/i, '')}`, 
+                    description: targetSection.prompt || `Diagram for ${targetSection.name.replace(/^(Diagram:|Flowchart \d+:)\s*/i, '')}`, 
                 };
                 const result = await generateDiagramAction(diagramInput);
                 if ('error' in result) {
@@ -679,7 +688,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         } else if (isTable) {
              setIsGenerating(true); 
              try {
-                const tablePrompt = targetSection.prompt || `Generate a Markdown table for: ${targetSection.name.replace(/^Table:\s*/i, '')}`;
+                const tablePrompt = targetSection.prompt || `Generate a Markdown table for: ${targetSection.name.replace(/^Table \d+:\s*/i, '')}`;
                 const input = {
                     projectTitle: project.title || 'Untitled Project',
                     sectionName: targetSection.name, 
@@ -771,7 +780,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         if (!project || !targetSection || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting) return;
 
         const nameLower = targetSection.name.toLowerCase();
-        const isDiagram = nameLower.startsWith("diagram:");
+        const isDiagram = nameLower.startsWith("diagram:") || nameLower.startsWith("flowchart:");
         const isFigure = nameLower.startsWith("figure ");
         const isTable = nameLower.startsWith("table:");
 
@@ -818,7 +827,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             const flattenSections = (sections: HierarchicalProjectSection[], level = 0): string => {
                  return sections.map(s => {
                     let sectionStr = `${'#'.repeat(level + 2)} ${s.name}\n\n`;
-                    if (s.name.toLowerCase().startsWith("diagram:")) {
+                    if (s.name.toLowerCase().startsWith("diagram:") || s.name.toLowerCase().startsWith("flowchart:")) {
                         sectionStr += `Mermaid Diagram Code:\n\`\`\`mermaid\n${s.content || '[No diagram code]'}\n\`\`\`\n\n`;
                     } else if (s.name.toLowerCase().startsWith("figure ")) {
                         sectionStr += `Image: ${s.content || '[No image URL or prompt]'}\n\n`;
@@ -900,14 +909,14 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
              lastGenerated: undefined,
              subSections: [], 
          };
-         const sectionWithDefaultSub = ensureDefaultSubSection(newSection, String(newSectionNumber));
-
+         // No longer call ensureDefaultSubSection here for top-level sections;
+         // content will be built from its sub-sections.
 
          updateProject(prev => ({
              ...prev,
-             sections: [...prev.sections, sectionWithDefaultSub],
+             sections: [...prev.sections, newSection], // Add the new section as a container
          }), true);
-         toast({ title: "Section Added", description: `"${sectionWithDefaultSub.name}" added.` });
+         toast({ title: "Section Added", description: `"${newSection.name}" added.` });
          setActiveSectionId(newSection.id); 
          setPreviewedOutline(null);
      };
@@ -926,7 +935,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
         const newSubData: Omit<HierarchicalProjectSection, 'id' | 'subSections'> = {
             name: newSubSectionName,
-            prompt: `Generate content for "${newSubSectionName}".`,
+            prompt: `Generate content for "${newSubSectionName}". This is a sub-item of "${parentSection.name}".`,
             content: "",
         };
 
@@ -964,7 +973,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     if (!project || !activeSectionId) return; 
 
     const targetSection = findSectionById(project.sections, activeSectionId);
-    if (!targetSection || !targetSection.name.toLowerCase().startsWith("diagram:")) return;
+    if (!targetSection || !(targetSection.name.toLowerCase().startsWith("diagram:") || targetSection.name.toLowerCase().startsWith("flowchart:"))) return;
 
     updateProject(prev => ({
         ...prev,
@@ -1007,6 +1016,12 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
   const handleApplyMarkdownFormat = (newContent: string, newCursorPosition?: number) => {
      if (!project || !activeSectionId) return;
+     const currentActive = findSectionById(project.sections, activeSectionId);
+     if (currentActive?.name.toLowerCase().startsWith("diagram:") || currentActive?.name.toLowerCase().startsWith("figure ") || currentActive?.name.toLowerCase().startsWith("table:") || currentActive?.name.toLowerCase().startsWith("flowchart:")) {
+        toast({variant: "destructive", title: "Cannot Edit Directly", description: "Specialized items like diagrams or figures cannot be edited with the Markdown toolbar. Use their specific generation/edit tools."});
+        return;
+     }
+
      handleSectionContentChange(activeSectionId, newContent);
      setTimeout(() => {
        if (contentTextAreaRef.current && newCursorPosition !== undefined) {
@@ -1201,7 +1216,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                              onBlur={handleProjectDetailBlur}
                              min={1}
                              inputId="min-sections-counter"
-                             tooltipText="Minimum TOP-LEVEL sections AI should aim for."
+                             tooltipText="Minimum TOP-LEVEL sections AI should aim for (if constraints enabled)."
                          />
                          <CounterInput
                              label="Max Sub-Section Depth"
@@ -1210,25 +1225,24 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                              onBlur={handleProjectDetailBlur}
                              min={0}
                              inputId="max-subsection-depth-counter"
-                             tooltipText="Max nesting level for sub-sections (e.g., 2 means 1.1.1)."
+                             tooltipText="Max nesting level for sub-sections (e.g., 2 means 1.1.1) (if constraints enabled)."
                          />
                          <div className="flex items-center space-x-2 sm:col-span-2">
                              <Switch
                                  id="ai-outline-constrained-toggle"
-                                 checked={isAiOutlineConstrained}
+                                 checked={project.isAiOutlineConstrained ?? true}
                                  onCheckedChange={(checked) => {
-                                     setIsAiOutlineConstrained(checked);
                                      handleProjectDetailChange('isAiOutlineConstrained', checked);
                                      handleProjectDetailBlur(); // Save this change to history
                                  }}
                                  aria-label="Toggle AI Outline Constraints"
                              />
                              <Label htmlFor="ai-outline-constrained-toggle" className="text-sm cursor-pointer">
-                                 {isAiOutlineConstrained ? "Constrain AI Outline (Uses Counters)" : "AI Freedom for Outline (Ignores Counters)"}
+                                 {project.isAiOutlineConstrained ?? true ? "Constrain AI Outline (Uses Counters)" : "AI Freedom for Outline (Ignores Counters)"}
                              </Label>
                          </div>
                      </div>
-                     <p className="text-xs text-muted-foreground -mt-4 sm:col-span-2">Control AI outline generation parameters.</p>
+                     <p className="text-xs text-muted-foreground -mt-4 sm:col-span-2">Control AI outline generation parameters. When constrained, AI uses the counters. When free, AI uses its judgment based on project context.</p>
 
                     <div className="grid grid-cols-2 gap-4 md:gap-6">
                         <LogoUpload label="University Logo" logoUrl={project.universityLogoUrl} field="universityLogoUrl" onUpload={handleLogoUpload} onRemove={handleRemoveLogo} isUploading={isUploadingLogo.universityLogoUrl} />
@@ -1298,7 +1312,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     } else if (selectedSectionInfo) {
         activeViewName = selectedSectionInfo.name;
         const nameLower = selectedSectionInfo.name.toLowerCase();
-        const isDiagram = nameLower.startsWith("diagram:");
+        const isDiagram = nameLower.startsWith("diagram:") || nameLower.startsWith("flowchart:");
         const isFigure = nameLower.startsWith("figure ");
         const isTable = nameLower.startsWith("table:");
 
@@ -1316,7 +1330,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                        <p className="text-sm text-muted-foreground">Use the AI generator below to create the diagram content. The generated Mermaid code will be stored for this item.</p>
                        <AiDiagramGenerator
                             onDiagramGenerated={handleDiagramGeneratedInSection}
-                            initialDescription={selectedSectionInfo.prompt.replace(/^Generate Mermaid code for:\s*/i, '').trim()}
+                            initialDescription={selectedSectionInfo.prompt.replace(/^(Generate Mermaid code for:|Diagram:|Flowchart \d+:)\s*/i, '').trim()}
                             projectContext={`For project: ${project.title}. Section: ${selectedSectionInfo.name}.`}
                         />
                        <Button onClick={() => handleGenerateSection(selectedSectionInfo.id)} disabled={isGeneratingDiagram || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting} className="hover:glow-primary focus-visible:glow-primary mt-2">
@@ -1686,3 +1700,5 @@ const validateOutlineStructure = (sections: any[] | undefined, currentDepth = 0,
         return true;
     });
 };
+
+      

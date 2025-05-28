@@ -16,7 +16,7 @@ import type { HierarchicalProjectSection } from '@/types/project'; // For the to
 // Recursive schema for sections and sub-sections allowing deeper nesting
 const OutlineSectionSchema: z.ZodType<any> = z.lazy(() =>
     z.object({
-        name: z.string().describe('The full name of the section or sub-section (e.g., "1.1 Background", "1.1.1 Diagram: System Architecture"). Should be descriptive. For diagrams, figures, or tables, use prefixes like "Diagram: ", "Figure X: ", or "Table Y: ". Increment X/Y for each figure/table type independently throughout the entire outline.'),
+        name: z.string().describe('The full name of the section or sub-section (e.g., "1.1 Background", "1.1.1 Diagram: System Architecture"). Should be descriptive. For diagrams, figures, flowcharts, or tables, YOU MUST use prefixes like "Diagram: ", "Figure X: ", "Flowchart Z: ", or "Table Y: ". Increment X, Y, Z for each figure/table/flowchart type independently throughout the entire outline.'),
         subSections: z.array(OutlineSectionSchema).optional().describe('An optional array of sub-sections or items (like diagrams/figures/tables) nested under this section. Allows for multiple levels (e.g., section -> sub-section -> diagram). COMPLETELY OMIT this key if there are no sub-items.'),
     }).describe('A single section or sub-section in the report outline. Sections should be logically ordered.')
 );
@@ -24,13 +24,13 @@ const OutlineSectionSchema: z.ZodType<any> = z.lazy(() =>
 const GenerateProjectOutlineInputSchema = z.object({
   projectTitle: z.string().describe('The title of the project.'),
   projectContext: z.string().describe('A detailed description of the project, its goals, scope, target audience, key features, technologies used, and methodology (if known). More context leads to better outlines.'),
-  minSections: z.number().optional().describe('If provided, the minimum number of TOP-LEVEL sections the AI should aim to generate. This does not count sub-sections or deeply nested items.'),
-  maxSubSectionsPerSection: z.number().optional().describe('If provided, the maximum TOTAL DEPTH of sub-section/item nesting the AI should generate. For example, 0 means no sub-sections (e.g., "1. Intro"). 1 means one level of sub-sections (e.g., "1. Intro" -> "1.1 Background"). 2 means two levels (e.g., "1. Intro" -> "1.1 Background" -> "1.1.1 Diagram: Flow"). Items at the max depth cannot have further subSections.'),
+  minSections: z.number().optional().describe('If provided (constraints enabled), the minimum number of TOP-LEVEL sections the AI should aim to generate. This does not count sub-sections or deeply nested items.'),
+  maxSubSectionsPerSection: z.number().optional().describe('If provided (constraints enabled), the maximum TOTAL DEPTH of sub-section/item nesting the AI should generate. For example, 0 means no sub-sections (e.g., "1. Intro"). 1 means one level of sub-sections (e.g., "1. Intro" -> "1.1 Background"). 2 means two levels (e.g., "1. Intro" -> "1.1 Background" -> "1.1.1 Diagram: Flow"). Items at the max depth cannot have further subSections.'),
 });
 export type GenerateProjectOutlineInput = z.infer<typeof GenerateProjectOutlineInputSchema>;
 
 const GenerateProjectOutlineOutputSchema = z.object({
-  sections: z.array(OutlineSectionSchema).describe('An ordered, hierarchical list of suggested sections and sub-sections for the report. May include items for diagrams/figures/tables (e.g., "Figure 1: Flowchart", "Table 1: Results") nested appropriately.'),
+  sections: z.array(OutlineSectionSchema).describe('An ordered, hierarchical list of suggested sections and sub-sections for the report. Must include items for diagrams/figures/flowcharts/tables (e.g., "Figure 1: Flowchart", "Table 1: Results") nested appropriately within relevant sub-sections.'),
 });
 export type GenerateProjectOutlineOutput = z.infer<typeof GenerateProjectOutlineOutputSchema>;
 
@@ -80,7 +80,6 @@ export async function generateProjectOutline(input: GenerateProjectOutlineInput)
   if (!input.projectContext || input.projectContext.trim().length < 30) {
       console.warn("Project context is very short for outline generation. AI results may be suboptimal.");
   }
-  // Parse with defaults, but the flow will decide if min/max are passed to the prompt
   const parsedInput = GenerateProjectOutlineInputSchema.parse(input);
   return generateProjectOutlineFlow(parsedInput);
 }
@@ -88,7 +87,7 @@ export async function generateProjectOutline(input: GenerateProjectOutlineInput)
 const prompt = ai.definePrompt({
   name: 'generateProjectOutlinePrompt',
   input: {
-    schema: GenerateProjectOutlineInputSchema, // Now minSections and maxSubSectionsPerSection are optional
+    schema: GenerateProjectOutlineInputSchema,
   },
   output: {
     schema: GenerateProjectOutlineOutputSchema,
@@ -109,7 +108,7 @@ The quality, depth, and breadth of this outline are critical.
 {{/if}}
 
 {{#if maxSubSectionsPerSection}}
-2.  **Maximum Nesting Depth:** The absolute maximum *nesting depth* for any item (section, sub-section, diagram, figure, table) is **{{maxSubSectionsPerSection}}**.
+2.  **Maximum Nesting Depth:** The absolute maximum *nesting depth* for any item (section, sub-section, diagram, figure, table, flowchart) is **{{maxSubSectionsPerSection}}**.
     *   Depth 0: Top-level section (e.g., "1. Introduction").
     *   Depth 1: Sub-section of a top-level section (e.g., "1.1 Background").
     *   Depth 2: Sub-sub-item (e.g., "1.1.1 Diagram: Flow", or "3.2.1 Module A: User Auth").
@@ -120,12 +119,13 @@ The quality, depth, and breadth of this outline are critical.
 
 3.  **GENERATION REQUIREMENT: For each main section (e.g., Introduction, Literature Review, Methodology, System Design, Implementation, Results, Discussion, Conclusion, References), you are REQUIRED to generate MULTIPLE (typically 3-5, but adjust based on the topic's breadth and relevance to the project context) distinct and logical sub-sections.** Decompose each main topic thoroughly. A main section having only one sub-section is generally insufficient unless the topic is inherently very narrow.
 
-4.  **DEEP NESTING FOR SPECIALIZED ITEMS:** Sub-sections themselves can, and often should, contain further nested items like diagrams, figures, or tables if relevant. These items are children of their respective sub-sections and contribute to the depth. For example, "1.1 Background" (a sub-section) can have "1.1.1 Diagram: Conceptual Model" as its child.
+4.  **DEEP NESTING FOR SPECIALIZED ITEMS:** Sub-sections themselves can, and often should, contain further nested items like diagrams, figures, flowcharts, or tables if relevant. These items are children of their respective sub-sections and contribute to the depth. For example, "1.1 Background" (a sub-section) can have "1.1.1 Diagram: Conceptual Model" as its child.
 
-5.  **Prefixes for Specialized Items:** When suggesting diagrams, figures, or tables, **YOU MUST** use the following prefixes in their "name" field:
+5.  **Prefixes for Specialized Items:** When suggesting diagrams, figures, flowcharts, or tables, **YOU MUST** use the following prefixes in their "name" field:
     *   "Diagram: [Descriptive Name]" (e.g., "Diagram: User Login Flow")
     *   "Figure X: [Descriptive Name]" (e.g., "Figure 1: System Architecture") - Increment X for each figure throughout the *entire* outline, starting from 1.
     *   "Table Y: [Descriptive Name]" (e.g., "Table 1: Comparison of Algorithms") - Increment Y for each table throughout the *entire* outline, starting from 1.
+    *   "Flowchart Z: [Descriptive Name]" (e.g., "Flowchart 1: User Registration Process") - Increment Z for each flowchart throughout the *entire* outline, starting from 1.
 
 6.  **Numbering:** Include hierarchical numbering in ALL section and sub-item names (e.g., "1.", "1.1", "1.1.1 Figure 1: Architecture", "3.2.1 Table 1: Component APIs").
 
@@ -135,7 +135,7 @@ The quality, depth, and breadth of this outline are critical.
 
 9.  **JSON Output ONLY:** The output MUST be a single, valid JSON object matching the 'GenerateProjectOutlineOutputSchema'. No extra text, explanations, apologies, or markdown formatting outside the JSON structure.
 
-**Example of Desired JSON Output Structure (demonstrating rich sub-sections and nested items):**
+**Example of Desired JSON Output Structure (Follow this structure and level of detail closely):**
 \`\`\`json
 {
   "sections": [
@@ -144,104 +144,129 @@ The quality, depth, and breadth of this outline are critical.
       "subSections": [
         { "name": "1.1 Background and Motivation" },
         { "name": "1.2 Problem Statement" },
-        {
-          "name": "1.3 Project Goals and Objectives",
-          "subSections": [
-            { "name": "1.3.1 Primary Objectives" },
-            { "name": "1.3.2 Secondary Objectives" }
-          ]
-        },
-        { "name": "1.4 Scope and Limitations" },
-        { "name": "1.5 Report Structure Overview" }
+        { "name": "1.3 Project Goals and Objectives" },
+        { "name": "1.4 Research Questions (if applicable)" },
+        { "name": "1.5 Scope and Limitations" },
+        { "name": "1.6 Significance of the Project" },
+        { "name": "1.7 Definitions of Key Terms" },
+        { "name": "1.8 Report Structure Overview" }
       ]
     },
     {
       "name": "2. Literature Review",
       "subSections": [
-        { "name": "2.1 Review of Existing Similar Systems" },
+        { "name": "2.1 Introduction to Literature Review" },
+        { "name": "2.2 Review of Existing Similar Systems/Solutions" },
         {
-          "name": "2.2 Analysis of Relevant Technologies and Frameworks",
+          "name": "2.3 Analysis of Relevant Technologies and Frameworks",
           "subSections": [
-            { "name": "2.2.1 Technology A: Overview" },
-            { "name": "2.2.2 Technology B: Pros and Cons" },
-            { "name": "2.2.3 Table 1: Technology Comparison Matrix" }
+            { "name": "2.3.1 Technology A: Overview and Relevance" },
+            { "name": "2.3.2 Technology B: Pros, Cons, and Suitability" },
+            { "name": "2.3.3 Table 1: Technology Comparison Matrix" }
           ]
         },
-        { "name": "2.3 Identification of Research Gaps" },
-        { "name": "2.4 Summary of Key Findings from Literature" }
+        { "name": "2.4 Discussion of Key Theories and Models" },
+        { "name": "2.5 Identification of Research Gaps" },
+        { "name": "2.6 Summary and Synthesis of Literature" },
+        {
+           "name": "2.7 Visual Aids from Literature",
+           "subSections": [
+               { "name": "2.7.1 Figure 1: Trends in [Relevant Field] (Graph/Image)" }
+           ]
+        }
       ]
     },
     {
-      "name": "3. System Design and Architecture",
+      "name": "3. System Analysis and Requirements",
       "subSections": [
+        { "name": "3.1 Overall System Overview" },
+        { "name": "3.2 Stakeholder Analysis" },
         {
-          "name": "3.1 Overall System Architecture",
+          "name": "3.3 Functional Requirements",
           "subSections": [
-            { "name": "3.1.1 Figure 1: High-Level Architectural Diagram" },
-            { "name": "3.1.2 Figure 2: Data Flow Diagram (DFD)" }
+            { "name": "3.3.1 Requirement FR-001: [Description]" },
+            { "name": "3.3.2 Requirement FR-002: [Description]" }
           ]
         },
         {
-          "name": "3.2 Component Design",
+          "name": "3.4 Non-Functional Requirements",
           "subSections": [
-            { "name": "3.2.1 Module A: User Authentication Design" },
-            { "name": "3.2.2 Module B: Report Generation Engine Design" },
-            { "name": "3.2.3 Table 2: Component Interface Specifications" }
+            { "name": "3.4.1 Performance Requirements" },
+            { "name": "3.4.2 Security Requirements" },
+            { "name": "3.4.3 Usability Requirements" }
           ]
         },
         {
-          "name": "3.3 Database Design (if applicable)",
+          "name": "3.5 Use Case Analysis",
           "subSections": [
-            { "name": "3.3.1 Diagram: Entity-Relationship Diagram (ERD)" }
+            { "name": "3.5.1 Use Case UC-01: [Actor] - [Action]" },
+            { "name": "3.5.2 Figure 2: Overall Use Case Diagram" }
           ]
         },
-        { "name": "3.4 User Interface (UI) Design Principles" }
+        { "name": "3.6 System Constraints" },
+        {
+           "name": "3.7 Supporting Tables and Diagrams",
+           "subSections": [
+               { "name": "3.7.1 Table 2: Requirement Traceability Matrix" },
+               { "name": "3.7.2 Diagram: Stakeholder Interaction Map" }
+           ]
+        }
       ]
     },
     {
-      "name": "4. Implementation",
-       "subSections": [
-          { "name": "4.1 Technology Stack Used" },
-          { "name": "4.2 Development Environment Setup" },
-          {
-            "name": "4.3 Implementation of Key Modules",
-            "subSections": [
-              { "name": "4.3.1 Module A Implementation Details" },
-              { "name": "4.3.2 Figure 3: Screenshot of Core Feature X in Action" }
-            ]
-          },
-          { "name": "4.4 Challenges Encountered and Solutions Implemented" }
-       ]
-    },
-    {
-      "name": "5. Results and Discussion",
+      "name": "4. System Design",
       "subSections": [
-          {
-            "name": "5.1 Presentation of Key Results",
-            "subSections": [
-              { "name": "5.1.1 Table 3: Performance Metrics Summary" },
-              { "name": "5.1.2 Figure 4: Graph Showing Result Trend Y" }
-            ]
-          },
-          { "name": "5.2 Analysis and Interpretation of Results" },
-          { "name": "5.3 Comparison with Project Objectives" },
-          { "name": "5.4 Limitations of the Current Work/Results" }
+        {
+          "name": "4.1 System Architecture",
+          "subSections": [
+            { "name": "4.1.1 Architectural Pattern Chosen (e.g., MVC, Microservices)" },
+            { "name": "4.1.2 Figure 3: High-Level System Architecture Diagram" },
+            { "name": "4.1.3 Figure 4: Component Diagram" }
+          ]
+        },
+        {
+          "name": "4.2 Database Design",
+          "subSections": [
+            { "name": "4.2.1 Figure 5: Entity-Relationship Diagram (ERD)" },
+            { "name": "4.2.2 Table 3: Database Schema - User Table" },
+            { "name": "4.2.3 Table 4: Database Schema - Project Table" }
+          ]
+        },
+        {
+          "name": "4.3 User Interface (UI) / User Experience (UX) Design",
+          "subSections": [
+            { "name": "4.3.1 Figure 6: Wireframe - Home Page" },
+            { "name": "4.3.2 Figure 7: Wireframe - Editor Page" },
+            { "name": "4.3.3 Flowchart 1: User Registration Flow" }
+          ]
+        },
+        {
+          "name": "4.4 Module Design",
+          "subSections": [
+            { "name": "4.4.1 Module A: [Name] - Description and Responsibilities" },
+            { "name": "4.4.2 Module B: [Name] - Description and Responsibilities" },
+            { "name": "4.4.3 Figure 8: Module Interaction Diagram" }
+          ]
+        },
+        {
+          "name": "4.5 Process Flow Design",
+          "subSections": [
+            { "name": "4.5.1 Flowchart 2: Main Report Generation Process" }
+          ]
+        },
+        { "name": "4.6 Security Design Considerations" }
       ]
     },
+    { "name": "5. Implementation Details" },
+    { "name": "6. Testing and Evaluation" },
+    { "name": "7. Results and Discussion" },
+    { "name": "8. Conclusion and Future Work" },
+    { "name": "9. References" },
     {
-      "name": "6. Conclusion and Future Work",
+      "name": "10. Appendices (Optional)",
       "subSections": [
-          { "name": "6.1 Summary of Achievements and Contributions" },
-          { "name": "6.2 Recommendations for Future Enhancements" },
-          { "name": "6.3 Potential Impact of the Project" }
-      ]
-    },
-    { "name": "7. References" },
-    {
-      "name": "8. Appendices (Optional)",
-      "subSections": [
-        { "name": "Appendix A: Survey Questions" },
-        { "name": "Appendix B: Additional Data Tables" }
+        { "name": "Appendix A: Glossary of Terms" },
+        { "name": "Appendix B: User Manual (if applicable)" }
       ]
     }
   ]
@@ -273,8 +298,7 @@ async (input) => {
 
     try {
         const promptInput = { ...input };
-        // If minSections or maxSubSectionsPerSection are undefined (AI freedom toggle is off),
-        // they won't be included in the handlebars templating if block, giving AI freedom.
+        // Only pass constraints if they are provided (i.e., AI is constrained)
         if (input.minSections === undefined) delete promptInput.minSections;
         if (input.maxSubSectionsPerSection === undefined) delete promptInput.maxSubSectionsPerSection;
 
@@ -351,3 +375,4 @@ interface OutlineSection {
     subSections?: OutlineSection[];
 }
     
+      
