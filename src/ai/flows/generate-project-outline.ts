@@ -92,7 +92,7 @@ const prompt = ai.definePrompt({
   output: {
     schema: GenerateProjectOutlineOutputSchema,
   },
-  prompt: `You are an AI expert specializing in structuring detailed and comprehensive academic and technical project reports. Your task is to generate a **thorough, multi-level, and deeply hierarchical** list of section names suitable for a full project report. The quality and depth of this outline are critical.
+  prompt: `You are an AI expert specializing in structuring detailed and comprehensive academic and technical project reports. Your task is to generate a **thorough, multi-level, and deeply hierarchical** list of section names suitable for a full project report. The quality, depth, and breadth of this outline are critical.
 
   **Project Title:** {{{projectTitle}}}
   **Project Context:** {{{projectContext}}}
@@ -100,20 +100,21 @@ const prompt = ai.definePrompt({
   **CRITICAL Generation Constraints & Instructions:**
   1.  **Hierarchical Structure is PARAMOUNT - Strive for Depth and Detail:**
       *   Generate at least **{{minSections}}** TOP-LEVEL sections. These should cover all essential parts of a typical academic/technical report (e.g., Introduction, Literature Review, Methodology, System Design, Implementation, Results, Discussion, Conclusion, References).
-      *   **CRUCIAL & MANDATORY: For standard academic/technical sections like "Introduction", "Literature Review", "Methodology", "System Design/Architecture", "Implementation", "Results", and "Discussion", you MUST generate MULTIPLE (typically 2-4) distinct and logical sub-sections.** Think about what topics typically fall under each of these main headings and break them down accordingly. A top-level section having only one sub-section is generally insufficient unless the topic is extremely narrow.
+      *   **GENERATION REQUIREMENT: For each main section (e.g., Introduction, Methodology, etc.), you are REQUIRED to generate a MINIMUM of 2, and ideally 3 to 5, distinct and logical sub-sections.** Only in extremely rare cases where a main topic is exceptionally narrow should a main section have fewer than 2 sub-sections. Decompose each main topic thoroughly. A flat list of main sections, or main sections with only a single sub-item, is NOT acceptable.
       *   **DEEP NESTING FOR SPECIALIZED ITEMS:** Sub-sections themselves can, and often should, contain further nested items like diagrams, figures, or tables if relevant. These items are children of their respective sub-sections and contribute to the depth. For example, "1.1 Background" (a sub-section) can have "1.1.1 Diagram: Conceptual Model" as its child.
-  2.  **Maximum Nesting Depth:** The absolute maximum nesting depth for any item (section, sub-section, diagram, figure, table) is **{{maxSubSectionsPerSection}}** levels.
+  2.  **Maximum Nesting Depth (\`maxSubSectionsPerSection\`):** The value of **{{maxSubSectionsPerSection}}** refers to the absolute maximum *nesting depth* for any item (section, sub-section, diagram, figure, table).
       *   Depth 0: Top-level section (e.g., "1. Introduction").
       *   Depth 1: Sub-section of a top-level section (e.g., "1.1 Background").
       *   Depth 2: Sub-sub-item (e.g., "1.1.1 Diagram: Flow" or "3.2.1 Module A: User Auth").
       *   An item at the \`maxSubSectionsPerSection\` depth **MUST NOT** have its own "subSections" key or array.
+      *   **DISTINCTION: This \`maxSubSectionsPerSection\` constraint refers to *nesting depth*. This does NOT limit the *number* of sub-sections you can create at any given level (e.g., you can have 1.1, 1.2, 1.3, 1.4, etc., as long as the project context warrants it).**
   3.  **Prefixes for Specialized Items:** When suggesting diagrams, figures, or tables, **YOU MUST** use the following prefixes in their "name" field:
       *   "Diagram: [Descriptive Name]" (e.g., "Diagram: User Login Flow")
       *   "Figure X: [Descriptive Name]" (e.g., "Figure 1: System Architecture") - Increment X for each figure throughout the *entire* outline, starting from 1.
       *   "Table Y: [Descriptive Name]" (e.g., "Table 1: Comparison of Algorithms") - Increment Y for each table throughout the *entire* outline, starting from 1.
   4.  **Numbering:** Include hierarchical numbering in ALL section and sub-item names (e.g., "1.", "1.1", "1.1.1 Figure 1: Architecture", "3.2.1 Table 1: Component APIs").
   5.  **OMIT EMPTY 'subSections' KEY:** If a section or any sub-item has NO children, COMPLETELY OMIT the "subSections" key for that object in the JSON. Do NOT include \`"subSections": []\`.
-  6.  **Context-Driven Content:** Tailor all sections, sub-sections, and item placements *specifically* to the project described in the provided context. Be thorough and imaginative.
+  6.  **Context-Driven Content:** Tailor all sections, sub-sections, and item placements *specifically* to the project described in the provided context. Be thorough and imaginative. Think about what typically goes into each main section of a report and break that down into multiple meaningful sub-topics.
   7.  **JSON Output ONLY:** The output MUST be a single, valid JSON object matching the 'GenerateProjectOutlineOutputSchema'. No extra text, explanations, apologies, or markdown formatting outside the JSON structure.
 
   **Example of Desired JSON Output Structure (for \`maxSubSectionsPerSection = 2\` demonstrating rich sub-sections and nested items):**
@@ -215,7 +216,7 @@ const prompt = ai.definePrompt({
   }
   \`\`\`
 
-  Generate the detailed, hierarchical JSON outline now, strictly adhering to ALL constraints and instructions. Ensure VIRTUALLY ALL top-level sections have MULTIPLE (2-4) meaningful sub-sections and that relevant diagrams/figures/tables are nested appropriately. The output must be a comprehensive structure for a detailed report.
+  Generate the detailed, hierarchical JSON outline now, strictly adhering to ALL constraints and instructions. Ensure each main section is thoroughly decomposed into a MINIMUM of 2 (ideally 3-5) sub-sections, and that relevant diagrams/figures/tables are nested appropriately. The output must be a comprehensive structure for a detailed report.
   `,
 });
 
@@ -262,9 +263,9 @@ async (input) => {
                  }
                  console.log("Structure validated successfully after defensive Zod parsing.");
                  // Qualitative check for flatness and multiple sub-sections
-                 const topLevelSectionsWithMultipleSubSections = parsed.sections.filter(s => s.subSections && s.subSections.length > 1).length;
-                 if (parsed.sections.length > 2 && topLevelSectionsWithMultipleSubSections < Math.min(3, parsed.sections.length -1) ) { // Stricter: expect at least 3 (or total-1 if less than 3) top-level sections to have >1 sub-section
-                    console.warn(`AI outline is structurally valid but may lack detail in sub-sections. Top-level sections: ${parsed.sections.length}, With >1 sub-section: ${topLevelSectionsWithMultipleSubSections}. Consider re-generating or refining context.`);
+                 const topLevelSectionsWithMultipleSubSections = parsed.sections.filter(s => s.subSections && s.subSections.length >= 2).length;
+                 if (parsed.sections.length > 1 && topLevelSectionsWithMultipleSubSections < Math.min(2, parsed.sections.length -1) ) { 
+                    console.warn(`AI outline is structurally valid but may lack sub-section detail. Top-level: ${parsed.sections.length}, With >=2 sub-sections: ${topLevelSectionsWithMultipleSubSections}.`);
                     toast({ variant: "default", title: "Outline May Lack Sub-Section Detail", description: "The generated outline is valid but some main sections might lack multiple sub-sections. Review carefully or try regenerating.", duration: 8000});
                  }
                  return parsed;
@@ -276,9 +277,9 @@ async (input) => {
         }
 
         console.log("AI outline generation successful and validated.");
-        const topLevelSectionsWithMultipleSubSections = output.sections.filter(s => s.subSections && s.subSections.length > 1).length;
-        if (output.sections.length > 2 && topLevelSectionsWithMultipleSubSections < Math.min(3, output.sections.length -1 )) { // Stricter heuristic for toast
-            console.warn(`AI outline is structurally valid but may lack detail in sub-sections. Top-level sections: ${output.sections.length}, With >1 sub-section: ${topLevelSectionsWithMultipleSubSections}. Consider re-generating or refining context.`);
+        const topLevelSectionsWithMultipleSubSections = output.sections.filter(s => s.subSections && s.subSections.length >= 2).length;
+        if (output.sections.length > 1 && topLevelSectionsWithMultipleSubSections < Math.min(2, output.sections.length -1 )) {
+            console.warn(`AI outline is structurally valid but may lack sub-section detail. Top-level: ${output.sections.length}, With >=2 sub-sections: ${topLevelSectionsWithMultipleSubSections}.`);
             toast({ variant: "default", title: "Outline May Lack Sub-Section Detail", description: "The generated outline is valid but some main sections might lack multiple sub-sections. Review carefully or try regenerating.", duration: 8000});
         }
         return output;
