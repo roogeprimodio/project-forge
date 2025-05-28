@@ -13,10 +13,12 @@ export interface GeneratedSectionOutline {
 export interface HierarchicalProjectSection {
   id: string; // Unique identifier for the section
   name: string;
-  prompt: string;
-  content: string; // For text sections or to store Mermaid code/image ref
+  prompt: string; // For content sub-sections, or description for diagrams/images/tables
+  content: string; // For text sections, Mermaid code, image URL/prompt, or Markdown table
   lastGenerated?: Date | string;
   subSections: HierarchicalProjectSection[]; // Subsections should always be an array
+  // Optional: Add a type field if parsing names becomes too complex
+  // itemType?: 'content' | 'diagram' | 'image' | 'table' | 'container';
 }
 
 

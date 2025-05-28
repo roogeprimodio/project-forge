@@ -6,9 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Settings, Undo, Lightbulb, Cloud, CloudOff, PlusCircle, FileText, Loader2, ChevronRight, ChevronDown, Edit3, Trash2 } from 'lucide-react'; // Import necessary icons
+import { Settings, Undo, Lightbulb, Cloud, CloudOff, PlusCircle, FileText, Loader2, Edit3, BookOpen } from 'lucide-react'; // Added BookOpen
 import type { Project, SectionIdentifier, HierarchicalProjectSection } from '@/types/project';
-import { STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, findSectionById, addSubSectionById, getSectionNumbering, ensureDefaultSubSection } from '@/lib/project-utils';
+import { STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, TOC_SECTION_NAME, findSectionById, addSubSectionById, getSectionNumbering } from '@/lib/project-utils'; // Removed ensureDefaultSubSection
 import { HierarchicalSectionItem } from './hierarchical-section-item';
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
@@ -17,11 +17,10 @@ import { cn } from '@/lib/utils';
 export interface ProjectSidebarContentProps {
     project: Project;
     updateProject: (updatedData: Partial<Project> | ((prev: Project) => Project), saveToHistory?: boolean) => void;
-    activeSectionId: string | null;
+    activeSectionId: string | null; // Will store the ID of any selected item (main section, sub-section, diagram, etc.)
     setActiveSectionId: (id: SectionIdentifier) => void;
-    activeSubSectionId: string | null;
-    setActiveSubSectionId: (id: string | null) => void;
-    handleGenerateTocClick: () => void;
+    // activeSubSectionId and setActiveSubSectionId are removed
+    handleGenerateTocClick: () => void; // Renamed to reflect its primary role as outline generator trigger
     isGeneratingOutline: boolean;
     isGenerating: boolean;
     isSummarizing: boolean;
@@ -34,19 +33,18 @@ export interface ProjectSidebarContentProps {
     setIsEditingSections: (editing: boolean) => void;
     onEditSectionName: (id: string, newName: string) => void;
     onDeleteSection: (id: string) => void;
-    handleAddNewSection: () => void;
+    onAddSubSection: (parentId: string) => void; // For adding a sub-item to an existing section
+    handleAddNewSection: () => void; // For adding a new top-level section
 }
 
 export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
     project,
-    updateProject,
+    updateProject, // Not directly used here but good for future direct updates from sidebar
     activeSectionId,
     setActiveSectionId,
-    activeSubSectionId,
-    setActiveSubSectionId,
     handleGenerateTocClick,
     isGeneratingOutline,
-    isGenerating,
+    isGenerating,     // These global states might be useful for disabling buttons
     isSummarizing,
     isSuggesting,
     handleSaveOnline,
@@ -57,54 +55,18 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
     setIsEditingSections,
     onEditSectionName,
     onDeleteSection,
+    onAddSubSection, // This will be passed to HierarchicalSectionItem
     handleAddNewSection,
 }) => {
      const { toast } = useToast();
 
-     const handleMainSectionClick = (id: SectionIdentifier) => {
+     const handleItemClick = (id: SectionIdentifier) => {
          setActiveSectionId(id);
-         setActiveSubSectionId(null); // Clear active sub-section when a main section is clicked
          onCloseSheet?.();
      };
     
-     // This function is now primarily for adding to top-level sections or designated parents.
-     // HierarchicalSectionItem will handle adding to its own children.
-     const handleAddNewSubSectionToParent = (parentId: string) => {
-            const parentSection = findSectionById(project.sections, parentId);
-            if (!parentSection) {
-                toast({ variant: "destructive", title: "Error", description: "Parent section not found." });
-                return;
-            }
-
-            const parentNumbering = getSectionNumbering(project.sections, parentId) || '';
-            const newSubSectionNumber = (parentSection.subSections?.length || 0) + 1;
-            const newSubSectionName = `New Sub-Section ${parentNumbering ? parentNumbering + '.' : ''}${newSubSectionNumber}`;
-            
-            const newSubSectionData: Omit<HierarchicalProjectSection, 'id' | 'subSections'> = {
-                name: newSubSectionName,
-                prompt: `Generate content for "${newSubSectionName}" under parent section "${parentSection.name}".`,
-                content: "",
-                lastGenerated: undefined,
-            };
-
-            updateProject(prev => {
-                if (!prev) return prev;
-                const newSections = addSubSectionById(prev.sections, parentId, newSubSectionData);
-                 // Find the newly added sub-section to set it active (optional)
-                const updatedParent = findSectionById(newSections, parentId);
-                const addedSubSection = updatedParent?.subSections?.[updatedParent.subSections.length - 1];
-                if (addedSubSection) {
-                    setActiveSubSectionId(addedSubSection.id);
-                }
-                return { ...prev, sections: newSections };
-            }, true);
-            toast({ title: "Sub-Section Added", description: `"${newSubSectionName}" added to "${parentSection.name}".` });
-        };
-    
-    // No need for renderSectionsRecursive here, HierarchicalSectionItem handles its children
-
      return (
-        <div className="flex flex-col h-full bg-card text-left"> {/* Ensure text-left for all content */}
+        <div className="flex flex-col h-full bg-card text-left">
             {/* Header */}
             <div className="p-4 border-b flex justify-between items-center flex-shrink-0">
                  <Input
@@ -130,12 +92,12 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
             {/* Project Details Link */}
             <div className="px-2 py-2 flex-shrink-0">
                 <Button
-                    key="-1"
-                    variant={activeSectionId === String(-1) && activeSubSectionId === null ? "secondary" : "ghost"}
+                    key="-1" // Unique key
+                    variant={activeSectionId === String(-1) ? "secondary" : "ghost"}
                     size="sm"
-                    onClick={() => handleMainSectionClick(String(-1))}
+                    onClick={() => handleItemClick(String(-1))}
                     className="justify-start w-full text-left text-sm hover:bg-muted/60 data-[variant=secondary]:bg-primary/10"
-                    aria-current={activeSectionId === String(-1) && activeSubSectionId === null ? "page" : undefined}
+                    aria-current={activeSectionId === String(-1) ? "page" : undefined}
                 >
                     <Settings className="mr-2 h-4 w-4" />
                     Project Details
@@ -152,12 +114,12 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                             const pageId = String(STANDARD_PAGE_INDICES[pageName]);
                             return (
                                 <Button
-                                    key={pageId}
-                                    variant={activeSectionId === pageId && activeSubSectionId === null ? "secondary" : "ghost"}
+                                    key={pageId} // Unique key
+                                    variant={activeSectionId === pageId ? "secondary" : "ghost"}
                                     size="sm"
-                                    onClick={() => handleMainSectionClick(STANDARD_PAGE_INDICES[pageName])}
+                                    onClick={() => handleItemClick(STANDARD_PAGE_INDICES[pageName])}
                                     className="justify-start text-left text-sm hover:bg-muted/60 data-[variant=secondary]:bg-primary/10"
-                                    aria-current={activeSectionId === pageId && activeSubSectionId === null ? "page" : undefined}
+                                    aria-current={activeSectionId === pageId ? "page" : undefined}
                                     title={pageName}
                                 >
                                     <FileText className="mr-2 h-4 w-4 flex-shrink-0" />
@@ -185,35 +147,34 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                          <Edit3 className="h-3 w-3 mr-1"/> {isEditingSections ? 'Done' : 'Edit'}
                     </Button>
                  </div>
-                 <ScrollArea className="flex-1 px-2 py-2 overflow-x-auto"> {/* Add overflow-x-auto */}
+                 <ScrollArea className="flex-1 px-2 py-2 overflow-x-auto">
                     <nav className="flex flex-col gap-0.5 min-w-max text-left whitespace-nowrap">
                        {project.sections?.length > 0 ? (
                           project.sections.map((section, index) => (
                             <HierarchicalSectionItem
-                                key={section.id} // Apply key here to the component rendered by map
+                                key={section.id}
                                 section={section}
-                                level={0}
-                                numbering={`${index + 1}`} // Pass top-level numbering
+                                level={0} // Top-level sections are level 0
+                                numbering={`${index + 1}`} // Main section numbering
                                 activeSectionId={activeSectionId}
-                                setActiveSectionId={setActiveSectionId} // Main section setter
-                                activeSubSectionId={activeSubSectionId}
-                                setActiveSubSectionId={setActiveSubSectionId} // Sub-section setter
+                                setActiveSectionId={handleItemClick} // Use the unified click handler
+                                // activeSubSectionId and setActiveSubSectionId are removed
                                 onEditSectionName={onEditSectionName}
                                 onDeleteSection={onDeleteSection}
-                                onAddSubSection={handleAddNewSubSectionToParent} // Use specific handler for adding to this level
+                                onAddSubSection={onAddSubSection} // Pass down the add sub-item handler
                                 isEditing={isEditingSections}
                                 onCloseSheet={onCloseSheet}
                             />
                           ))
                        ) : (
-                         <p className="px-2 py-1 text-xs text-muted-foreground italic">Generate sections or add manually in edit mode.</p>
+                         <p className="px-2 py-1 text-xs text-muted-foreground italic">Generate an outline or add sections in edit mode.</p>
                        )}
                        {isEditingSections && (
                            <Button
                                key="add-new-top-level-section-button"
                                variant="outline"
                                size="sm"
-                               onClick={handleAddNewSection} // This adds a new top-level section
+                               onClick={handleAddNewSection}
                                className="justify-start mt-2 text-muted-foreground hover:text-primary text-left text-sm"
                                title="Add new top-level section"
                            >
@@ -232,13 +193,13 @@ export const ProjectSidebarContent: React.FC<ProjectSidebarContentProps> = ({
                  <Button
                     variant="outline"
                     size="sm"
-                    onClick={handleGenerateTocClick}
+                    onClick={handleGenerateTocClick} // This now triggers outline generation
                     disabled={isGeneratingOutline || isGenerating || isSummarizing || isSuggesting || !project.projectContext?.trim()}
                     className="w-full hover:glow-accent focus-visible:glow-accent"
-                    title={!project.projectContext?.trim() ? "Add project context in Project Details first" : "Generate Table of Contents based on project context"}
+                    title={!project.projectContext?.trim() ? "Add project context in Project Details first" : "Generate project outline based on context"}
                 >
                     {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
-                    {isGeneratingOutline ? 'Generating Sections...' : 'Generate/Update Sections'}
+                    {isGeneratingOutline ? 'Generating Outline...' : 'Generate Outline'}
                 </Button>
                  <Button
                      variant="outline"

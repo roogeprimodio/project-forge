@@ -27,13 +27,13 @@ export function updateSectionById(
 ): HierarchicalProjectSection[] {
     return sections.map(section => {
         if (section.id === id) {
-            return { ...section, ...updates };
+            return { ...section, ...updates, updatedAt: new Date().toISOString() }; // Also update updatedAt timestamp
         }
         if (section.subSections) {
             const updatedSubSections = updateSectionById(section.subSections, id, updates);
             // Check if subSections array reference changed to avoid unnecessary re-renders
             if (updatedSubSections !== section.subSections) {
-                return { ...section, subSections: updatedSubSections };
+                return { ...section, subSections: updatedSubSections, updatedAt: new Date().toISOString() };
             }
         }
         return section;
@@ -60,20 +60,30 @@ export const getSectionNumbering = (sections: HierarchicalProjectSection[], targ
 
 
 // Function to ensure a section has a default sub-section if it's meant to hold content but has no explicit sub-sections
+// This logic needs to be smarter: only add a default "Content" sub-section if no other content-bearing sub-sections exist.
+// Diagram/Figure/Table sections are content-bearing.
 export function ensureDefaultSubSection(section: HierarchicalProjectSection, baseNumbering: string): HierarchicalProjectSection {
-    if (!section.subSections || section.subSections.length === 0) {
-        const defaultSubSectionName = `${baseNumbering}.1 ${section.name} Content`;
+    const isContainerSection = !(
+        section.name.toLowerCase().startsWith("diagram:") ||
+        section.name.toLowerCase().startsWith("figure:") ||
+        section.name.toLowerCase().startsWith("table:")
+    );
+
+    // If it's a container and has no subSections, or all its subSections are also containers (unlikely but possible), add a default content sub-section.
+    if (isContainerSection && (!section.subSections || section.subSections.length === 0 || section.subSections.every(ss => !ss.name.match(/^(Diagram:|Figure \d+:|Table \d+:)/i)))) {
+        const defaultSubSectionName = `${baseNumbering ? baseNumbering + ".1" : "1"} ${section.name} - Overview`; // Changed naming
         return {
             ...section,
             subSections: [
                 {
                     id: uuidv4(),
                     name: defaultSubSectionName,
-                    prompt: `Generate detailed content for the "${section.name}" section, specifically focusing on what would be covered in "${defaultSubSectionName}".`,
+                    prompt: `Generate an overview or main content for the "${section.name}" section, specifically focusing on what would be covered in "${defaultSubSectionName}".`,
                     content: '',
                     subSections: [], // Default sub-sections are leaves
                     lastGenerated: undefined,
                 },
+                ...(section.subSections || []), // Append existing non-content subSections if any (though logic above filters this out)
             ],
         };
     }
@@ -92,15 +102,21 @@ export function addSubSectionById(
         const currentNumbering = parentNumbering ? `${parentNumbering}.${index + 1}` : `${index + 1}`;
         if (section.id === parentId) {
             const newSubSectionId = uuidv4();
-            const subSectionToAdd: HierarchicalProjectSection = {
+            let subSectionToAdd: HierarchicalProjectSection = {
                 ...newSubSectionData,
                 id: newSubSectionId,
                 subSections: [],
-                // Optional: Auto-generate a default prompt if none provided
                 prompt: newSubSectionData.prompt || `Generate content for ${newSubSectionData.name} as part of ${section.name}.`,
             };
-            // Ensure the newly added sub-section itself gets a default sub-section if it's meant to be a content leaf
-            // const processedSubSection = ensureDefaultSubSection(subSectionToAdd, `${currentNumbering}.${(section.subSections || []).length + 1}`);
+
+            // If the new sub-section is NOT a diagram/figure/table, ensure it gets a default content part.
+            const isSpecialItem = newSubSectionData.name.toLowerCase().startsWith("diagram:") ||
+                                  newSubSectionData.name.toLowerCase().startsWith("figure:") ||
+                                  newSubSectionData.name.toLowerCase().startsWith("table:");
+            if (!isSpecialItem) {
+                subSectionToAdd = ensureDefaultSubSection(subSectionToAdd, `${currentNumbering}.${(section.subSections || []).length + 1}`);
+            }
+
 
             return {
                 ...section,
@@ -126,7 +142,14 @@ export function deleteSectionById(sections: HierarchicalProjectSection[], id: st
         }
         if (section.subSections) {
             const updatedSubSections = deleteSectionById(section.subSections, id);
-            acc.push({ ...section, subSections: updatedSubSections });
+            // Only push if subSections changed or it wasn't empty before and now is (edge case)
+            if (updatedSubSections !== section.subSections || (section.subSections.length > 0 && updatedSubSections.length === 0)) {
+                 acc.push({ ...section, subSections: updatedSubSections });
+            } else if (updatedSubSections.length > 0 || section.subSections.length === 0 ) { // if no subsections or subsections still exist
+                 acc.push({ ...section, subSections: updatedSubSections });
+            } else {
+                 acc.push(section); // No change in subsections, push original
+            }
         } else {
             acc.push(section);
         }
@@ -162,22 +185,21 @@ export const updateProject = (
     updatedData: Partial<Project> | ((prev: Project) => Project),
     saveToHistory: boolean,
     projectId: string,
-    currentProjectState: Project | undefined, // Pass the current project state derived from history or local storage
-    setProjects: React.Dispatch<React.SetStateAction<Project[]>>, // Setter from useLocalStorage
-    setHistory: React.Dispatch<React.SetStateAction<Project[]>>, // History state setter
-    setHistoryIndex: React.Dispatch<React.SetStateAction<number>>, // History index setter
-    isUpdatingHistory: React.MutableRefObject<boolean>, // Ref to prevent loops
-    historyIndex: number, // Current history index
-    maxHistoryLength: number // Max history length constant
+    currentProjectState: Project | undefined,
+    setProjects: React.Dispatch<React.SetStateAction<Project[]>>,
+    setHistory: React.Dispatch<React.SetStateAction<Project[]>>,
+    setHistoryIndex: React.Dispatch<React.SetStateAction<number>>,
+    isUpdatingHistory: React.MutableRefObject<boolean>,
+    historyIndex: number,
+    maxHistoryLength: number
 ) => {
     if (!currentProjectState && typeof updatedData !== 'function') {
         console.error("Cannot update project: Current project state is undefined and update is not a function.");
-        return; // Exit if project doesn't exist and not using function update
+        return;
     }
 
-    isUpdatingHistory.current = true; // Prevent feedback loop with history effect
+    isUpdatingHistory.current = true;
 
-    // Use setProjects which updates local storage via useLocalStorage hook
     setProjects((prevProjects = []) => {
         const currentProjectsArray = Array.isArray(prevProjects) ? prevProjects : [];
         const currentProjectIndex = currentProjectsArray.findIndex(p => p.id === projectId);
@@ -185,76 +207,58 @@ export const updateProject = (
         let projectToUpdate: Project | undefined;
         if (currentProjectIndex !== -1) {
             projectToUpdate = currentProjectsArray[currentProjectIndex];
-        } else if (currentProjectState) { // If not found in local storage list, use the state from history/memo
+        } else if (currentProjectState) {
             projectToUpdate = currentProjectState;
         }
 
         if (!projectToUpdate) {
             console.error("Project not found in setProjects during update");
             requestAnimationFrame(() => { isUpdatingHistory.current = false; });
-            return currentProjectsArray; // Return unchanged list
+            return currentProjectsArray;
         }
 
-        // Apply the updates
-        const updatedProject = typeof updatedData === 'function'
+        const newProjectState = typeof updatedData === 'function'
             ? updatedData(projectToUpdate)
             : { ...projectToUpdate, ...updatedData, updatedAt: new Date().toISOString() };
 
-        // --- History Management ---
         if (saveToHistory) {
             setHistory(prevHistory => {
-                const newHistory = prevHistory.slice(0, historyIndex + 1);
-                // Only add to history if the state actually changed
-                if (newHistory.length === 0 || JSON.stringify(newHistory[newHistory.length - 1]) !== JSON.stringify(updatedProject)) {
-                    newHistory.push(updatedProject);
-                    // Trim history if it exceeds the maximum length
-                    if (newHistory.length > maxHistoryLength) {
-                         newHistory.shift(); // Remove the oldest entry
-                    }
-                    // Update the history index to point to the latest state
-                    setHistoryIndex(newHistory.length - 1);
-                } else {
-                    // If state hasn't changed, don't add duplicates, just ensure index is correct
-                    setHistoryIndex(newHistory.length - 1);
+                const newHistorySlice = prevHistory.slice(0, historyIndex + 1);
+                if (newHistorySlice.length === 0 || JSON.stringify(newHistorySlice[newHistorySlice.length - 1]) !== JSON.stringify(newProjectState)) {
+                    const updatedHistory = [...newHistorySlice, newProjectState];
+                    const finalHistory = updatedHistory.length > maxHistoryLength ? updatedHistory.slice(-maxHistoryLength) : updatedHistory;
+                    setHistoryIndex(finalHistory.length - 1);
+                    return finalHistory;
                 }
-
-                return newHistory;
+                setHistoryIndex(newHistorySlice.length - 1); // Ensure index is correct even if no new state added
+                return newHistorySlice;
             });
         } else {
-            // If not saving to history (e.g., during typing), update the current history state directly
-            // Only update if the state actually changed to prevent unnecessary state updates
             setHistory(prevHistory => {
                 const newHistory = [...prevHistory];
                 if (historyIndex >= 0 && historyIndex < newHistory.length) {
-                    if (JSON.stringify(newHistory[historyIndex]) !== JSON.stringify(updatedProject)) {
-                        newHistory[historyIndex] = updatedProject;
+                    if (JSON.stringify(newHistory[historyIndex]) !== JSON.stringify(newProjectState)) {
+                        newHistory[historyIndex] = newProjectState;
                     }
                 }
                 return newHistory;
             });
         }
 
-
-        // --- Update Main Projects Array (for localStorage) ---
         const updatedProjectsArray = [...currentProjectsArray];
         if (currentProjectIndex !== -1) {
-            // Update existing project if found in the main list
-            if (JSON.stringify(updatedProjectsArray[currentProjectIndex]) !== JSON.stringify(updatedProject)) {
-                updatedProjectsArray[currentProjectIndex] = updatedProject;
+            if (JSON.stringify(updatedProjectsArray[currentProjectIndex]) !== JSON.stringify(newProjectState)) {
+                updatedProjectsArray[currentProjectIndex] = newProjectState;
                 return updatedProjectsArray;
             }
         } else if (currentProjectState && saveToHistory) {
-            // If project wasn't in the main list (maybe loaded from history), add it back
-             // Ensure not to add duplicates if it somehow exists but index was wrong
              if (!updatedProjectsArray.some(p => p.id === projectId)) {
-                updatedProjectsArray.push(updatedProject);
+                updatedProjectsArray.push(newProjectState);
                 return updatedProjectsArray;
              }
         }
-        // Return the potentially updated or original array
-        return updatedProjectsArray;
+        return currentProjectsArray; // Return original if no changes to the array itself
     });
 
-    // Reset the flag after the state update cycle
     requestAnimationFrame(() => { isUpdatingHistory.current = false; });
 };
