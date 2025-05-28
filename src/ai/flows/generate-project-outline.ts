@@ -93,32 +93,32 @@ const prompt = ai.definePrompt({
   output: {
     schema: GenerateProjectOutlineOutputSchema,
   },
-  prompt: `You are an AI expert specializing in structuring academic and technical project reports. Your task is to generate a comprehensive, **deeply hierarchical**, and logically ordered list of section names suitable for a project report.
+  prompt: `You are an AI expert specializing in structuring academic and technical project reports. Your task is to generate a **thorough, detailed, and deeply hierarchical** list of section names suitable for a comprehensive project report. The quality of this outline is critical for the user.
 
   **Project Title:** {{{projectTitle}}}
   **Project Context:** {{{projectContext}}}
 
   **CRITICAL Generation Constraints & Instructions:**
   1.  **Hierarchical Structure is PARAMOUNT:**
-      *   Generate at least **{{minSections}}** TOP-LEVEL sections (e.g., "1. Introduction", "2. Literature Review").
-      *   **MOST (if not ALL) top-level sections MUST be broken down into multiple logical sub-sections** (e.g., "1.1 Background", "1.2 Problem Statement"). These sub-sections are children of the top-level section. Do not generate flat lists of main sections only.
-      *   **Deep Nesting for Items:** Sub-sections themselves can, and often should, contain further nested items like diagrams, figures, or tables if relevant to the content. These items are children of their respective sub-sections.
+      *   Generate at least **{{minSections}}** TOP-LEVEL sections (e.g., "1. Introduction", "2. Literature Review"). These should cover all essential parts of a typical academic/technical report.
+      *   **Crucial: Almost ALL top-level sections MUST be broken down into multiple (2-4) logical sub-sections.** Do not just provide one sub-section for a major topic. For example, "Introduction" should have sub-sections like "1.1 Background and Motivation", "1.2 Problem Statement", "1.3 Project Goals and Objectives", "1.4 Scope and Limitations". Similarly for "Methodology", "System Design", "Implementation", "Results", "Discussion", etc. A flat list of main sections, or main sections with only a single sub-item, is NOT acceptable.
+      *   **Deep Nesting for Items:** Sub-sections themselves can, and often should, contain further nested items like diagrams, figures, or tables if relevant to the content. These items are children of their respective sub-sections and contribute to the depth.
   2.  **Maximum Nesting Depth:** The absolute maximum nesting depth for any item (section, sub-section, diagram, figure, table) is **{{maxSubSectionsPerSection}}** levels.
       *   An item at depth 0 is a top-level section.
       *   An item at depth 1 is a sub-section of a top-level section.
-      *   An item at depth 2 is a sub-sub-item (e.g., a diagram within a sub-section).
+      *   An item at depth 2 is a sub-sub-item (e.g., a diagram within a sub-section, or a sub-sub-section of content).
       *   An item at the \`maxSubSectionsPerSection\` depth (e.g., depth 2 if max is 2) **MUST NOT** have its own "subSections" key or array.
   3.  **Prefixes for Specialized Items:** When suggesting diagrams, figures, or tables, **YOU MUST** use the following prefixes in their "name" field:
       *   "Diagram: [Descriptive Name]" (e.g., "Diagram: User Login Flow")
-      *   "Figure X: [Descriptive Name]" (e.g., "Figure 1: System Architecture") - Increment X for each figure throughout the *entire* outline.
-      *   "Table Y: [Descriptive Name]" (e.g., "Table 1: Comparison of Algorithms") - Increment Y for each table throughout the *entire* outline.
-  4.  **Numbering:** Include hierarchical numbering in all section and sub-item names (e.g., "1.", "1.1", "1.1.1", "3.2.1 Figure 1: Architecture").
+      *   "Figure X: [Descriptive Name]" (e.g., "Figure 1: System Architecture") - Increment X for each figure throughout the *entire* outline, starting from 1.
+      *   "Table Y: [Descriptive Name]" (e.g., "Table 1: Comparison of Algorithms") - Increment Y for each table throughout the *entire* outline, starting from 1.
+  4.  **Numbering:** Include hierarchical numbering in all section and sub-item names (e.g., "1.", "1.1", "1.1.1 Figure 1: Architecture", "3.2.1 Table 1: Component APIs").
   5.  **OMIT EMPTY 'subSections' KEY:** If a section or any sub-item has NO children, COMPLETELY OMIT the "subSections" key for that object in the JSON. Do NOT include \`"subSections": []\`.
-  6.  **Context-Driven Content:** Tailor all sections, sub-sections, and item placements *specifically* to the project described in the provided context.
-  7.  **Standard Sections:** Include essential academic/technical report sections (e.g., Introduction, Literature Review, Methodology, System Design/Architecture, Implementation, Results, Discussion, Conclusion, References, Appendix if applicable). **Each of these should be structured with relevant sub-sections and potentially nested items as appropriate for the project context.**
+  6.  **Context-Driven Content:** Tailor all sections, sub-sections, and item placements *specifically* to the project described in the provided context. Be thorough and imaginative.
+  7.  **Standard Sections (Detailed Breakdown EXPECTED):** Include essential academic/technical report sections (e.g., Introduction, Literature Review, Methodology, System Design/Architecture, Implementation, Results, Discussion, Conclusion, References, Appendix if applicable). **Each of these major sections MUST be broken down into relevant, detailed sub-sections and potentially nested items as appropriate for the project context.**
   8.  **JSON Output ONLY:** The output MUST be a single, valid JSON object matching the 'GenerateProjectOutlineOutputSchema'. No extra text, explanations, apologies, or markdown formatting outside the JSON structure.
 
-  **Example of Desired JSON Output Structure (for \`maxSubSectionsPerSection = 2\` and demonstrating sub-sections for multiple main topics):**
+  **Example of Desired JSON Output Structure (for \`maxSubSectionsPerSection = 2\` and demonstrating rich sub-sections and nested items):**
   \`\`\`json
   {
     "sections": [
@@ -128,29 +128,41 @@ const prompt = ai.definePrompt({
           {
             "name": "1.1 Background and Motivation",
             "subSections": [
-              { "name": "1.1.1 Diagram: Conceptual Model" }
+              { "name": "1.1.1 Diagram: Conceptual Model of the Problem Space" }
             ]
           },
           { "name": "1.2 Problem Statement" },
-          { "name": "1.3 Project Goals and Objectives" }
+          { "name": "1.3 Project Goals and Objectives" },
+          { "name": "1.4 Scope and Limitations" }
         ]
       },
       {
         "name": "2. Literature Review",
         "subSections": [
-          { "name": "2.1 Existing Systems" },
-          { "name": "2.2 Relevant Technologies" }
+          { "name": "2.1 Review of Existing Similar Systems" },
+          { "name": "2.2 Analysis of Relevant Technologies and Frameworks" },
+          { "name": "2.3 Identification of Research Gaps" }
         ]
       },
       {
-        "name": "3. System Design",
+        "name": "3. System Design and Architecture",
         "subSections": [
-          { "name": "3.1 Architecture Overview" },
-          { "name": "3.2.1 Figure 1: High-Level Architecture" },
-          {
-            "name": "3.3 Component Design",
+          { "name": "3.1 Overall System Architecture" ,
             "subSections": [
-              { "name": "3.3.1 Table 1: Component APIs" }
+                { "name": "3.1.1 Figure 1: High-Level Architectural Diagram" }
+            ]
+          },
+          {
+            "name": "3.2 Component Design",
+            "subSections": [
+              { "name": "3.2.1 Module A Design" },
+              { "name": "3.2.2 Module B Design" },
+              { "name": "3.2.3 Table 1: Component Interface Specifications" }
+            ]
+          },
+          { "name": "3.3 Database Design (if applicable)",
+            "subSections": [
+                { "name": "3.3.1 Diagram: Entity-Relationship Diagram (ERD)" }
             ]
           }
         ]
@@ -158,19 +170,43 @@ const prompt = ai.definePrompt({
       {
         "name": "4. Implementation",
          "subSections": [
-            { "name": "4.1 Technology Stack" },
-            { "name": "4.2 Key Modules Implemented" }
+            { "name": "4.1 Technology Stack Used" },
+            { "name": "4.2 Development Environment Setup" },
+            { "name": "4.3 Implementation of Key Modules",
+              "subSections": [
+                { "name": "4.3.1 Figure 2: Screenshot of Core Feature X" }
+              ]
+            },
+            { "name": "4.4 Challenges Encountered and Solutions" }
          ]
       },
       {
-        "name": "5. Results and Discussion"
-      }
-      // ... more top-level sections, most with hierarchical sub-items ...
+        "name": "5. Results and Discussion",
+        "subSections": [
+            { "name": "5.1 Presentation of Results" ,
+              "subSections": [
+                { "name": "5.1.1 Table 2: Performance Metrics" },
+                { "name": "5.1.2 Figure 3: Graph of Results Y" }
+              ]
+            },
+            { "name": "5.2 Analysis of Results" },
+            { "name": "5.3 Comparison with Objectives" }
+        ]
+      },
+      {
+        "name": "6. Conclusion and Future Work",
+        "subSections": [
+            { "name": "6.1 Summary of Achievements" },
+            { "name": "6.2 Future Enhancements and Scope" }
+        ]
+      },
+      { "name": "7. References" },
+      { "name": "8. Appendix (Optional)" }
     ]
   }
   \`\`\`
 
-  Generate the detailed, hierarchical JSON outline now, strictly adhering to ALL constraints and instructions. Ensure MOST top-level sections have sub-sections.
+  Generate the detailed, hierarchical JSON outline now, strictly adhering to ALL constraints and instructions. Ensure VIRTUALLY ALL top-level sections have multiple, meaningful sub-sections and that relevant diagrams/figures/tables are nested appropriately. Be comprehensive.
   `,
 });
 
@@ -186,11 +222,11 @@ async (input) => {
     let output: GenerateProjectOutlineOutput | undefined;
     const fallbackOutline: GenerateProjectOutlineOutput = { sections: [
         { name: "1. Introduction", subSections: [ { name: "1.1 Background" }, { name: "1.1.1 Diagram: Basic Flow" } ]},
-        { name: "2. Methodology", subSections: [ { name: "2.1 Research Approach" } ] }, 
-        { name: "3. Implementation Details", subSections: [ { name: "3.1 Core Modules" } ] }, 
-        { name: "4. Results & Discussion" },
+        { name: "2. Methodology", subSections: [ { name: "2.1 Research Approach" }, { name: "2.1.1 Table 1: Methods Comparison"} ] }, 
+        { name: "3. Implementation Details", subSections: [ { name: "3.1 Core Modules" }, { name: "3.1.1 Figure 1: Module Interaction" } ] }, 
+        { name: "4. Results & Discussion", subSections: [ {name: "4.1 Key Findings"}, {name: "4.1.1 Figure 2: Results Graph"}] },
         { name: "5. Conclusion & Future Work" }, 
-        { name: "References" }
+        { name: "6. References" }
     ]};
 
     try {
@@ -205,22 +241,22 @@ async (input) => {
             return fallbackOutline;
         }
         
-        if (!validateOutlineStructure(output.sections, 0, input.maxSubSectionsPerSection)) {
-            console.warn("AI outline validation failed against max depth or structure. Output:", JSON.stringify(output, null, 2));
+        if (!validateOutlineStructure(output.sections, 0, input.maxSubSectionsPerSection ?? 2)) {
+            console.warn("AI outline validation failed against max depth or structure rules. Output:", JSON.stringify(output, null, 2));
              try {
-                 const parsed = GenerateProjectOutlineOutputSchema.parse(output); // Try to parse defensively
+                 const parsed = GenerateProjectOutlineOutputSchema.parse(output); 
                  console.log("Defensive Zod parsing successful despite custom validation warning. Parsed output will be used if structure is now valid.");
-                 if (!validateOutlineStructure(parsed.sections, 0, input.maxSubSectionsPerSection)) {
+                 if (!validateOutlineStructure(parsed.sections, 0, input.maxSubSectionsPerSection ?? 2)) {
                      console.error("Zod parsing ok, but structure STILL invalid for depth/rules. Using fallback.");
-                     toast({ variant: "destructive", title: "Outline Structure Invalid", description: `Generated outline violates depth limits (${input.maxSubSectionsPerSection}) or has invalid item structure. Using fallback.` });
+                     toast({ variant: "destructive", title: "Outline Structure Invalid", description: `Generated outline violates depth limits (${input.maxSubSectionsPerSection ?? 2}) or has invalid item structure. Using fallback.` });
                      return fallbackOutline;
                  }
                  console.log("Structure validated successfully after defensive Zod parsing.");
-                 // Check for flatness as a qualitative measure
+                 // Qualitative check for flatness
                  const topLevelSectionsWithSubSections = parsed.sections.filter(s => s.subSections && s.subSections.length > 0).length;
-                 if (parsed.sections.length > 2 && topLevelSectionsWithSubSections < Math.min(2, parsed.sections.length -1) ) { // Heuristic for flatness
+                 if (parsed.sections.length > 2 && topLevelSectionsWithSubSections < Math.min(3, parsed.sections.length -1) ) { // Stricter heuristic for flatness
                     console.warn(`AI outline is structurally valid but appears too flat. Top-level sections: ${parsed.sections.length}, With sub-sections: ${topLevelSectionsWithSubSections}. Consider re-generating or refining context.`);
-                    toast({ variant: "default", title: "Outline Might Be Too Flat", description: "The generated outline is valid but might lack depth in some areas. Review carefully.", duration: 7000});
+                    toast({ variant: "default", title: "Outline May Lack Detail", description: "The generated outline is valid but might lack depth in some areas. Review carefully or try regenerating.", duration: 7000});
                  }
                  return parsed;
              } catch (parseError) {
@@ -231,11 +267,10 @@ async (input) => {
         }
 
         console.log("AI outline generation successful and validated.");
-         // Qualitative check for flatness on successfully validated output
         const topLevelSectionsWithSubSections = output.sections.filter(s => s.subSections && s.subSections.length > 0).length;
-        if (output.sections.length > 2 && topLevelSectionsWithSubSections < Math.min(2, output.sections.length -1)) {
+        if (output.sections.length > 2 && topLevelSectionsWithSubSections < Math.min(3, output.sections.length -1 )) { // Stricter heuristic
             console.warn(`AI outline is structurally valid but appears too flat. Top-level sections: ${output.sections.length}, With sub-sections: ${topLevelSectionsWithSubSections}. Consider re-generating or refining context.`);
-            toast({ variant: "default", title: "Outline Might Be Too Flat", description: "The generated outline is valid but may lack depth in some areas. Review carefully.", duration: 7000});
+            toast({ variant: "default", title: "Outline May Lack Detail", description: "The generated outline is valid but may lack depth in some areas. Review carefully or try regenerating.", duration: 7000});
         }
         return output;
 
