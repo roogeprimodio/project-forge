@@ -50,6 +50,7 @@ export interface Project {
   storageType: 'local' | 'cloud';
   minSections?: number; // Minimum sections AI should aim for
   maxSubSectionsPerSection?: number; // Max depth of sub-sections AI should generate
+  isAiOutlineConstrained?: boolean; // Toggle for AI outline constraints
 }
 
 // AI Concept Explainer Types
