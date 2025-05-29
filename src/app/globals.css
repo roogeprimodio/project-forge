@@ -20,78 +20,83 @@ body {
 
 @layer base {
   :root {
-    /* Light Theme - Light Gray (#F5F5F5), Dark Blue (#303F9F), Teal (#009688) */
-    --background: 0 0% 96.1%; /* Light Gray #F5F5F5 */
-    --foreground: 240 10% 3.9%; /* Dark Gray for text */
-    --card: 0 0% 100%; /* White card */
-    --card-foreground: 240 10% 3.9%;
-    --popover: 0 0% 100%; /* White popover */
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 232 52% 40%; /* Dark Blue #303F9F */
-    --primary-foreground: 0 0% 98%; /* White */
-    --secondary: 240 4.8% 95.9%; /* Slightly off-white */
-    --secondary-foreground: 232 52% 40%; /* Dark Blue on secondary */
-    --muted: 240 4.8% 95.9%; /* Same as secondary */
-    --muted-foreground: 240 3.8% 46.1%; /* Medium gray text */
-    --accent: 174 100% 29%; /* Teal #009688 */
-    --accent-foreground: 0 0% 98%; /* White */
-    --destructive: 0 84.2% 60.2%; /* Red */
+    /* Light Theme - Beige/Bone White Palette */
+    --background: 0 0% 96.1%; /* Light Gray #F5F5F5 - Keeping for a clean base */
+    --foreground: 35 15% 25%; /* Dark Brown for text */
+    --card: 45 30% 97%; /* Very Light Bone White/Off-White for cards */
+    --card-foreground: 35 15% 25%; /* Dark Brown text on cards */
+    --popover: 45 30% 97%; /* Very Light Bone White/Off-White for popovers */
+    --popover-foreground: 35 15% 25%;
+    --primary: 35 35% 50%; /* Muted Earthy Brown */
+    --primary-foreground: 35 30% 95%; /* Very Light Beige/Cream for text on primary */
+    --secondary: 40 30% 92%; /* Light Beige */
+    --secondary-foreground: 35 35% 40%; /* Darker Brown for text on secondary */
+    --muted: 40 30% 92%; /* Light Beige */
+    --muted-foreground: 35 25% 50%; /* Muted Brown text */
+    --accent: 40 55% 85%; /* Soft Beige/Cream for accents */
+    --accent-foreground: 35 35% 30%; /* Dark Brown for text on accent */
+    --destructive: 0 70% 55%; /* A slightly softer Red */
     --destructive-foreground: 0 0% 98%; /* White */
-    --border: 0 0% 89.8%; /* Slightly darker gray border */
-    --input: 0 0% 100%; /* White input background */
-    --input-foreground: 240 10% 3.9%; /* Dark input text */
-    --ring: 174 100% 29%; /* Teal ring */
-    --chart-1: 232 52% 40%; /* Dark Blue */
-    --chart-2: 174 100% 29%; /* Teal */
-    --chart-3: 197 37% 34%; /* Darker Teal/Blue */
-    --chart-4: 43 74% 66%; /* Orange/Yellow */
-    --chart-5: 27 87% 67%; /* Coral */
+    --border: 40 25% 88%; /* Softer Beige Border */
+    --input: 45 40% 98%; /* Very Light Bone White for input background */
+    --input-foreground: 35 15% 25%; /* Dark Brown input text */
+    --ring: 35 35% 50%; /* Muted Earthy Brown ring (matching primary) */
+    
+    --chart-1: 35 35% 50%; /* Muted Earthy Brown (Primary) */
+    --chart-2: 40 55% 85%; /* Soft Beige/Cream (Accent) */
+    --chart-3: 25 45% 60%; /* Terracotta/Muted Orange */
+    --chart-4: 90 30% 55%; /* Muted Olive Green */
+    --chart-5: 210 25% 60%; /* Muted Slate Blue */
+
     --radius: 0.5rem;
-    --sidebar-background: 0 0% 98%; /* Slightly off-white sidebar */
-    --sidebar-foreground: 240 5.3% 26.1%; /* Dark sidebar text */
-    --sidebar-primary: 232 52% 40%; /* Dark Blue */
-    --sidebar-primary-foreground: 0 0% 98%; /* White */
-    --sidebar-accent: 0 0% 93%; /* Very light gray accent */
-    --sidebar-accent-foreground: 232 52% 40%; /* Dark Blue text on accent */
-    --sidebar-border: 0 0% 90%; /* Slightly darker sidebar border */
-    --sidebar-ring: 174 100% 29%; /* Teal ring */
+
+    --sidebar-background: 45 35% 95%; /* Light Bone White/Very Light Beige */
+    --sidebar-foreground: 35 30% 30%; /* Dark Brown text */
+    --sidebar-primary: 35 35% 50%; /* Muted Earthy Brown (same as main primary) */
+    --sidebar-primary-foreground: 35 30% 95%; /* Very Light Beige/Cream */
+    --sidebar-accent: 40 40% 90%; /* Slightly darker light beige for hover */
+    --sidebar-accent-foreground: 35 35% 25%; /* Darkest brown for text on hover */
+    --sidebar-border: 40 30% 85%; /* Muted Beige Border */
+    --sidebar-ring: 35 35% 50%; /* Muted Earthy Brown ring */
   }
 
   .dark {
-    /* Dark Theme - Complementary to light */
-    --background: 240 10% 3.9%; /* Very dark gray */
-    --foreground: 0 0% 98%; /* White text */
-    --card: 240 4% 10%; /* Dark card */
-    --card-foreground: 0 0% 98%; /* White text */
-    --popover: 240 4% 10%; /* Dark popover */
-    --popover-foreground: 0 0% 98%; /* White text */
-    --primary: 174 90% 45%; /* Brighter Teal for primary in dark mode */
-    --primary-foreground: 240 10% 3.9%; /* Dark text on primary */
-    --secondary: 240 4% 15.9%; /* Darker secondary */
-    --secondary-foreground: 0 0% 90%; /* Lighter gray text */
-    --muted: 240 4% 15.9%; /* Same as secondary */
-    --muted-foreground: 0 0% 63.9%; /* Medium gray text */
-    --accent: 232 60% 60%; /* Lighter Blue accent */
-    --accent-foreground: 0 0% 98%; /* White text on accent */
-    --destructive: 0 62.8% 50.6%; /* Brighter Red */
-    --destructive-foreground: 0 0% 98%; /* White text */
-    --border: 240 4% 18%; /* Darker border */
-    --input: 240 4% 15.9%; /* Dark input background */
-    --input-foreground: 0 0% 98%; /* White input text */
-    --ring: 174 80% 50%; /* Brighter Teal ring */
-    --chart-1: 174 70% 50%; /* Teal */
-    --chart-2: 232 60% 55%; /* Blue */
-    --chart-3: 30 80% 55%; /* Orange */
-    --chart-4: 280 65% 60%; /* Purple */
-    --chart-5: 340 75% 55%; /* Pink */
-    --sidebar-background: 240 6% 10%; /* Slightly darker sidebar */
-    --sidebar-foreground: 0 0% 85%; /* Lighter sidebar text */
-    --sidebar-primary: 174 90% 45%; /* Brighter Teal */
-    --sidebar-primary-foreground: 240 10% 3.9%; /* Dark text */
-    --sidebar-accent: 240 4% 15.9%; /* Dark accent */
-    --sidebar-accent-foreground: 0 0% 95%; /* Light text on accent */
-    --sidebar-border: 240 4% 18%; /* Darker border */
-    --sidebar-ring: 174 80% 50%; /* Brighter Teal ring */
+    /* Dark Theme - Complementary Muted Palette */
+    --background: 35 15% 10%; /* Very Dark Desaturated Brown */
+    --foreground: 35 20% 85%; /* Light Beige/Off-white text */
+    --card: 35 15% 15%; /* Dark Brown card */
+    --card-foreground: 35 20% 85%; /* Light Beige text on cards */
+    --popover: 35 15% 15%; /* Dark Brown popover */
+    --popover-foreground: 35 20% 85%;
+    --primary: 40 50% 70%; /* Muted Gold/Light Tan for primary in dark mode */
+    --primary-foreground: 35 20% 10%; /* Very Dark Brown for text on primary */
+    --secondary: 35 15% 20%; /* Darker Brown secondary */
+    --secondary-foreground: 35 20% 75%; /* Lighter Beige text */
+    --muted: 35 15% 20%; /* Darker Brown muted */
+    --muted-foreground: 35 15% 55%; /* Medium-Dark Beige text */
+    --accent: 30 40% 55%; /* Muted Bronze/Copper accent */
+    --accent-foreground: 30 20% 90%; /* Light Cream text on accent */
+    --destructive: 0 50% 45%; /* Muted Red */
+    --destructive-foreground: 0 0% 90%; /* Off-white */
+    --border: 35 15% 25%; /* Darker Brown Border */
+    --input: 35 15% 20%; /* Dark Brown input background */
+    --input-foreground: 35 20% 85%; /* Light Beige input text */
+    --ring: 40 50% 70%; /* Muted Gold/Light Tan ring */
+
+    --chart-1: 40 50% 70%; /* Muted Gold/Light Tan (Primary Dark) */
+    --chart-2: 30 40% 55%; /* Muted Bronze/Copper (Accent Dark) */
+    --chart-3: 25 35% 45%; /* Darker Terracotta */
+    --chart-4: 90 20% 40%; /* Dark Muted Olive */
+    --chart-5: 210 20% 45%; /* Dark Muted Slate Blue */
+
+    --sidebar-background: 35 15% 12%; /* Slightly darker than main dark bg */
+    --sidebar-foreground: 35 20% 80%; /* Light beige text */
+    --sidebar-primary: 40 50% 70%; /* Muted Gold/Light Tan (same as main dark primary) */
+    --sidebar-primary-foreground: 35 20% 10%; /* Very Dark Brown */
+    --sidebar-accent: 35 15% 22%; /* Darker brown for hover */
+    --sidebar-accent-foreground: 35 20% 90%; /* Lighter beige text on hover */
+    --sidebar-border: 35 15% 25%; /* Darker Brown Border for Sidebar */
+    --sidebar-ring: 40 50% 70%; /* Muted Gold/Light Tan ring */
   }
 }
 
