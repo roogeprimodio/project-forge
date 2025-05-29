@@ -20,83 +20,86 @@ body {
 
 @layer base {
   :root {
-    /* Light Theme - Beige/Bone White Palette */
-    --background: 45 40% 98%; /* VERY LIGHT BONE WHITE/BEIGE - Main Background */
-    --foreground: 35 15% 25%; /* Dark Brown for text */
-    --card: 45 35% 97%; /* Slightly Deeper Bone White/Beige for cards */
-    --card-foreground: 35 15% 25%; /* Dark Brown text on cards */
-    --popover: 45 35% 97%; /* Slightly Deeper Bone White/Beige for popovers */
-    --popover-foreground: 35 15% 25%;
-    --primary: 35 35% 50%; /* Muted Earthy Brown */
-    --primary-foreground: 35 30% 95%; /* Very Light Beige/Cream for text on primary */
-    --secondary: 40 30% 92%; /* Light Beige */
-    --secondary-foreground: 35 35% 40%; /* Darker Brown for text on secondary */
-    --muted: 40 30% 92%; /* Light Beige */
-    --muted-foreground: 35 25% 50%; /* Muted Brown text */
-    --accent: 40 55% 85%; /* Soft Beige/Cream for accents */
-    --accent-foreground: 35 35% 30%; /* Dark Brown for text on accent */
-    --destructive: 0 70% 55%; /* A slightly softer Red */
-    --destructive-foreground: 0 0% 98%; /* White */
-    --border: 40 25% 88%; /* Softer Beige Border */
-    --input: 45 40% 98%; /* Very Light Bone White for input background (can be same as main bg or slightly off) */
-    --input-foreground: 35 15% 25%; /* Dark Brown input text */
-    --ring: 35 35% 50%; /* Muted Earthy Brown ring (matching primary) */
+    /* Light Theme - Electric Blue / Cyan Blue Palette */
+    --background: 210 20% 98%; /* Very Light Cool Gray/Off-White - Main Background */
+    --foreground: 220 15% 25%; /* Dark Slate Gray for text */
+    --card: 210 20% 96%; /* Slightly Deeper Cool Off-White for cards */
+    --card-foreground: 220 15% 25%; /* Dark Slate Gray text on cards */
+    --popover: 210 20% 96%; /* Slightly Deeper Cool Off-White for popovers */
+    --popover-foreground: 220 15% 25%;
+    --primary: 200 100% 50%; /* Vibrant Electric Blue */
+    --primary-foreground: 200 100% 95%; /* Very Light Cyan/White for text on primary */
+    --secondary: 190 60% 85%; /* Light Cyan */
+    --secondary-foreground: 195 50% 30%; /* Darker Cyan/Blue for text on secondary */
+    --muted: 200 20% 90%; /* Light Blue-Gray */
+    --muted-foreground: 210 15% 50%; /* Muted Blue-Gray text */
+    --accent: 180 90% 45%; /* Bright Cyan for accents */
+    --accent-foreground: 180 100% 15%; /* Dark Cyan/Teal for text on accent */
+    --destructive: 0 70% 55%; /* A slightly softer Red (kept for consistency) */
+    --destructive-foreground: 0 0% 98%; /* White (kept for consistency) */
+    --border: 200 25% 88%; /* Softer Blue-Gray Border */
+    --input: 210 20% 98%; /* Matches background or slightly off for input */
+    --input-foreground: 220 15% 25%; /* Dark Slate Gray input text */
+    --ring: 200 100% 50%; /* Matching primary electric blue ring */
     
-    --chart-1: 35 35% 50%; /* Muted Earthy Brown (Primary) */
-    --chart-2: 40 55% 85%; /* Soft Beige/Cream (Accent) */
-    --chart-3: 25 45% 60%; /* Terracotta/Muted Orange */
-    --chart-4: 90 30% 55%; /* Muted Olive Green */
-    --chart-5: 210 25% 60%; /* Muted Slate Blue */
+    --chart-1: 200 100% 50%; /* Electric Blue (Primary) */
+    --chart-2: 180 90% 45%; /* Bright Cyan (Accent) */
+    --chart-3: 220 70% 60%; /* Medium Blue */
+    --chart-4: 170 50% 55%; /* Muted Teal */
+    --chart-5: 240 60% 70%; /* Soft Indigo */
 
     --radius: 0.5rem;
 
-    --sidebar-background: 45 35% 95%; /* Light Bone White/Very Light Beige */
-    --sidebar-foreground: 35 30% 30%; /* Dark Brown text */
-    --sidebar-primary: 35 35% 50%; /* Muted Earthy Brown (same as main primary) */
-    --sidebar-primary-foreground: 35 30% 95%; /* Very Light Beige/Cream */
-    --sidebar-accent: 40 40% 90%; /* Slightly darker light beige for hover */
-    --sidebar-accent-foreground: 35 35% 25%; /* Darkest brown for text on hover */
-    --sidebar-border: 40 30% 85%; /* Muted Beige Border */
-    --sidebar-ring: 35 35% 50%; /* Muted Earthy Brown ring */
+    /* Sidebar Light Theme */
+    --sidebar-background: 210 15% 95%; /* Light Cool Gray for sidebar */
+    --sidebar-foreground: 220 20% 30%; /* Dark Blue-Gray text */
+    --sidebar-primary: 200 100% 50%; /* Electric Blue (same as main primary) */
+    --sidebar-primary-foreground: 200 100% 95%; /* Very Light Cyan/White */
+    --sidebar-accent: 190 50% 90%; /* Very Light Cyan for hover */
+    --sidebar-accent-foreground: 195 60% 25%; /* Dark Cyan text on hover */
+    --sidebar-border: 200 20% 85%; /* Muted Blue-Gray Border for Sidebar */
+    --sidebar-ring: 200 100% 50%; /* Electric Blue ring */
   }
 
   .dark {
-    /* Dark Theme - Complementary Muted Palette */
-    --background: 35 15% 10%; /* Very Dark Desaturated Brown */
-    --foreground: 35 20% 85%; /* Light Beige/Off-white text */
-    --card: 35 15% 15%; /* Dark Brown card */
-    --card-foreground: 35 20% 85%; /* Light Beige text on cards */
-    --popover: 35 15% 15%; /* Dark Brown popover */
-    --popover-foreground: 35 20% 85%;
-    --primary: 40 50% 70%; /* Muted Gold/Light Tan for primary in dark mode */
-    --primary-foreground: 35 20% 10%; /* Very Dark Brown for text on primary */
-    --secondary: 35 15% 20%; /* Darker Brown secondary */
-    --secondary-foreground: 35 20% 75%; /* Lighter Beige text */
-    --muted: 35 15% 20%; /* Darker Brown muted */
-    --muted-foreground: 35 15% 55%; /* Medium-Dark Beige text */
-    --accent: 30 40% 55%; /* Muted Bronze/Copper accent */
-    --accent-foreground: 30 20% 90%; /* Light Cream text on accent */
-    --destructive: 0 50% 45%; /* Muted Red */
-    --destructive-foreground: 0 0% 90%; /* Off-white */
-    --border: 35 15% 25%; /* Darker Brown Border */
-    --input: 35 15% 20%; /* Dark Brown input background */
-    --input-foreground: 35 20% 85%; /* Light Beige input text */
-    --ring: 40 50% 70%; /* Muted Gold/Light Tan ring */
+    /* Dark Theme - Electric Blue / Cyan Blue Palette */
+    --background: 220 30% 10%; /* Very Dark Desaturated Blue */
+    --foreground: 190 80% 90%; /* Light Cyan text */
+    --card: 220 25% 15%; /* Dark Blue-Gray card */
+    --card-foreground: 190 80% 90%; /* Light Cyan text on cards */
+    --popover: 220 25% 15%; /* Dark Blue-Gray popover */
+    --popover-foreground: 190 80% 90%;
+    --primary: 200 100% 60%; /* Bright Electric Blue (slightly lighter for dark mode contrast) */
+    --primary-foreground: 220 100% 10%; /* Very Dark Blue for text on primary */
+    --secondary: 195 50% 25%; /* Dark Muted Cyan */
+    --secondary-foreground: 190 70% 80%; /* Lighter Cyan text */
+    --muted: 210 20% 20%; /* Darker Blue-Gray muted */
+    --muted-foreground: 200 15% 60%; /* Medium Blue-Gray text */
+    --accent: 180 100% 55%; /* Vibrant Cyan (slightly lighter for dark mode) */
+    --accent-foreground: 180 100% 5%; /* Very Dark Cyan/Teal text on accent */
+    --destructive: 0 60% 50%; /* Muted Red (kept for consistency) */
+    --destructive-foreground: 0 0% 95%; /* Off-white (kept for consistency) */
+    --border: 210 20% 25%; /* Darker Blue-Gray Border */
+    --input: 220 25% 18%; /* Dark Blue-Gray input background */
+    --input-foreground: 190 80% 90%; /* Light Cyan input text */
+    --ring: 200 100% 60%; /* Matching primary electric blue ring */
 
-    --chart-1: 40 50% 70%; /* Muted Gold/Light Tan (Primary Dark) */
-    --chart-2: 30 40% 55%; /* Muted Bronze/Copper (Accent Dark) */
-    --chart-3: 25 35% 45%; /* Darker Terracotta */
-    --chart-4: 90 20% 40%; /* Dark Muted Olive */
-    --chart-5: 210 20% 45%; /* Dark Muted Slate Blue */
+    /* Chart Colors Dark Theme */
+    --chart-1: 200 100% 60%; /* Bright Electric Blue */
+    --chart-2: 180 100% 55%; /* Vibrant Cyan */
+    --chart-3: 220 80% 70%; /* Lighter Blue */
+    --chart-4: 170 60% 65%; /* Bright Teal */
+    --chart-5: 240 70% 75%; /* Lighter Indigo */
 
-    --sidebar-background: 35 15% 12%; /* Slightly darker than main dark bg */
-    --sidebar-foreground: 35 20% 80%; /* Light beige text */
-    --sidebar-primary: 40 50% 70%; /* Muted Gold/Light Tan (same as main dark primary) */
-    --sidebar-primary-foreground: 35 20% 10%; /* Very Dark Brown */
-    --sidebar-accent: 35 15% 22%; /* Darker brown for hover */
-    --sidebar-accent-foreground: 35 20% 90%; /* Lighter beige text on hover */
-    --sidebar-border: 35 15% 25%; /* Darker Brown Border for Sidebar */
-    --sidebar-ring: 40 50% 70%; /* Muted Gold/Light Tan ring */
+    /* Sidebar Dark Theme */
+    --sidebar-background: 220 28% 12%; /* Slightly darker than main dark bg */
+    --sidebar-foreground: 190 75% 85%; /* Light cyan text */
+    --sidebar-primary: 200 100% 60%; /* Bright Electric Blue (same as main dark primary) */
+    --sidebar-primary-foreground: 220 100% 10%; /* Very Dark Blue */
+    --sidebar-accent: 195 45% 20%; /* Darker cyan for hover */
+    --sidebar-accent-foreground: 190 85% 90%; /* Lighter cyan text on hover */
+    --sidebar-border: 210 20% 22%; /* Darker Blue-Gray Border for Sidebar */
+    --sidebar-ring: 200 100% 60%; /* Electric Blue ring */
   }
 }
 
