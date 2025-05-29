@@ -1,3 +1,4 @@
+
 // src/app/profile/page.tsx
 "use client";
 
@@ -12,18 +13,37 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { useLocalStorage } from '@/hooks/use-local-storage';
-import { User, Mail, Bell, Palette, ShieldCheck, Activity, Edit3, LogOut, Save, XCircle, Loader2, KeyRound, Eye, EyeOff } from 'lucide-react'; // Added Eye, EyeOff
+import { User, Mail, Bell, Palette, ShieldCheck, Activity, Edit3, LogOut, Save, XCircle, Loader2, KeyRound, Eye, EyeOff, Briefcase, School, CalendarClock, GraduationCap } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+interface UserProfile {
+    name: string;
+    email: string;
+    avatarUrl: string;
+    username: string;
+    degree?: string;
+    branch?: string;
+    instituteName?: string;
+    universityName?: string;
+    semester?: string;
+    submissionYear?: string; // Can be used as graduation year or academic year
+}
 
 export default function ProfilePage() {
     const router = useRouter();
     const { toast } = useToast();
 
-    const [user, setUser] = useState({
-        name: 'Alex Doe',
-        email: 'alex.doe@example.com',
-        avatarUrl: 'https://picsum.photos/id/237/200/200',
-        username: 'alex_doe',
+    const [user, setUser] = useLocalStorage<UserProfile>('userProfileData', {
+        name: '',
+        email: '',
+        avatarUrl: `https://placehold.co/200x200.png?text=P`,
+        username: '',
+        degree: '',
+        branch: '',
+        instituteName: '',
+        universityName: '',
+        semester: '',
+        submissionYear: '',
     });
 
     const [geminiApiKey, setGeminiApiKey] = useLocalStorage<string>('geminiApiKey', '');
@@ -36,24 +56,22 @@ export default function ProfilePage() {
     const [showOpenAiKey, setShowOpenAiKey] = useState(false);
 
     const [isEditing, setIsEditing] = useState(false);
-    const [editForm, setEditForm] = useState({ name: '', email: '', username: '' });
+    const [editForm, setEditForm] = useState<UserProfile>(user);
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
-        if (isEditing) {
-            setEditForm({
-                name: user.name,
-                email: user.email,
-                username: user.username,
-            });
+        // When 'user' state (from localStorage) changes, update editForm if not currently editing
+        if (!isEditing) {
+            setEditForm(user);
         }
-    }, [isEditing, user]);
+    }, [user, isEditing]);
 
     const handleEditToggle = () => {
-        setIsEditing(!isEditing);
-        if (isEditing) {
-            setEditForm({ name: user.name, email: user.email, username: user.username });
+        if (!isEditing) {
+            // Entering edit mode, populate form with current user data
+            setEditForm(user);
         }
+        setIsEditing(!isEditing);
     };
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -63,27 +81,19 @@ export default function ProfilePage() {
 
     const handleSave = () => {
         setIsSaving(true);
-        console.log('Saving profile:', editForm);
-        console.log('Saving API keys (local storage):', { geminiApiKey: '...', openaiApiKey: '...' });
-        console.log('API Key Enabled States:', { isGeminiKeyEnabled, isOpenAiKeyEnabled });
+        // Simulate saving
         setTimeout(() => {
-            setUser(prevUser => ({
-                ...prevUser,
-                name: editForm.name,
-                email: editForm.email,
-                username: editForm.username,
-            }));
+            setUser(editForm); // Save updated form data to localStorage via useLocalStorage hook
             setIsSaving(false);
             setIsEditing(false);
             toast({
                 title: 'Profile Updated',
-                description: 'Your profile information and API key settings have been saved locally.',
+                description: 'Your profile information has been saved locally.',
             });
         }, 1500);
     };
 
     const handleLogout = () => {
-        console.log('Logging out...');
         toast({
             title: 'Logged Out',
             description: 'You have been successfully logged out.',
@@ -91,8 +101,13 @@ export default function ProfilePage() {
         router.push('/login');
     };
 
-    const joinDate = new Date(Date.now() - 1000 * 60 * 60 * 24 * 90);
+    const joinDate = new Date(Date.now() - 1000 * 60 * 60 * 24 * 90); // Placeholder
     const projectsCount = 5; // Placeholder
+
+    const getAvatarFallback = (name?: string) => {
+        if (!name) return "P";
+        return name.split(' ').map(n => n[0]).join('').toUpperCase() || "P";
+    }
 
     return (
         <div className="container mx-auto p-2 sm:p-4 md:p-8">
@@ -100,17 +115,17 @@ export default function ProfilePage() {
                 <CardHeader className="bg-gradient-to-r from-primary/10 via-background to-primary/10 p-4 sm:p-6 md:p-8 relative">
                     <div className="flex flex-col items-center text-center sm:flex-row sm:items-center sm:text-left gap-3 sm:gap-4">
                         <Avatar className="w-20 h-20 sm:w-24 sm:h-24 md:w-32 md:h-32 border-4 border-background shadow-md hover:scale-105 transition-transform duration-300">
-                            <AvatarImage src={user.avatarUrl} alt={user.name} data-ai-hint="professional person portrait" />
+                            <AvatarImage src={user.avatarUrl || `https://placehold.co/200x200.png?text=${getAvatarFallback(user.name)}`} alt={user.name || "User Avatar"} data-ai-hint="professional person portrait" />
                             <AvatarFallback className="text-3xl sm:text-4xl">
-                                {user.name.split(' ').map(n => n[0]).join('')}
+                                {getAvatarFallback(user.name)}
                             </AvatarFallback>
                         </Avatar>
                         <div className="flex-1">
                             {!isEditing ? (
                                 <>
-                                    <CardTitle className="text-2xl sm:text-3xl font-bold text-primary text-glow-primary">{user.name}</CardTitle>
+                                    <CardTitle className="text-2xl sm:text-3xl font-bold text-primary text-glow-primary">{user.name || "Your Name"}</CardTitle>
                                     <CardDescription className="text-base sm:text-lg text-muted-foreground mt-1 flex items-center justify-center sm:justify-start gap-2">
-                                        <Mail className="w-4 h-4" /> {user.email}
+                                        <Mail className="w-4 h-4" /> {user.email || "your.email@example.com"}
                                     </CardDescription>
                                 </>
                             ) : (
@@ -120,7 +135,7 @@ export default function ProfilePage() {
                                         name="name"
                                         value={editForm.name}
                                         onChange={handleInputChange}
-                                        placeholder="Your Name"
+                                        placeholder="Enter Your Full Name"
                                         className="text-2xl sm:text-3xl font-bold border-0 shadow-none focus-visible:ring-0 focus-visible:border-b focus-visible:border-primary p-0 h-auto"
                                     />
                                     <Input
@@ -129,13 +144,13 @@ export default function ProfilePage() {
                                         type="email"
                                         value={editForm.email}
                                         onChange={handleInputChange}
-                                        placeholder="Your Email"
+                                        placeholder="Enter Your Email Address"
                                         className="text-base sm:text-lg border-0 shadow-none focus-visible:ring-0 focus-visible:border-b focus-visible:border-primary p-0 h-auto text-muted-foreground"
                                     />
                                 </div>
                             )}
                             <p className="text-xs sm:text-sm text-muted-foreground mt-2">Joined {joinDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
-                            <p className="text-xs sm:text-sm text-muted-foreground">{projectsCount} Projects Created</p>
+                            <p className="text-xs sm:text-sm text-muted-foreground">{projectsCount} Projects Created (Placeholder)</p>
                         </div>
                          <div className={cn(
                              "flex gap-2 mt-3 sm:mt-0",
@@ -166,8 +181,7 @@ export default function ProfilePage() {
                         <h3 className="text-lg sm:text-xl font-semibold text-primary flex items-center gap-2"><User className="w-5 h-5" /> Account Details</h3>
                          {!isEditing ? (
                             <div className="space-y-2 text-sm">
-                                <p><strong className="text-foreground">Username:</strong> {user.username}</p>
-                                <p><strong className="text-foreground">Email:</strong> {user.email}</p>
+                                <p><strong className="text-foreground">Username:</strong> {user.username || "Not set"}</p>
                                 <Button variant="link" className="p-0 h-auto text-primary hover:underline text-sm">Change Password</Button>
                             </div>
                          ) : (
@@ -179,17 +193,38 @@ export default function ProfilePage() {
                                         name="username"
                                         value={editForm.username}
                                         onChange={handleInputChange}
-                                        placeholder="Username"
+                                        placeholder="Enter Username"
                                         className="mt-1 focus-visible:glow-primary h-9"
                                      />
                                 </div>
-                                <p><strong className="text-foreground">Email:</strong> {editForm.email} (Cannot change)</p>
                                 <Button variant="link" className="p-0 h-auto text-primary hover:underline text-sm">Change Password</Button>
                              </div>
                          )}
 
                         <Separator />
+                        <h3 className="text-lg sm:text-xl font-semibold text-primary flex items-center gap-2"><GraduationCap className="w-5 h-5" /> Educational Information</h3>
+                        {!isEditing ? (
+                            <div className="space-y-2 text-sm">
+                                <p><strong className="text-foreground">Degree:</strong> {user.degree || "Not set"}</p>
+                                <p><strong className="text-foreground">Branch:</strong> {user.branch || "Not set"}</p>
+                                <p><strong className="text-foreground">Institute:</strong> {user.instituteName || "Not set"}</p>
+                                <p><strong className="text-foreground">University:</strong> {user.universityName || "Not set"}</p>
+                                <p><strong className="text-foreground">Semester:</strong> {user.semester || "Not set"}</p>
+                                <p><strong className="text-foreground">Academic/Graduation Year:</strong> {user.submissionYear || "Not set"}</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-3 text-sm">
+                                <div><Label htmlFor="edit-degree">Degree</Label><Input id="edit-degree" name="degree" value={editForm.degree} onChange={handleInputChange} placeholder="e.g., Bachelor of Engineering" className="mt-1 focus-visible:glow-primary h-9"/></div>
+                                <div><Label htmlFor="edit-branch">Branch</Label><Input id="edit-branch" name="branch" value={editForm.branch} onChange={handleInputChange} placeholder="e.g., Computer Engineering" className="mt-1 focus-visible:glow-primary h-9"/></div>
+                                <div><Label htmlFor="edit-instituteName">Institute Name</Label><Input id="edit-instituteName" name="instituteName" value={editForm.instituteName} onChange={handleInputChange} placeholder="e.g., XYZ College of Engineering" className="mt-1 focus-visible:glow-primary h-9"/></div>
+                                <div><Label htmlFor="edit-universityName">University Name</Label><Input id="edit-universityName" name="universityName" value={editForm.universityName} onChange={handleInputChange} placeholder="e.g., ABC University" className="mt-1 focus-visible:glow-primary h-9"/></div>
+                                <div><Label htmlFor="edit-semester">Current Semester</Label><Input id="edit-semester" name="semester" type="number" value={editForm.semester} onChange={handleInputChange} placeholder="e.g., 7" className="mt-1 focus-visible:glow-primary h-9"/></div>
+                                <div><Label htmlFor="edit-submissionYear">Academic/Graduation Year</Label><Input id="edit-submissionYear" name="submissionYear" value={editForm.submissionYear} onChange={handleInputChange} placeholder="e.g., 2024 or 2023-2024" className="mt-1 focus-visible:glow-primary h-9"/></div>
+                            </div>
+                        )}
 
+
+                        <Separator />
                         <h3 className="text-lg sm:text-xl font-semibold text-primary flex items-center gap-2"><KeyRound className="w-5 h-5" /> API Key Management (Local)</h3>
                         <div className="space-y-4">
                             <div className="space-y-2">
@@ -265,37 +300,29 @@ export default function ProfilePage() {
                              <p className="text-xs text-destructive">Note: Keys are stored locally in your browser. Do not use on shared computers.</p>
                         </div>
 
-
-                        <Separator />
-
-                        <h3 className="text-lg sm:text-xl font-semibold text-primary flex items-center gap-2"><Palette className="w-5 h-5" /> Preferences</h3>
-                        <div className="space-y-2 text-sm">
-                            <p><strong className="text-foreground">Theme:</strong> (Toggle in sidebar)</p>
-                            <p><strong className="text-foreground">Language:</strong> English (US)</p>
-                        </div>
-
-                        <Separator />
-
-                        <h3 className="text-lg sm:text-xl font-semibold text-primary flex items-center gap-2"><Bell className="w-5 h-5" /> Notifications</h3>
-                        <div className="space-y-2 text-sm text-muted-foreground">
-                            <p>Manage notification preferences (e.g., email updates).</p>
-                        </div>
-
-                        <Separator />
-
-                        <h3 className="text-lg sm:text-xl font-semibold text-primary flex items-center gap-2"><ShieldCheck className="w-5 h-5" /> Security</h3>
-                        <div className="space-y-2 text-sm text-muted-foreground">
-                            <p>Review login activity.</p>
-                            <Button variant="link" className="p-0 h-auto text-primary hover:underline text-sm">View Login History</Button>
-                        </div>
-
-                        <Separator />
+                         <Separator />
                          <Button variant="destructive" className="w-full mt-3 sm:mt-4" onClick={handleLogout}>
                             <LogOut className="mr-2 h-4 w-4" /> Log Out
                          </Button>
                     </div>
 
                     <div className="space-y-4 md:space-y-6">
+                        <h3 className="text-lg sm:text-xl font-semibold text-primary flex items-center gap-2"><Palette className="w-5 h-5" /> Preferences</h3>
+                        <div className="space-y-2 text-sm">
+                            <p><strong className="text-foreground">Theme:</strong> (Toggle in main sidebar)</p>
+                            <p><strong className="text-foreground">Language:</strong> English (US) (Not configurable yet)</p>
+                        </div>
+                        <Separator/>
+                        <h3 className="text-lg sm:text-xl font-semibold text-primary flex items-center gap-2"><Bell className="w-5 h-5" /> Notifications</h3>
+                        <div className="space-y-2 text-sm text-muted-foreground">
+                            <p>Manage notification preferences (e.g., email updates). (Not implemented)</p>
+                        </div>
+                        <Separator/>
+                        <h3 className="text-lg sm:text-xl font-semibold text-primary flex items-center gap-2"><ShieldCheck className="w-5 h-5" /> Security</h3>
+                        <div className="space-y-2 text-sm text-muted-foreground">
+                            <p>Review login activity. (Not implemented)</p>
+                        </div>
+                        <Separator />
                         <h3 className="text-lg sm:text-xl font-semibold text-primary flex items-center gap-2"><Activity className="w-5 h-5" /> Recent Activity</h3>
                         <div className="space-y-3 text-sm p-3 sm:p-4 border rounded-md bg-muted/30 min-h-[150px] sm:min-h-[200px] flex flex-col justify-center items-center">
                             <p className="text-muted-foreground">Recent project activities appear here.</p>
@@ -307,3 +334,5 @@ export default function ProfilePage() {
         </div>
     );
 }
+
+    
