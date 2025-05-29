@@ -11,11 +11,11 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, Eye, Projector, BrainCircuit, Plus, Minus, CheckCircle, Edit3, ChevronRight, BookOpen, HelpCircle, ImageIcon, Table as TableIcon, Eraser } from 'lucide-react';
 import Link from 'next/link';
-import type { Project, HierarchicalProjectSection, GeneratedSectionOutline, SectionIdentifier, OutlineSection, ExplanationSlide, ExplainConceptOutput } from '@/types/project'; // Use hierarchical type
-import { findSectionById, updateSectionById, deleteSectionById, STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, TOC_SECTION_NAME, ensureDefaultSubSection, getSectionNumbering, addSubSectionById as addSubSectionUtil, parseTextToOutlineStructure } from '@/lib/project-utils'; // Added parseTextToOutlineStructure
+import type { Project, HierarchicalProjectSection, GeneratedSectionOutline, SectionIdentifier, OutlineSection, ExplanationSlide, ExplainConceptOutput } from '@/types/project';
+import { findSectionById, updateSectionById, deleteSectionById, STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, TOC_SECTION_NAME, ensureDefaultSubSection, getSectionNumbering, addSubSectionById } from '@/lib/project-utils';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { useToast } from '@/hooks/use-toast';
-import { generateSectionAction, summarizeSectionAction, generateOutlineAction, suggestImprovementsAction, generateDiagramAction, explainConceptAction, generateImageForSlideAction } from '@/app/actions';
+import { generateSectionAction, summarizeSectionAction, generateOutlineAction, suggestImprovementsAction, generateDiagramAction, explainConceptAction, generateImageForSlideAction, parseTextOutlineAction } from '@/app/actions'; // Added parseTextOutlineAction
 import type { GenerateDiagramMermaidInput } from '@/ai/flows/generate-diagram-mermaid';
 import type { ExplainConceptInput } from '@/ai/flows/explain-concept-flow';
 import { useRouter } from 'next/navigation';
@@ -286,7 +286,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const [sectionToDelete, setSectionToDelete] = useState<string | null>(null);
   const contentTextAreaRef = useRef<HTMLTextAreaElement>(null);
   const [aiImagePrompt, setAiImagePrompt] = useState("");
-  const [textOutlineInput, setTextOutlineInput] = useState(''); // For text-based outline input
+  const [textOutlineInput, setTextOutlineInput] = useState('');
+  const [isParsingTextOutline, setIsParsingTextOutline] = useState(false);
 
 
     // State for AI Concept Explainer
@@ -340,11 +341,10 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
     const handleSetActiveSection = useCallback((idOrIndex: SectionIdentifier) => {
         const newActiveId = String(idOrIndex);
-        // setActiveSubSectionId(null); // This state is removed
         if (activeSectionId !== newActiveId) {
             setActiveSectionId(newActiveId);
-            if (newActiveId !== String(-1)) { // -1 is Project Details
-                setPreviewedOutline(null); // Clear outline preview when selecting a specific section
+            if (newActiveId !== String(-1)) { 
+                setPreviewedOutline(null); 
             }
         }
         setIsMobileSheetOpen(false);
@@ -389,7 +389,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
          return currentProjectsArray;
       });
       setPreviewedOutline(null);
-      // Restore AI constraint toggle state from history
       if (undoneProject.isAiOutlineConstrained !== undefined) {
         setIsAiOutlineConstrained(undoneProject.isAiOutlineConstrained);
       }
@@ -524,13 +523,11 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                  }  else if (isFlowchart) {
                     promptText = `Generate Mermaid code for a flowchart: ${outlineSection.name.replace(/^Flowchart \d+:\s*/i, '').trim()}`;
                 } else {
-                     // General content prompt
                      promptText = `Generate the content for the section titled "${outlineSection.name.trim()}" which is numbered ${currentNumber}. This section is part of the project "${project.title}". The overall project context is: "${project.projectContext || '[No specific context provided by user for the project.]'}". Focus on providing relevant, well-structured information for this specific section.`;
                  }
 
 
                  let subSections: HierarchicalProjectSection[] = [];
-                 // Only create sub-sections if allowed by constraints (if enabled) and if AI provided them
                  if (outlineSection.subSections && (project.isAiOutlineConstrained === false || level < (project.maxSubSectionsPerSection ?? 2))) {
                      subSections = convertOutlineToSections(outlineSection.subSections, level + 1, currentNumber);
                  } else if (outlineSection.subSections) {
@@ -560,9 +557,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         toast({ title: "Sections Updated", description: `Project sections updated with the generated outline. You can now edit individual sections.`, duration: 7000 });
         setPreviewedOutline(null);
 
-        // Reset active section to project details or first section if available
         if (newSections.length > 0) {
-            handleSetActiveSection(String(-1)); // Or newSections[0].id if preferred
+            handleSetActiveSection(String(-1)); 
         } else {
             handleSetActiveSection(String(-1));
         }
@@ -578,9 +574,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             const outlineInput: GenerateProjectOutlineInput = {
                 projectTitle: project.title,
                 projectContext: project.projectContext || '',
-                isAiOutlineConstrained: project.isAiOutlineConstrained ?? true, // Pass the toggle state
+                isAiOutlineConstrained: project.isAiOutlineConstrained ?? true,
             };
-            // Only pass constraints if the toggle is ON
             if (project.isAiOutlineConstrained ?? true) {
                 outlineInput.minSections = project.minSections ?? 5;
                 outlineInput.maxSubSectionsPerSection = project.maxSubSectionsPerSection ?? 2;
@@ -644,7 +639,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             setIsGeneratingDiagram(true);
             try {
                 const diagramInput: GenerateDiagramMermaidInput = {
-                    description: targetSection.prompt || `Diagram for ${targetSection.name.replace(/^(Diagram:|Flowchart \d+:)\s*/i, '')}`, 
+                    description: targetSection.prompt || `Diagram for ${targetSection.name.replace(/^(Diagram:|Flowchart \d+:)\s*/i, '').trim()}`, 
                 };
                 const result = await generateDiagramAction(diagramInput);
                 if ('error' in result) {
@@ -912,12 +907,10 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
              lastGenerated: undefined,
              subSections: [], 
          };
-         // No longer call ensureDefaultSubSection here for top-level sections;
-         // content will be built from its sub-sections.
 
          updateProject(prev => ({
              ...prev,
-             sections: [...prev.sections, newSection], // Add the new section as a container
+             sections: [...prev.sections, newSection],
          }), true);
          toast({ title: "Section Added", description: `"${newSection.name}" added.` });
          setActiveSectionId(newSection.id); 
@@ -1144,18 +1137,34 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
       }
   };
 
-  const handleParseTextOutline = () => {
+  const handleParseTextOutline = async () => {
     if (!project || !textOutlineInput.trim()) {
         toast({ variant: "destructive", title: "No Text Provided", description: "Please paste or type your outline into the text area." });
         return;
     }
-    const parsed = parseTextToOutlineStructure(textOutlineInput);
-    if (parsed && parsed.length > 0) {
-        setPreviewedOutline({ sections: parsed });
-        toast({ title: "Text Outline Parsed", description: "Review the preview below and click 'Apply Outline' if it looks correct." });
-        setTextOutlineInput(''); // Clear input after successful parse
-    } else {
-        toast({ variant: "destructive", title: "Parsing Failed", description: "Could not parse the provided text into a valid outline structure. Please check formatting (indentation, list markers)." });
+    setIsParsingTextOutline(true);
+    try {
+        const result = await parseTextOutlineAction({ textOutline: textOutlineInput });
+        if (result && 'error' in result && typeof result.error === 'string') {
+             toast({ variant: "destructive", title: "Parsing Failed", description: result.error });
+        } else if (result && Array.isArray(result.sections)) {
+            if (result.sections.length === 0 && textOutlineInput.trim().length > 0) {
+                 toast({ variant: "destructive", title: "Parsing Issue", description: "AI could not parse the provided text into a valid outline. Please check format or try rephrasing." });
+            } else if (result.sections.length > 0) {
+                 setPreviewedOutline({ sections: result.sections });
+                 toast({ title: "Text Outline Parsed by AI", description: "Review the preview below and click 'Apply Outline' if it looks correct." });
+                 setTextOutlineInput('');
+            } else {
+                 toast({ title: "No Outline Generated", description: "The AI did not generate an outline from the provided text. It might be empty or unclear." });
+            }
+        } else {
+             toast({ variant: "destructive", title: "Parsing Failed", description: "An unexpected error occurred while parsing the outline with AI." });
+        }
+    } catch (error) {
+        console.error("Error calling parseTextOutlineAction:", error);
+        toast({ variant: "destructive", title: "Parsing Error", description: error instanceof Error ? error.message : "An unknown error occurred." });
+    } finally {
+        setIsParsingTextOutline(false);
     }
   };
 
@@ -1185,19 +1194,27 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     
     const selectedItemInfo = activeSectionId ? findSectionById(project.sections, activeSectionId) : null;
     let selectedItemLevel = -1; 
+    let parentOfSelectedItem: HierarchicalProjectSection | null = null;
 
     if (selectedItemInfo) {
-        const findLevel = (sections: HierarchicalProjectSection[], targetId: string, currentLevel: number): number => {
-            for (const s of sections) {
-                if (s.id === targetId) return currentLevel;
+        const findLevelAndParent = (
+            sectionsToSearch: HierarchicalProjectSection[],
+            targetId: string,
+            currentLevel: number,
+            currentParent: HierarchicalProjectSection | null
+        ): { level: number; parent: HierarchicalProjectSection | null } => {
+            for (const s of sectionsToSearch) {
+                if (s.id === targetId) return { level: currentLevel, parent: currentParent };
                 if (s.subSections) {
-                    const found = findLevel(s.subSections, targetId, currentLevel + 1);
-                    if (found !== -1) return found;
+                    const found = findLevelAndParent(s.subSections, targetId, currentLevel + 1, s);
+                    if (found.level !== -1) return found;
                 }
             }
-            return -1;
+            return { level: -1, parent: null };
         };
-        selectedItemLevel = findLevel(project.sections, activeSectionId!, 0); 
+        const result = findLevelAndParent(project.sections, activeSectionId!, 0, null);
+        selectedItemLevel = result.level;
+        parentOfSelectedItem = result.parent;
     }
 
 
@@ -1251,7 +1268,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                                  checked={project.isAiOutlineConstrained ?? true}
                                  onCheckedChange={(checked) => {
                                      handleProjectDetailChange('isAiOutlineConstrained', checked);
-                                     handleProjectDetailBlur(); // Save this change to history
+                                     handleProjectDetailBlur();
                                  }}
                                  aria-label="Toggle AI Outline Constraints"
                              />
@@ -1305,8 +1322,9 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                              placeholder="Paste your outline here (use indentation for hierarchy)..."
                              className="mt-1 min-h-[100px] focus-visible:glow-primary"
                          />
-                         <Button variant="outline" size="sm" onClick={handleParseTextOutline} className="mt-2">
-                             <Eraser className="mr-2 h-4 w-4" /> Parse & Preview Text Outline
+                         <Button variant="outline" size="sm" onClick={handleParseTextOutline} className="mt-2" disabled={isParsingTextOutline}>
+                             {isParsingTextOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Eraser className="mr-2 h-4 w-4" />}
+                              {isParsingTextOutline ? 'Parsing...' : 'Parse & Preview Text Outline'}
                          </Button>
                      </div>
 
@@ -1323,7 +1341,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                                      variant="default"
                                      size="sm"
                                      onClick={applyGeneratedOutline}
-                                     disabled={isGeneratingOutline}
+                                     disabled={isGeneratingOutline || isParsingTextOutline}
                                      className="hover:glow-accent focus-visible:glow-accent"
                                  >
                                      <CheckCircle className="mr-2 h-4 w-4" /> Apply Outline
@@ -1332,7 +1350,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                                      variant="outline"
                                      size="sm"
                                      onClick={() => setPreviewedOutline(null)}
-                                     disabled={isGeneratingOutline}
+                                     disabled={isGeneratingOutline || isParsingTextOutline}
                                   >
                                       Discard Preview
                                   </Button>
@@ -1349,7 +1367,9 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         const isFigure = nameLower.startsWith("figure ");
         const isTable = nameLower.startsWith("table:");
 
-        if (selectedItemLevel === 0 && !isDiagram && !isFigure && !isTable && selectedItemInfo.subSections.length > 0) {
+        const isMainLevelSection = selectedItemLevel === 0;
+
+        if (isMainLevelSection && !isDiagram && !isFigure && !isTable && selectedItemInfo.subSections.length > 0) {
             activeViewContent = <CombinedSectionPreview section={selectedItemInfo} projectTitle={project.title} />;
         } else if (isDiagram) {
             activeViewContent = (
@@ -1364,7 +1384,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                        <AiDiagramGenerator
                             onDiagramGenerated={handleDiagramGeneratedInSection}
                             initialDescription={selectedItemInfo.prompt.replace(/^(Generate Mermaid code for:|Diagram:|Flowchart \d+:)\s*/i, '').trim()}
-                            projectContext={`For project: ${project.title}. Section: ${selectedItemInfo.name}.`}
+                            projectContext={`For project: ${project.title}. Section: ${selectedItemInfo.name}. Parent: ${parentOfSelectedItem?.name || 'Top Level'}`}
                         />
                        <Button onClick={() => handleGenerateSection(selectedItemInfo.id)} disabled={isGeneratingDiagram || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting} className="hover:glow-primary focus-visible:glow-primary mt-2">
                          {isGeneratingDiagram ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BrainCircuit className="mr-2 h-4 w-4" />}

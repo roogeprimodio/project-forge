@@ -1,3 +1,4 @@
+
 // src/app/actions.ts
 "use server";
 import { generateReportSection, GenerateReportSectionInput } from '@/ai/flows/generate-report-section';
@@ -24,6 +25,9 @@ import type { ExplainConceptOutput } from '@/types/project';
 
 // Import new flow for image generation
 import { generateImageFromPrompt, GenerateImageFromPromptInput, GenerateImageFromPromptOutput } from '@/ai/flows/generate-image-from-prompt-flow';
+
+// Import new flow for parsing text outline
+import { parseTextToOutline, ParseTextToOutlineInput, ParseTextToOutlineOutput } from '@/ai/flows/parse-text-to-outline-flow';
 
 
 /**
@@ -208,8 +212,6 @@ export async function explainConceptAction(input: ExplainConceptInput): Promise<
       return { error: "Concept to explain cannot be empty." };
     }
     const result = await explainConcept(input);
-    // The explainConcept flow itself now handles initial slide generation.
-    // It provides prompts for images, but doesn't generate them directly.
     console.log("Concept explanation (text & diagram prompts) result:", { title: result.conceptTitle, slidesCount: result.slides.length });
     return result;
   } catch (error) {
@@ -221,7 +223,6 @@ export async function explainConceptAction(input: ExplainConceptInput): Promise<
 
 /**
  * Server action to generate an image for a slide using the AI flow.
- * This is called by the client component (AiConceptExplainer) when an image needs to be generated for a specific slide.
  */
 export async function generateImageForSlideAction(input: GenerateImageFromPromptInput): Promise<GenerateImageFromPromptOutput> {
     try {
@@ -229,12 +230,35 @@ export async function generateImageForSlideAction(input: GenerateImageFromPrompt
         if (!input.prompt?.trim()) {
             return { generatedImageUrl: '', error: "Image prompt cannot be empty." };
         }
-        // Use the dedicated image generation flow
         const result = await generateImageFromPrompt(input);
-        return result; // This already includes an error field if one occurred
+        return result;
     } catch (error) {
         console.error("Error in generateImageForSlideAction:", error);
         const errorMessage = error instanceof Error ? error.message : "An unknown error occurred during image generation for slide.";
         return { generatedImageUrl: '', error: `AI Image Generation Failed: ${errorMessage}` };
     }
+}
+
+/**
+ * Server action to parse a text-based outline using an AI flow.
+ */
+export async function parseTextOutlineAction(input: ParseTextToOutlineInput): Promise<ParseTextToOutlineOutput | { error: string }> {
+  try {
+    console.log("Parsing text outline with AI. Text length:", input.textOutline.length);
+    if (!input.textOutline.trim()) {
+      return { sections: [] }; // Consistent with AI flow's empty input handling
+    }
+    const result = await parseTextToOutline(input);
+     // The flow itself should return { sections: [] } or { sections: [{name: "Error..."}]} on failure.
+     // So we just check if 'error' key exists if the action wrapper itself fails.
+    if (result && 'error' in result && typeof result.error === 'string') { // Check if the action wrapper caught an error
+        return { error: result.error };
+    }
+    console.log("AI Text outline parsing result:", result);
+    return result as ParseTextToOutlineOutput; // Cast because error case is handled above.
+  } catch (error) {
+    console.error("Error in parseTextOutlineAction:", error);
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred during AI text outline parsing.";
+    return { error: errorMessage };
+  }
 }

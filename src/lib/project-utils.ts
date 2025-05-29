@@ -65,13 +65,12 @@ export const getSectionNumbering = (sections: HierarchicalProjectSection[], targ
 export function ensureDefaultSubSection(section: HierarchicalProjectSection, baseNumbering: string): HierarchicalProjectSection {
     const isSpecializedItem =
         section.name.toLowerCase().startsWith("diagram:") ||
-        section.name.toLowerCase().startsWith("figure ") || // Note the space for "Figure X:"
+        section.name.toLowerCase().startsWith("figure ") || 
         section.name.toLowerCase().startsWith("table:") ||
         section.name.toLowerCase().startsWith("flowchart ");
 
-    // Only add a default "Overview" if it's NOT specialized AND has NO subSections.
     if (!isSpecializedItem && (!section.subSections || section.subSections.length === 0)) {
-        const defaultSubSectionName = `${baseNumbering}.1 Overview`; // Default name
+        const defaultSubSectionName = `${baseNumbering}.1 Overview`; 
         return {
             ...section,
             subSections: [
@@ -80,7 +79,7 @@ export function ensureDefaultSubSection(section: HierarchicalProjectSection, bas
                     name: defaultSubSectionName,
                     prompt: `Generate an overview or main content for the "${section.name}" section, specifically focusing on what would be covered in "${defaultSubSectionName}".`,
                     content: '',
-                    subSections: [], // Default sub-sections are leaves
+                    subSections: [], 
                     lastGenerated: undefined,
                 },
             ],
@@ -95,7 +94,7 @@ export function addSubSectionById(
     sections: HierarchicalProjectSection[],
     parentId: string,
     newSubSectionData: Omit<HierarchicalProjectSection, 'subSections' | 'id'>,
-    parentNumbering: string = '' // Pass parent numbering for default sub-section naming
+    parentNumbering: string = '' 
 ): HierarchicalProjectSection[] {
     return sections.map((section, index) => {
         const currentNumbering = parentNumbering ? `${parentNumbering}.${index + 1}` : `${index + 1}`;
@@ -104,7 +103,7 @@ export function addSubSectionById(
             let subSectionToAdd: HierarchicalProjectSection = {
                 ...newSubSectionData,
                 id: newSubSectionId,
-                subSections: [], // New sub-items start with no children of their own
+                subSections: [], 
                 prompt: newSubSectionData.prompt || `Generate content for ${newSubSectionData.name} as part of ${section.name}.`,
             };
             
@@ -128,7 +127,7 @@ export function addSubSectionById(
 export function deleteSectionById(sections: HierarchicalProjectSection[], id: string): HierarchicalProjectSection[] {
     return sections.reduce((acc, section) => {
         if (section.id === id) {
-            return acc; // Skip this section
+            return acc; 
         }
         if (section.subSections) {
             const updatedSubSections = deleteSectionById(section.subSections, id);
@@ -146,92 +145,6 @@ export function deleteSectionById(sections: HierarchicalProjectSection[], id: st
     }, [] as HierarchicalProjectSection[]);
 }
 
-// Function to parse text-based outline into OutlineSection[]
-export function parseTextToOutlineStructure(text: string): OutlineSection[] | null {
-    const rawLines = text.split('\n');
-    if (rawLines.length === 0) return [];
-
-    const TAB_SPACE_EQUIVALENT = 4; // Number of spaces one tab equals
-
-    const processedLines = rawLines.map(line => {
-        // Replace leading tabs with spaces
-        const normalizedTabs = line.replace(/^\t+/g, match => ' '.repeat(match.length * TAB_SPACE_EQUIVALENT));
-        // Get leading spaces count and the actual content
-        const leadingSpacesMatch = normalizedTabs.match(/^(\s*)/);
-        const leadingSpaces = leadingSpacesMatch ? leadingSpacesMatch[0].length : 0;
-        const content = normalizedTabs.substring(leadingSpaces).trim();
-        return { originalLine: line, leadingSpaces, content };
-    }).filter(line => line.content !== ''); // Filter out lines that are empty after trimming
-
-    if (processedLines.length === 0) return [];
-
-    // Determine the indentation unit (smallest non-zero indent)
-    let indentUnit = 0;
-    const indents = processedLines.map(l => l.leadingSpaces).filter(s => s > 0);
-    if (indents.length > 0) {
-        let potentialUnit = Math.min(...indents);
-        if (potentialUnit === 0 && indents.some(i => i > 0)) { // If min is 0 but other indents exist
-            potentialUnit = Math.min(...indents.filter(i => i > 0));
-        }
-        // Check if all other indents are multiples of this unit or 0
-        const isConsistent = indents.every(i => i === 0 || i % potentialUnit === 0);
-        indentUnit = isConsistent && potentialUnit > 0 ? potentialUnit : (indents.includes(2) ? 2 : (indents.includes(4) ? 4 : (potentialUnit > 0 ? potentialUnit : 2)));
-         if (indentUnit === 0 && processedLines.some(l => l.leadingSpaces > 0)) indentUnit = 2; // Final fallback if only >0 indents exist but unit calc failed
-    }
-     if (indentUnit === 0 && processedLines.length > 1) indentUnit = 2; // Default if no indents found but multiple lines exist (might be flat list)
-     if (indentUnit === 0 && processedLines.length === 1) indentUnit = 1; // Single line, indent unit doesn't matter much but avoid division by zero
-
-
-    const result: OutlineSection[] = [];
-    const stack: { level: number; section: OutlineSection }[] = [];
-
-    const cleanName = (rawName: string): string => {
-        // Remove common list markers (hyphens, asterisks, numbers followed by dot/paren and space)
-        return rawName.replace(/^([-*]|\d+[\.\)]\s*)/, '').trim();
-    };
-
-    for (const { leadingSpaces, content } of processedLines) {
-        if (!content) continue;
-
-        const level = indentUnit > 0 ? Math.floor(leadingSpaces / indentUnit) : 0;
-        const name = cleanName(content);
-
-        if (!name) continue;
-
-        const newSection: OutlineSection = { name };
-
-        while (stack.length > 0 && stack[stack.length - 1].level >= level) {
-            stack.pop();
-        }
-
-        if (stack.length === 0) {
-            result.push(newSection);
-        } else {
-            const parent = stack[stack.length - 1].section;
-            if (!parent.subSections) {
-                parent.subSections = [];
-            }
-            parent.subSections.push(newSection);
-        }
-        stack.push({ level, section: newSection });
-    }
-    
-    const cleanEmptySubSections = (sections: OutlineSection[]): void => {
-        for (const section of sections) {
-            if (section.subSections) {
-                if (section.subSections.length === 0) {
-                    delete section.subSections;
-                } else {
-                    cleanEmptySubSections(section.subSections);
-                }
-            }
-        }
-    };
-    cleanEmptySubSections(result);
-
-    return result.length > 0 ? result : null;
-}
-
 
 // Constants for standard pages and their indices
 export const TOC_SECTION_NAME = "Table of Contents";
@@ -247,17 +160,13 @@ export const STANDARD_REPORT_PAGES = [
   "Abbreviations",
 ];
 
-// STANDARD_PAGE_INDICES should be exported
 export const STANDARD_PAGE_INDICES: { [key: string]: number } = {};
 STANDARD_REPORT_PAGES.forEach((page, index) => {
-  STANDARD_PAGE_INDICES[page] = -(index + 2); // Start from -2 (-1 is Project Details)
+  STANDARD_PAGE_INDICES[page] = -(index + 2); 
 });
-STANDARD_PAGE_INDICES[TOC_SECTION_NAME] = -100; // Assign a distinct index for TOC
+STANDARD_PAGE_INDICES[TOC_SECTION_NAME] = -100; 
 
 
-/**
- * Centralized function to update project state, handle local storage, and manage history.
- */
 export const updateProject = (
     updatedData: Partial<Project> | ((prev: Project) => Project),
     saveToHistory: boolean,
@@ -347,3 +256,6 @@ export const updateProject = (
     requestAnimationFrame(() => { isUpdatingHistory.current = false; });
 };
 
+
+// REMOVED the JavaScript-based parseTextToOutlineStructure function
+// as it's being replaced by an AI flow.
