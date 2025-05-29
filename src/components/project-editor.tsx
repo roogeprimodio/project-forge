@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, Eye, Projector, BrainCircuit, Plus, Minus, CheckCircle, Edit3, ChevronRight, BookOpen, HelpCircle, ImageIcon, Table as TableIcon, Eraser, FileUp, FileJson } from 'lucide-react';
+import { Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, Eye, Projector, BrainCircuit, Plus, Minus, CheckCircle, Edit3, ChevronRight, BookOpen, HelpCircle, ImageIcon, Table as TableIcon, Eraser, FileUp, FileJson, Info } from 'lucide-react';
 import Link from 'next/link';
 import type { Project, HierarchicalProjectSection, GeneratedSectionOutline, SectionIdentifier, OutlineSection } from '@/types/project';
 import { findSectionById, updateSectionById, deleteSectionById, STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, TOC_SECTION_NAME, ensureDefaultSubSection, getSectionNumbering, addSubSectionById } from '@/lib/project-utils';
@@ -21,6 +21,7 @@ import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Dialog, DialogClose, DialogContent as DialogModalContent, DialogDescription as DialogModalDescription, DialogFooter as DialogModalFooter, DialogHeader as DialogModalHeader, DialogTitle as DialogModalTitle, DialogTrigger as DialogModalTrigger } from "@/components/ui/dialog"; // Renamed imports
 import { marked } from 'marked';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
@@ -289,6 +290,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const [isParsingTextOutline, setIsParsingTextOutline] = useState(false);
   const textOutlineFileInputRef = useRef<HTMLInputElement>(null);
   const projectStructureFileInputRef = useRef<HTMLInputElement>(null);
+  const [isExampleJsonDialogOpen, setIsExampleJsonDialogOpen] = useState(false);
 
 
   const [activeSubSectionId, setActiveSubSectionId] = useState<string | null>(null);
@@ -1150,6 +1152,30 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     }
   };
 
+  const exampleJsonStructure = `[
+  {
+    "name": "1. Main Example Section",
+    "subSections": [
+      {
+        "name": "1.1 Example Sub-Section",
+        "subSections": [
+          { "name": "1.1.1 Diagram: Example Diagram" }
+        ]
+      },
+      { "name": "1.2 Another Example Sub-Section" }
+    ]
+  },
+  {
+    "name": "2. Second Main Example",
+    "subSections": [
+      { "name": "2.1 Simple Sub-Section" }
+    ]
+  },
+  {
+    "name": "3. Section without Sub-sections"
+  }
+]`;
+
 
   if (!hasMounted || isProjectFound === null) {
     return (
@@ -1332,6 +1358,32 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                             >
                                 <FileJson className="mr-2 h-4 w-4" /> Upload JSON File
                             </Button>
+                            <Dialog open={isExampleJsonDialogOpen} onOpenChange={setIsExampleJsonDialogOpen}>
+                                <DialogModalTrigger asChild>
+                                    <Button variant="link" size="sm" className="text-xs h-auto p-0">
+                                        <Info className="mr-1 h-3 w-3" /> View Example Format
+                                    </Button>
+                                </DialogModalTrigger>
+                                <DialogModalContent className="sm:max-w-md md:max-w-lg lg:max-w-xl">
+                                    <DialogModalHeader>
+                                        <DialogModalTitle>Example JSON Outline Structure</DialogModalTitle>
+                                        <DialogModalDescription>
+                                            Use this format for your JSON file. Ensure 'name' is present for all items. 'subSections' is optional.
+                                        </DialogModalDescription>
+                                    </DialogModalHeader>
+                                    <ScrollArea className="max-h-[60vh] mt-4">
+                                        <pre className="text-xs bg-muted p-3 rounded-md overflow-x-auto">
+                                            <code>{exampleJsonStructure}</code>
+                                        </pre>
+                                    </ScrollArea>
+                                    <DialogModalFooter className="mt-4">
+                                        <DialogClose asChild>
+                                            <Button type="button" variant="secondary">Close</Button>
+                                        </DialogClose>
+                                    </DialogModalFooter>
+                                </DialogModalContent>
+                            </Dialog>
+
                             <Input
                                 id="project-structure-file-input"
                                 type="file"
@@ -1342,9 +1394,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                             />
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">
-                            Upload a JSON file containing a pre-defined section structure. Example:
-                            <code className="text-xs bg-muted p-1 rounded">{'{ "sections": [{ "name": "Section 1", "subSections": [...] }] }'}</code> or 
-                            <code className="text-xs bg-muted p-1 rounded">{'[{ "name": "Section 1", ... }, ...]'}</code>
+                            Upload a JSON file containing a pre-defined section structure.
                         </p>
                        </div>
 
@@ -1794,5 +1844,6 @@ const validateOutlineStructure = (sections: any[] | undefined, currentDepth = 0,
         return true;
     });
 };
+
 
 
