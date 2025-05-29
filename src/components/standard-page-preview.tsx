@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2, ShieldAlert, Wand2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import MarkdownPreview from './markdown-preview'; // Assuming MarkdownPreview can handle HTML string
 
 // Import server actions for AI generation
 import {
@@ -28,6 +29,7 @@ interface StandardPagePreviewProps {
 // This now returns an HTML string and uses specific placeholders
 const getStaticPlaceholderContent = (pageName: string, project: Project): string => {
   const defaultOr = (value: string | undefined, placeholder: string) => value?.trim() || placeholder;
+  const defaultYear = new Date().getFullYear().toString();
 
   switch (pageName) {
     case 'Cover Page':
@@ -69,7 +71,7 @@ const getStaticPlaceholderContent = (pageName: string, project: Project): string
           <div style="font-size: 12pt; font-weight: bold; margin-bottom: 20px; text-align: center;">
             ${(defaultOr(project.teamDetails, '[Team Member Names & Enrollment Numbers Placeholder]').split('\n').filter(Boolean).map(line => `${line}<br>`).join(''))}
           </div>
-          <p style="font-size: 12pt; line-height: 1.6; text-align: justify; margin-bottom: 30px;">in partial fulfillment of the requirements for the award of the degree of <strong>${defaultOr(project.degree, '[Degree Placeholder]')}</strong> in <strong>${defaultOr(project.branch, '[Branch Placeholder]')}</strong> during the academic year ${defaultOr(project.submissionYear, `[${new Date().getFullYear()}]`)}.</p>
+          <p style="font-size: 12pt; line-height: 1.6; text-align: justify; margin-bottom: 30px;">in partial fulfillment of the requirements for the award of the degree of <strong>${defaultOr(project.degree, '[Degree Placeholder]')}</strong> in <strong>${defaultOr(project.branch, '[Branch Placeholder]')}</strong> during the academic year ${defaultOr(project.submissionYear, defaultYear)}.</p>
           <div style="display: flex; justify-content: space-between; margin-top: 70px; font-size: 12pt;">
             <div style="text-align: left;">
               <div style="height: 30px;"></div><hr style="border-top: 1px solid #000; width: 150px; margin-bottom: 5px;">
@@ -109,7 +111,7 @@ const getStaticPlaceholderContent = (pageName: string, project: Project): string
             </div>
         `;
     case 'Abstract':
-        const isContextSufficient = project.projectContext && project.projectContext.length >= 50;
+        const isContextSufficient = project.projectContext && project.projectContext.trim().length >= 50;
         return `
           <div style="font-family: 'Times New Roman', serif; padding: 20px; margin: 20px; page-break-after: always;">
           <h1 style="text-align: center; font-size: 20pt; font-weight: bold; margin-bottom: 30px; text-decoration: underline;">ABSTRACT</h1>
@@ -125,9 +127,9 @@ const getStaticPlaceholderContent = (pageName: string, project: Project): string
         const ackIsPlural = ackTeamMembers.length > 1 || (ackTeamMembers.length === 0 && project.teamDetails?.includes('\n'));
         const ackPronoun = ackIsPlural ? "We" : "I";
         const ackPossessivePronoun = ackIsPlural ? "our" : "my";
-        const ackVerbOwe = "owe";
-        const ackVerbAm = ackIsPlural ? "are" : "am";
-        const ackVerbWish = "wish";
+        const ackVerbOwe = "owe"; // Helper would handle this
+        const ackVerbAmAre = ackIsPlural ? "are" : "am"; // Helper would handle this
+        const ackVerbWish = "wish"; // Helper would handle this
         const ackThankHOD = project.hodName ? `To the Head of the Department, Prof. ${defaultOr(project.hodName, '[HOD Name Placeholder]')}, ${ackPronoun} would like to express ${ackPossessivePronoun} gratitude for his/her cordial collaboration and support in ${ackPossessivePronoun} endeavor.` : '';
         const ackAdditionalThanks = project.additionalThanks ? `<p style="font-size: 12pt; line-height: 1.8; text-align: justify; text-indent: 30px; margin-bottom: 15px;">${ackPronoun} would also like to extend ${ackPossessivePronoun} thanks to ${project.additionalThanks}.</p>` : '';
 
@@ -141,7 +143,7 @@ const getStaticPlaceholderContent = (pageName: string, project: Project): string
             ${ackPronoun} ${ackVerbOwe} a lot to ${defaultOr(project.guideName, '[Guide Name Placeholder]')} for ${ackPossessivePronoun} guidance and constant supervision, as well as for providing important project specifics and invaluable support throughout the course of this project.
             </p>
             <p style="font-size: 12pt; line-height: 1.8; text-align: justify; text-indent: 30px; margin-bottom: 15px;">
-            ${ackPronoun} ${ackVerbAm} thankful to the <strong>${defaultOr(project.instituteName, '[Institute Name Placeholder]')}</strong> and the Department of <strong>${defaultOr(project.branch, '[Branch Placeholder]')}</strong> for providing all the necessary facilities and a conducive environment for the project work.
+            ${ackPronoun} ${ackVerbAmAre} thankful to the <strong>${defaultOr(project.instituteName, '[Institute Name Placeholder]')}</strong> and the Department of <strong>${defaultOr(project.branch, '[Branch Placeholder]')}</strong> for providing all the necessary facilities and a conducive environment for the project work.
             ${ackThankHOD}
             </p>
             ${ackAdditionalThanks}
@@ -241,11 +243,15 @@ export const StandardPagePreview: React.FC<StandardPagePreviewProps> = ({ pageNa
       }
 
       if (result && result.error) {
-          throw new Error(result.error);
+          // If the action returned a specific error message, show it as a toast
+          toast({ variant: "destructive", title: `Failed to Generate ${pageName}`, description: result.error, duration: 7000 });
+          setError(result.error); // Optionally set local error state too
+          setIsLoading(false); // Ensure loading state is reset
+          return; // Stop further execution
       }
       toast({ title: `${pageName} Content Generated`, description: "AI has generated the content for this page." });
 
-    } catch (err: any) {
+    } catch (err: any) { // This catch block is for unexpected errors during the action call itself
       const errorMessage = err instanceof Error ? err.message : "An unknown error occurred during generation.";
       setError(errorMessage);
       toast({ variant: "destructive", title: `Failed to Generate ${pageName}`, description: errorMessage, duration: 7000 });
@@ -276,7 +282,7 @@ export const StandardPagePreview: React.FC<StandardPagePreviewProps> = ({ pageNa
       </CardHeader>
       <CardContent className="flex-grow overflow-hidden">
         <ScrollArea className="h-full pr-1">
-          {error && !isLoading && ( // Show error only if not loading and error exists
+          {error && !isLoading && !generatedContent && ( // Show error only if not loading, no generated content, and error exists
             <div className="my-4 p-3 bg-destructive/10 border border-destructive text-destructive rounded-md text-sm">
               <div className="flex items-center gap-2 font-semibold">
                 <ShieldAlert className="h-5 w-5"/> Error Generating Content:
@@ -288,7 +294,7 @@ export const StandardPagePreview: React.FC<StandardPagePreviewProps> = ({ pageNa
             className={cn(
               "bg-white dark:bg-neutral-900 shadow-xl rounded-sm mx-auto",
               "p-6 sm:p-10 md:p-16",
-              "w-full max-w-[210mm]", // A4 width
+              "w-full max-w-[210mm]",
               "min-h-[297mm] md:min-h-[calc(1.4142*var(--a4-width-val,210mm))]",
               "aspect-[210/297]",
               "text-sm sm:text-base"
