@@ -74,7 +74,7 @@ const AiDiagramGenerator: React.FC<AiDiagramGeneratorProps> = ({
       } else if (result.mermaidCode) {
         setGeneratedCode(result.mermaidCode);
         if (onDiagramGenerated) { 
-          onDiagramGenerated(result.mermaidCode);
+          onDiagramGenerated(result.mermaidCode); // Pass generated code up
         }
         toast({ title: 'Diagram Generated', description: 'Mermaid code created successfully.' });
       } else {
@@ -96,7 +96,7 @@ const AiDiagramGenerator: React.FC<AiDiagramGeneratorProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
         <div className="md:col-span-2 space-y-2">
           <Label htmlFor="diagram-description-ai" className="text-sm font-medium">
-            Diagram Description
+            Diagram Description (Prompt for AI)
           </Label>
           <Textarea
             id="diagram-description-ai"
