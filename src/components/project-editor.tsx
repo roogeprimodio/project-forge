@@ -1,5 +1,5 @@
 
-"use client"; // Keep this if ProjectEditor uses client hooks like useState, useEffect
+"use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
@@ -44,7 +44,7 @@ import Image from 'next/image';
 const OutlinePreviewItem: React.FC<{ item: OutlineSection; level: number }> = ({ item, level }) => {
   const hasSubSections = item.subSections && item.subSections.length > 0;
   // Defensive check for item.name
-  const itemName = typeof item.name === 'string' ? item.name : "[Unnamed Section]";
+  const itemName = (typeof item.name === 'string' && item.name.trim()) ? item.name : "[Unnamed Section]";
   const isDiagram = itemName.toLowerCase().startsWith("diagram:") || itemName.toLowerCase().startsWith("figure:") || itemName.toLowerCase().startsWith("table:") || itemName.toLowerCase().startsWith("flowchart:");
 
   return (
@@ -442,6 +442,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
          updateProject({ [field]: Math.max(0, value) }, false);
     } else if (validBooleanFields.includes(field) && typeof value === 'boolean') {
         updateProject({ [field]: value }, false);
+        if (field === 'isAiOutlineConstrained') setIsAiOutlineConstrained(value);
     } else if (validNumberFields.includes(field) && typeof value === 'string') {
         const numValue = parseInt(value, 10);
         if (!isNaN(numValue)) {
@@ -971,12 +972,12 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     if (!project || !activeSectionId) return; 
 
     const targetSection = findSectionById(project.sections, activeSectionId);
-    if (!targetSection || !(targetSection.name.toLowerCase().startsWith("diagram:") || targetSection.name.toLowerCase().startsWith("flowchart:"))) return;
+    if (!targetSection || !(targetSection.name.toLowerCase().startsWith("diagram:") || targetSection.name.toLowerCase().startsWith("flowchart:") || targetSection.name.toLowerCase().startsWith("figure "))) return;
 
     updateProject(prev => ({
         ...prev,
         sections: updateSectionById(prev.sections, activeSectionId!, {
-            content: mermaidCode,
+            content: mermaidCode, // Assuming diagram/figure uses content to store mermaid/prompt
             lastGenerated: new Date().toISOString(),
         }),
     }), true);
@@ -1152,6 +1153,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         } else if (result && Array.isArray(result.sections)) {
             if (result.sections.length === 0 && textOutlineInput.trim().length > 0) {
                  toast({ variant: "destructive", title: "Parsing Issue", description: "AI could not parse the provided text into a valid outline. Please check format or try rephrasing." });
+            } else if (result.sections.length > 0 && result.sections[0]?.name?.startsWith("Error:")) {
+                 toast({ variant: "destructive", title: "AI Parsing Error", description: result.sections[0].name });
             } else if (result.sections.length > 0) {
                  setPreviewedOutline({ sections: result.sections });
                  toast({ title: "Text Outline Parsed by AI", description: "Review the preview below and click 'Apply Outline' if it looks correct." });

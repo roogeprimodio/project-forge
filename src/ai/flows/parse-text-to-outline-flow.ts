@@ -15,7 +15,7 @@ import type { OutlineSection, GeneratedSectionOutline } from '@/types/project';
 // Recursive schema for sections and sub-sections
 const OutlineSectionSchema: z.ZodType<OutlineSection> = z.lazy(() =>
   z.object({
-    name: z.string().min(1).describe('The full name of the section or sub-section. Original numbering/markers MUST be stripped. This name is MANDATORY.'), // Enforce non-empty name
+    name: z.string().min(1).describe('The full name of the section or sub-section. Original numbering/markers MUST be stripped. This name is MANDATORY and must not be empty.'),
     subSections: z.array(OutlineSectionSchema).optional().describe('An optional array of sub-sections. OMIT this key if there are no sub-items.'),
   })
 );
@@ -48,22 +48,22 @@ Input Text Outline:
 {{{textOutline}}}
 \`\`\`
 
-**Instructions for JSON Conversion:**
+**CRITICAL Instructions for JSON Conversion:**
 1.  **Hierarchy:** Accurately interpret the indentation to determine parent-child relationships.
     *   Lines with less indentation are parents to subsequent lines with more indentation.
     *   Lines with the same indentation level (after a parent) are siblings.
-2.  **Section Names (CRITICAL):**
-    *   Extract the meaningful name for each section/sub-section. This name field is MANDATORY.
+2.  **Section Names (MANDATORY):**
+    *   For EVERY item in the outline (section or sub-section), you MUST extract a meaningful 'name'.
     *   Strip any leading list markers (e.g., '-', '*', '1.', 'A)', 'i.') and their subsequent spaces from the name.
     *   Trim leading/trailing whitespace from the extracted name.
-    *   Ensure EVERY section and sub-section object has a non-empty 'name' property.
-3.  subSections Key:
+    *   Ensure EVERY section and sub-section object in the output JSON has a non-empty 'name' string property. If a line seems to be only indentation or markers with no actual text, it should be ignored or you should try to infer a placeholder name like "[Unnamed Item]".
+3.  **'subSections' Key:**
     *   If a section has child items, represent them as an array in a 'subSections' key.
     *   **CRITICAL: If a section has NO children, COMPLETELY OMIT the 'subSections' key for that object in the JSON. Do NOT include \`"subSections": []\` for leaf nodes.**
 4.  **Output Format:**
     *   The entire output MUST be a single JSON object matching the 'ParseTextToOutlineOutputSchema'.
     *   The root of this object must have a "sections" key, which is an array of top-level OutlineSection objects.
-    *   If the input text is empty, invalid, or cannot be parsed into a meaningful outline, return an empty "sections" array: \`{ "sections": [] }\`.
+    *   If the input text is empty, invalid, or cannot be parsed into a meaningful outline with named sections, return an empty "sections" array: \`{ "sections": [] }\`.
 
 **Example Input Text:**
 \`\`\`text
@@ -116,29 +116,45 @@ const parseTextToOutlineFlow = ai.defineFlow(
     inputSchema: ParseTextToOutlineInputSchema,
     outputSchema: ParseTextToOutlineOutputSchema,
   },
-  async (input) => {
+  async (input): Promise<ParseTextToOutlineOutput> => {
     if (!input.textOutline || input.textOutline.trim() === '') {
       return { sections: [] }; // Return empty if input is empty
     }
-    const { output } = await prompt(input);
-    if (!output || !Array.isArray(output.sections)) {
-        console.error("AI parsing for text outline returned invalid structure:", output);
-        // Attempt to provide a fallback or indicate error
-        return { sections: [{ name: "Error: AI failed to parse the outline. Please check your text format."}] };
-    }
-    // Additional validation to ensure all items have names (though Zod should catch this)
-    const validateNames = (secs: OutlineSection[]): boolean => {
-        return secs.every(s => {
-            if (typeof s.name !== 'string' || !s.name.trim()) return false;
-            if (s.subSections && !validateNames(s.subSections)) return false;
-            return true;
-        });
-    };
-    if (!validateNames(output.sections)) {
-        console.error("AI parsing returned items without names:", output);
-        return { sections: [{ name: "Error: AI returned some items without names. Please check your text format."}] };
-    }
+    try {
+      const { output: rawOutput } = await prompt(input);
 
-    return output;
+      // Validate the raw output from AI against the Zod schema
+      // This will throw an error if the structure is incorrect (e.g., missing 'name')
+      const parsedOutput = ParseTextToOutlineOutputSchema.parse(rawOutput);
+
+      // Additional explicit check for names, although Zod should catch it.
+      const validateNamesRecursive = (secs: OutlineSection[]): boolean => {
+        return secs.every(s => {
+          if (typeof s.name !== 'string' || !s.name.trim()) return false;
+          if (s.subSections && !validateNamesRecursive(s.subSections)) return false;
+          return true;
+        });
+      };
+
+      if (!parsedOutput.sections || !validateNamesRecursive(parsedOutput.sections)) {
+        console.error("AI parsing returned items without names or invalid section structure:", parsedOutput);
+        return { sections: [{ name: "Error: AI returned an invalid outline structure (e.g., missing names). Please check your text format or simplify."}] };
+      }
+
+      return parsedOutput;
+
+    } catch (error: any) {
+      console.error("Error in parseTextToOutlineFlow:", error);
+      let errorMessage = "AI failed to parse the outline. Please check your text format or try again.";
+      if (error instanceof z.ZodError) {
+        errorMessage = `AI returned data in an unexpected format. Details: ${error.errors.map(e => `${e.path.join('.')} - ${e.message}`).join(', ')}`;
+        // Limit length of Zod error details in toast
+        if (errorMessage.length > 200) errorMessage = errorMessage.substring(0, 197) + "...";
+      } else if (error.message) {
+        errorMessage = error.message.substring(0,200); // Limit length for toast
+      }
+      // Return a valid structure with an error message
+      return { sections: [{ name: `Error: ${errorMessage}` }] };
+    }
   }
 );
