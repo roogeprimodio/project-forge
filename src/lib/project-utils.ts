@@ -61,18 +61,17 @@ export const getSectionNumbering = (sections: HierarchicalProjectSection[], targ
 
 
 // Function to ensure a section has a default sub-section if it's meant to hold content but has no explicit sub-sections
-// This function is now less relevant as the AI prompt is designed to create rich sub-sections.
-// It might still be useful if a user manually adds a section that should have content.
+// This is primarily for non-specialized (content) sections.
 export function ensureDefaultSubSection(section: HierarchicalProjectSection, baseNumbering: string): HierarchicalProjectSection {
     const isSpecializedItem =
         section.name.toLowerCase().startsWith("diagram:") ||
-        section.name.toLowerCase().startsWith("figure:") ||
+        section.name.toLowerCase().startsWith("figure ") || // Note the space for "Figure X:"
         section.name.toLowerCase().startsWith("table:") ||
-        section.name.toLowerCase().startsWith("flowchart:");
+        section.name.toLowerCase().startsWith("flowchart ");
 
-    // If it's not a specialized item and has no subSections, add a default "Overview" child.
+    // Only add a default "Overview" if it's NOT specialized AND has NO subSections.
     if (!isSpecializedItem && (!section.subSections || section.subSections.length === 0)) {
-        const defaultSubSectionName = `${baseNumbering}.1 Overview`;
+        const defaultSubSectionName = `${baseNumbering}.1 Overview`; // Default name
         return {
             ...section,
             subSections: [
@@ -108,13 +107,14 @@ export function addSubSectionById(
                 subSections: [], // New sub-items start with no children of their own
                 prompt: newSubSectionData.prompt || `Generate content for ${newSubSectionData.name} as part of ${section.name}.`,
             };
-
-            // No longer call ensureDefaultSubSection here when adding.
-            // The user/AI will decide if this new item needs further children.
+            
+            // Ensure the new sub-section has a default child if it's not a specialized item
+            // const processedSubSection = ensureDefaultSubSection(subSectionToAdd, `${currentNumbering}.${(section.subSections || []).length + 1}`);
 
             return {
                 ...section,
-                subSections: [...(section.subSections || []), subSectionToAdd],
+                // subSections: [...(section.subSections || []), processedSubSection],
+                subSections: [...(section.subSections || []), subSectionToAdd], // Add as is, default child creation handled by AI outline or editor
             };
         }
         if (section.subSections) {
@@ -159,57 +159,67 @@ export function parseTextToOutlineStructure(text: string): OutlineSection[] | nu
     const result: OutlineSection[] = [];
     const stack: { level: number; section: OutlineSection }[] = [];
 
-    // Determine indentation type and size from the first indented line
-    let indentSize = 2; // Default to 2 spaces
+    let indentSize = 0;
     let indentType: 'space' | 'tab' | null = null;
 
+    // Attempt to determine indentation style and size from the first few indented lines
     for (const line of lines) {
-        const firstChar = line[0];
-        if (firstChar === ' ') {
-            indentType = 'space';
-            let count = 0;
-            while (line[count] === ' ') count++;
-            if (count > 0) indentSize = count; // Assume first indent sets the size
-            break;
-        } else if (firstChar === '\t') {
-            indentType = 'tab';
-            indentSize = 1; // Tabs are typically 1 unit of indentation
-            break;
-        }
-    }
-     if (indentType === null && lines.length > 1 && (lines[1].startsWith(' ') || lines[1].startsWith('\t'))) {
-        // If first line has no indent but second does, re-check from second
-        const firstCharSecond = lines[1][0];
-         if (firstCharSecond === ' ') {
-            indentType = 'space';
-            let count = 0;
-            while (lines[1][count] === ' ') count++;
-            if (count > 0) indentSize = count;
-        } else if (firstCharSecond === '\t') {
-            indentType = 'tab';
-            indentSize = 1;
+        if (line.trim() === '') continue; // Skip blank lines for indent detection
+        const match = line.match(/^(\s+)/);
+        if (match) {
+            const leadingSpace = match[0];
+            if (leadingSpace.includes('\t')) {
+                indentType = 'tab';
+                indentSize = 1; // Typically, one tab is one level
+                break;
+            } else if (leadingSpace.includes(' ')) {
+                indentType = 'space';
+                // Try common space indentations or the first one found
+                if (leadingSpace.length % 4 === 0) indentSize = 4;
+                else if (leadingSpace.length % 2 === 0) indentSize = 2;
+                else indentSize = leadingSpace.length; // Fallback to the exact space count if not typical
+                break;
+            }
         }
     }
 
+    // If no indentation detected, assume flat list or default to a common space indent
+    if (!indentType) {
+        indentType = 'space';
+        indentSize = 2; // Default if no indentation is found or lines are all at root
+    }
 
     const getIndentationLevel = (line: string): number => {
-        if (indentType === 'space') {
-            const match = line.match(/^(\s*)/);
-            return match ? Math.floor(match[0].length / indentSize) : 0;
-        } else if (indentType === 'tab') {
-            const match = line.match(/^(\t*)/);
-            return match ? match[0].length : 0;
+        if (line.trim() === '') return -1; // Indicate blank line to be skipped later
+        const match = line.match(/^(\s*)/);
+        if (match) {
+            const leadingSpace = match[0];
+            if (indentType === 'tab') {
+                return leadingSpace.split('\t').length - 1;
+            } else if (indentType === 'space' && indentSize > 0) {
+                return Math.floor(leadingSpace.length / indentSize);
+            }
         }
-        return 0; // No indentation or mixed
+        return 0; // No indentation
+    };
+    
+    const cleanName = (rawName: string): string => {
+        // Remove common list markers (hyphens, asterisks, numbers followed by dot/paren and space)
+        // and leading/trailing whitespace.
+        return rawName.replace(/^(\s*[-*]|\s*\d+[\.\)]\s*)/, '').trim();
     };
 
+
     for (const line of lines) {
-        const level = getIndentationLevel(line);
-        const name = line.trim().replace(/^(- |\* |\d+\.?\s*)/, '').trim(); // Clean list markers and numbers
+        const trimmedLine = line.trimRight(); // Keep leading spaces for indent detection
+        if (trimmedLine.trim() === '') continue; // Skip effectively blank lines
 
-        if (!name) continue; // Skip empty lines after trimming markers
+        const level = getIndentationLevel(trimmedLine);
+        const name = cleanName(trimmedLine);
 
-        const newSection: OutlineSection = { name }; // Initialize subSections as undefined
+        if (!name) continue;
+
+        const newSection: OutlineSection = { name };
 
         while (stack.length > 0 && stack[stack.length - 1].level >= level) {
             stack.pop();
@@ -219,16 +229,15 @@ export function parseTextToOutlineStructure(text: string): OutlineSection[] | nu
             result.push(newSection);
         } else {
             const parent = stack[stack.length - 1].section;
-            if (!parent.subSections) { 
-                parent.subSections = []; // Initialize if it's the first child
+            if (!parent.subSections) {
+                parent.subSections = [];
             }
             parent.subSections.push(newSection);
         }
         stack.push({ level, section: newSection });
     }
     
-    // Clean up empty subSections arrays to match AI flow expectation (omit key if empty)
-    // This also ensures consistency: if subSections has items, it's an array; otherwise, the key is omitted.
+    // Ensure `subSections` key is omitted if empty, as per AI output expectations
     const cleanEmptySubSections = (sections: OutlineSection[]): void => {
         for (const section of sections) {
             if (section.subSections) {
@@ -241,6 +250,7 @@ export function parseTextToOutlineStructure(text: string): OutlineSection[] | nu
         }
     };
     cleanEmptySubSections(result);
+
     return result.length > 0 ? result : null;
 }
 
@@ -259,6 +269,7 @@ export const STANDARD_REPORT_PAGES = [
   "Abbreviations",
 ];
 
+// STANDARD_PAGE_INDICES should be exported
 export const STANDARD_PAGE_INDICES: { [key: string]: number } = {};
 STANDARD_REPORT_PAGES.forEach((page, index) => {
   STANDARD_PAGE_INDICES[page] = -(index + 2); // Start from -2 (-1 is Project Details)
@@ -318,6 +329,7 @@ export const updateProject = (
         if (saveToHistory) {
             setHistory(prevHistory => {
                 const newHistorySlice = prevHistory.slice(0, historyIndex + 1);
+                // Only add to history if the new state is actually different from the current top of history
                 if (newHistorySlice.length === 0 || JSON.stringify(newHistorySlice[newHistorySlice.length - 1]) !== JSON.stringify(newProjectState)) {
                     const updatedHistory = [...newHistorySlice, newProjectState];
                     const finalHistory = updatedHistory.length > maxHistoryLength ? updatedHistory.slice(-maxHistoryLength) : updatedHistory;
@@ -353,15 +365,15 @@ export const updateProject = (
                 return updatedProjectsArray;
             }
         } else if (currentProjectState && saveToHistory) { // Project might not be in 'projects' if coming from history
-             if (!updatedProjectsArray.some(p => p.id === projectId)) { // Add if not present
+             // Add if not present and intended for history save (implies it should be in projects list too)
+             if (!updatedProjectsArray.some(p => p.id === projectId)) {
                 updatedProjectsArray.push(newProjectState);
                 return updatedProjectsArray;
              }
         }
+        // If no actual change to the project in the list, return the original array to avoid re-render
         return currentProjectsArray; 
     });
 
     requestAnimationFrame(() => { isUpdatingHistory.current = false; });
 };
-
-      
