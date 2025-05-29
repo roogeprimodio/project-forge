@@ -1,5 +1,5 @@
 
-"use client";
+"use client"; // Keep this if ProjectEditor uses client hooks like useState, useEffect
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, Eye, Projector, BrainCircuit, Plus, Minus, CheckCircle, Edit3, ChevronRight, BookOpen, HelpCircle, ImageIcon, Table as TableIcon, Eraser, FileUp } from 'lucide-react'; // Added FileUp
+import { Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, Eye, Projector, BrainCircuit, Plus, Minus, CheckCircle, Edit3, ChevronRight, BookOpen, HelpCircle, ImageIcon, Table as TableIcon, Eraser, FileUp, FileJson } from 'lucide-react';
 import Link from 'next/link';
 import type { Project, HierarchicalProjectSection, GeneratedSectionOutline, SectionIdentifier, OutlineSection } from '@/types/project';
 import { findSectionById, updateSectionById, deleteSectionById, STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, TOC_SECTION_NAME, ensureDefaultSubSection, getSectionNumbering, addSubSectionById } from '@/lib/project-utils';
@@ -38,6 +38,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import Image from 'next/image';
 
 
+// Recursive component to render the preview outline
 const OutlinePreviewItem: React.FC<{ item: OutlineSection; level: number }> = ({ item, level }) => {
   const hasSubSections = item.subSections && item.subSections.length > 0;
   const itemName = (typeof item.name === 'string' && item.name.trim()) ? item.name : "[Unnamed Section]";
@@ -286,8 +287,8 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   
   const [textOutlineInput, setTextOutlineInput] = useState('');
   const [isParsingTextOutline, setIsParsingTextOutline] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [aiImagePrompt, setAiImagePrompt] = useState('');
+  const textOutlineFileInputRef = useRef<HTMLInputElement>(null);
+  const projectStructureFileInputRef = useRef<HTMLInputElement>(null);
 
 
   const [activeSubSectionId, setActiveSubSectionId] = useState<string | null>(null);
@@ -511,13 +512,13 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                  let promptText = `Generate content for the "${outlineSection.name.trim()}" section.`;
                  if (isDiagram) {
                      promptText = `Generate Mermaid code for: ${outlineSection.name.replace(/^Diagram:\s*/i, '').trim()}`;
+                 } else if (isFlowchart) {
+                    promptText = `Generate Mermaid code for a flowchart: ${outlineSection.name.replace(/^Flowchart \d+:\s*/i, '').trim()}`;
                  } else if (isFigure) {
                      promptText = `Provide a detailed description or prompt for an AI to generate an image for: ${outlineSection.name.replace(/^Figure \d+:\s*/i, '').trim()}`;
                  } else if (isTable) {
                      promptText = `Generate Markdown table data for: ${outlineSection.name.replace(/^Table \d+:\s*/i, '').trim()}`;
-                 }  else if (isFlowchart) {
-                    promptText = `Generate Mermaid code for a flowchart: ${outlineSection.name.replace(/^Flowchart \d+:\s*/i, '').trim()}`;
-                } else {
+                 }  else {
                      promptText = `Generate the content for the section titled "${outlineSection.name.trim()}" which is numbered ${currentNumber}. This section is part of the project "${project.title}". The overall project context is: "${project.projectContext || '[No specific context provided by user for the project.]'}". Focus on providing relevant, well-structured information for this specific section.`;
                  }
 
@@ -661,8 +662,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             setIsGeneratingImage(true);
             try {
                 const imageGenPrompt = targetSection.prompt || `An image depicting: ${targetSection.name.replace(/^Figure \d+:\s*/i, '')}`;
-                setAiImagePrompt(imageGenPrompt); 
-                const result = await generateImageForSlideAction({ prompt: imageGenPrompt });
+                const result = await generateImageForSlideAction({ prompt: imageGenPrompt }); // Reusing slide action for now
                 if (result.error) {
                     throw new Error(result.error);
                 }
@@ -902,7 +902,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
          const newSection: HierarchicalProjectSection = {
              id: uuidv4(),
              name: `New Section ${newSectionNumber}`,
-             prompt: `Generate an outline for this new section.`, 
+             prompt: `Generate content for this new section.`, 
              content: '', 
              lastGenerated: undefined,
              subSections: [],
@@ -930,15 +930,16 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
      }
    };
 
-  const handleDiagramGeneratedInSection = (mermaidCode: string) => {
-    if (!project || !activeSubSectionId) return;
+  const handleDiagramGeneratedInSection = (mermaidCode: string, sectionId?: string) => {
+    const targetId = sectionId || activeSubSectionId;
+    if (!project || !targetId) return;
 
-    const subSection = findSectionById(project.sections, activeSubSectionId);
+    const subSection = findSectionById(project.sections, targetId);
     if (!subSection || !(subSection.name.toLowerCase().startsWith("diagram:") || subSection.name.toLowerCase().startsWith("flowchart:"))) return;
 
     updateProject(prev => ({
         ...prev,
-        sections: updateSectionById(prev.sections, activeSubSectionId!, {
+        sections: updateSectionById(prev.sections, targetId!, {
             content: mermaidCode,
             lastGenerated: new Date().toISOString(),
         }),
@@ -1083,7 +1084,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     }
   };
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleTextOutlineFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       const reader = new FileReader();
@@ -1092,20 +1093,60 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         setTextOutlineInput(text);
         toast({
           title: "File Content Loaded",
-          description: "File content has been loaded into the text area. Click 'Parse & Preview' to process.",
+          description: "Text outline loaded. Click 'Parse & Preview' to process.",
         });
       };
       reader.onerror = () => {
-        toast({
-          variant: "destructive",
-          title: "File Read Error",
-          description: "Could not read the selected file.",
-        });
+        toast({ variant: "destructive", title: "File Read Error", description: "Could not read the selected text file." });
       };
       reader.readAsText(file);
     }
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
+    if (textOutlineFileInputRef.current) {
+      textOutlineFileInputRef.current.value = "";
+    }
+  };
+
+  const handleProjectStructureFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+        if (file.type !== 'application/json') {
+            toast({ variant: "destructive", title: "Invalid File Type", description: "Please upload a valid JSON file for project structure."});
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const text = e.target?.result as string;
+                const parsedJson = JSON.parse(text);
+                // Validate if parsedJson has a 'sections' property and it's an array
+                if (parsedJson && Array.isArray(parsedJson.sections) && validateOutlineStructure(parsedJson.sections)) {
+                     // Further validate if each item in sections matches OutlineSection structure (simplified check here)
+                    const isValidStructure = parsedJson.sections.every((sec: any) => typeof sec.name === 'string');
+                    if (isValidStructure) {
+                        setPreviewedOutline({ sections: parsedJson.sections });
+                        toast({ title: "Project Structure Loaded", description: "Review the preview and click 'Apply Outline'." });
+                    } else {
+                        throw new Error("JSON structure is not a valid section outline.");
+                    }
+                } else if (parsedJson && Array.isArray(parsedJson) && validateOutlineStructure(parsedJson)) {
+                    // Handle case where the uploaded JSON is directly an array of OutlineSection
+                    setPreviewedOutline({ sections: parsedJson });
+                    toast({ title: "Project Structure Loaded", description: "Review the preview and click 'Apply Outline'." });
+                } else {
+                    throw new Error("JSON file does not contain a valid 'sections' array or is not a direct array of sections.");
+                }
+            } catch (err) {
+                console.error("Error parsing project structure JSON:", err);
+                toast({ variant: "destructive", title: "Import Failed", description: `Could not parse JSON file: ${err instanceof Error ? err.message : "Unknown error"}` });
+            }
+        };
+        reader.onerror = () => {
+            toast({ variant: "destructive", title: "File Read Error", description: "Could not read the project structure file." });
+        };
+        reader.readAsText(file);
+    }
+    if (projectStructureFileInputRef.current) {
+        projectStructureFileInputRef.current.value = "";
     }
   };
 
@@ -1240,7 +1281,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                      </Button>
                       <Separator />
                      <div>
-                         <Label htmlFor="text-outline-input">Paste Text Outline</Label>
+                         <Label htmlFor="text-outline-input">Paste Text Outline (for AI Parsing)</Label>
                          <Textarea
                              id="text-outline-input"
                              value={textOutlineInput}
@@ -1257,26 +1298,56 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                                 type="button"
                                 variant="outline"
                                 size="icon"
-                                onClick={() => fileInputRef.current?.click()}
-                                title="Upload Outline File"
+                                onClick={() => textOutlineFileInputRef.current?.click()}
+                                title="Upload Text Outline File"
                                 className="h-9 w-9"
                             >
                                 <FileUp className="h-4 w-4" />
-                                <span className="sr-only">Upload Outline File</span>
+                                <span className="sr-only">Upload Text Outline File</span>
                              </Button>
                              <Input
                                 id="text-outline-file-input"
                                 type="file"
                                 accept=".txt,text/plain"
-                                ref={fileInputRef}
-                                onChange={handleFileChange}
+                                ref={textOutlineFileInputRef}
+                                onChange={handleTextOutlineFileChange}
                                 className="hidden"
                               />
                          </div>
                           <p className="text-xs text-muted-foreground mt-1">
-                            The AI will attempt to parse the text into a hierarchical outline. You can also upload a .txt file.
+                            AI will parse this text into a hierarchical outline. You can also upload a .txt file.
                          </p>
                      </div>
+
+                      <Separator />
+                       <div>
+                        <Label htmlFor="project-structure-file-input">Import Project Structure (JSON)</Label>
+                        <div className="flex items-center gap-2 mt-1">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => projectStructureFileInputRef.current?.click()}
+                                className="flex-1"
+                            >
+                                <FileJson className="mr-2 h-4 w-4" /> Upload JSON File
+                            </Button>
+                            <Input
+                                id="project-structure-file-input"
+                                type="file"
+                                accept=".json,application/json"
+                                ref={projectStructureFileInputRef}
+                                onChange={handleProjectStructureFileChange}
+                                className="hidden"
+                            />
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                            Upload a JSON file containing a pre-defined section structure. Example:
+                            <code className="text-xs bg-muted p-1 rounded">{'{ "sections": [{ "name": "Section 1", "subSections": [...] }] }'}</code> or 
+                            <code className="text-xs bg-muted p-1 rounded">{'[{ "name": "Section 1", ... }, ...]'}</code>
+                        </p>
+                       </div>
+
 
                      {previewedOutline && (
                          <div className="w-full p-4 border rounded-md bg-muted/30 space-y-3">
@@ -1310,7 +1381,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 </CardFooter>
             </Card>
         );
-    } else if (itemToRender) { // Check if itemToRender (either main section or sub-section) is selected
+    } else if (itemToRender) { 
         activeViewName = itemToRender.name;
         const isMainLevelSection = !activeSubSectionId && !!activeSectionId && itemToRender.id === activeSectionId;
 
@@ -1329,15 +1400,11 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                      <CardContent className="space-y-4">
                        <p className="text-sm text-muted-foreground">Use the AI generator below to create the diagram content. The generated Mermaid code will be stored for this item.</p>
                        <AiDiagramGenerator
-                            onDiagramGenerated={(code) => handleSectionContentChange(itemToRender.id, code)}
+                            onDiagramGenerated={(code) => handleDiagramGeneratedInSection(code, itemToRender.id)}
                             initialDescription={itemToRender.prompt.replace(/^(Generate Mermaid code for:|Diagram:|Flowchart \d+:)\s*/i, '').trim()}
                             projectContext={`For project: ${project.title}. Section: ${itemToRender.name}.`}
                         />
-                       <Button onClick={() => handleGenerateSection(itemToRender.id)} disabled={isGeneratingDiagram || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting || isGeneratingImage} className="hover:glow-primary focus-visible:glow-primary mt-2">
-                         {isGeneratingDiagram ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BrainCircuit className="mr-2 h-4 w-4" />}
-                         {isGeneratingDiagram ? 'Generating Diagram...' : 'Generate/Update Diagram with AI'}
-                       </Button>
-                        {itemToRender.content && (
+                       {itemToRender.content && (
                            <div className="mt-4 space-y-2">
                                <Label>Current Diagram:</Label>
                                <MermaidDiagram chart={itemToRender.content} id={`diagram-${itemToRender.id}`} />
@@ -1688,6 +1755,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   );
 }
 
+// Validates the structure of OutlineSection[] for basic correctness
 const validateOutlineStructure = (sections: any[] | undefined, currentDepth = 0, maxDepth?: number): sections is OutlineSection[] => {
     if (!Array.isArray(sections)) {
         console.warn(`Outline Validation Failed (Depth ${currentDepth}): Root 'sections' is not an array.`);
@@ -1726,4 +1794,5 @@ const validateOutlineStructure = (sections: any[] | undefined, currentDepth = 0,
         return true;
     });
 };
+
 

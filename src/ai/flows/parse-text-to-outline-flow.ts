@@ -15,14 +15,14 @@ import type { OutlineSection } from '@/types/project'; // Ensure this matches th
 // Recursive schema for sections and sub-sections
 const OutlineSectionSchema: z.ZodType<OutlineSection> = z.lazy(() =>
   z.object({
-    name: z.string().min(1).describe('The full name of the section or sub-section, extracted verbatim from the input text after stripping list markers. THIS IS MANDATORY and must not be empty.'),
+    name: z.string().min(1, { message: "Section name cannot be empty." }).describe('The full name of the section or sub-section, extracted verbatim from the input text after stripping list markers. THIS IS MANDATORY and must not be empty.'),
     subSections: z.array(OutlineSectionSchema).optional().describe('An optional array of sub-sections. OMIT this key completely if there are no sub-items. DO NOT provide an empty array like "subSections": [].'),
   })
 );
 
 // Output schema matches GeneratedSectionOutline from types/project.ts
 const ParseTextToOutlineOutputSchema = z.object({
-  sections: z.array(OutlineSectionSchema).describe('An ordered, hierarchical list of sections parsed from the text. If parsing fails or text is empty/unparseable, return an empty array: { "sections": [] } or a single error section: { "sections": [{ "name": "Error: Parsing failed..." }] }.'),
+  sections: z.array(OutlineSectionSchema).describe('An ordered, hierarchical list of sections parsed from the text. If parsing fails or text is empty/unparseable, return an object like: { "sections": [{ "name": "Error: Parsing failed due to [reason]. Please check your text format or simplify." }] }. If input is empty, return { "sections": [] }.'),
 });
 export type ParseTextToOutlineOutput = z.infer<typeof ParseTextToOutlineOutputSchema>;
 
@@ -57,14 +57,16 @@ Input Text Outline:
     *   STRIP any leading list markers (e.g., '-', '*', '1.', 'A)', 'i.', '#', '##') and any subsequent spaces from the name.
     *   The extracted name becomes the value for the 'name' string property.
     *   Trim leading/trailing whitespace from the extracted name.
-    *   **Ensure EVERY section object in the output JSON has a non-empty 'name' string property.** If a line seems to be only indentation or markers with no actual text, it should be ignored or you should try to infer a placeholder name like "[Unnamed Item]".
+    *   **Ensure EVERY section object in the output JSON has a non-empty 'name' string property.** If a line is empty or only markers, ignore it or use a placeholder like "[Unnamed Item]".
 3.  **'subSections' Key (Conditional):**
     *   If a section has child items (items indented further beneath it), represent these children as an array in a 'subSections' key for that parent section.
     *   **CRITICAL: If a section has NO children, COMPLETELY OMIT the 'subSections' key for that object in the JSON. Do NOT include \`"subSections": []\` for leaf nodes.**
 4.  **Output Format:**
     *   The entire output MUST be a single JSON object precisely matching the 'ParseTextToOutlineOutputSchema'.
     *   The root of this object must have a "sections" key, which is an array of top-level OutlineSection objects.
-    *   If the input text is empty, invalid, or cannot be parsed into a meaningful outline, return an object with an empty "sections" array: \`{ "sections": [] }\`. DO NOT return conversational text or explanations.
+    *   If the input text is empty, return \`{ "sections": [] }\`.
+    *   If the input text cannot be parsed into a meaningful outline, return an object like \`{ "sections": [{ "name": "Error: Could not parse the provided text into a hierarchical outline. Please check formatting and ensure clear indentation." }] }\`.
+    *   DO NOT return conversational text or explanations outside the JSON.
 
 **Example Input Text:**
 \`\`\`text
@@ -108,7 +110,7 @@ Input Text Outline:
 }
 \`\`\`
 Process the provided "{{{textOutline}}}" now. Adhere STRICTLY to all instructions and the JSON output format.
-Only output the JSON object.
+Only output the JSON object. If parsing fails due to ambiguous input, provide the structured error format mentioned above.
 `,
 });
 
@@ -134,13 +136,24 @@ const parseTextToOutlineFlow = ai.defineFlow(
 
       console.log("parseTextToOutlineFlow: Raw AI output:", JSON.stringify(rawOutput).substring(0, 200) + "...");
 
-      // Try to parse the AI's output
-      const parsedOutput = ParseTextToOutlineOutputSchema.safeParse(rawOutput);
+      // Try to parse the AI's output string if it's a string, otherwise assume it's already an object
+      let outputObject: any = rawOutput;
+      if (typeof rawOutput === 'string') {
+        try {
+          outputObject = JSON.parse(rawOutput);
+        } catch (jsonParseError) {
+          console.error("parseTextToOutlineFlow: Failed to parse AI's string output as JSON.", jsonParseError);
+          return { sections: [{ name: `Error: AI output was not valid JSON. Output: ${rawOutput.substring(0,100)}...` }] };
+        }
+      }
+
+      // Validate the structure with Zod
+      const parsedOutput = ParseTextToOutlineOutputSchema.safeParse(outputObject);
 
       if (!parsedOutput.success) {
         console.error("parseTextToOutlineFlow: Zod validation failed for AI output.", parsedOutput.error.issues);
         const errorMessages = parsedOutput.error.issues.map(issue => `Path: ${issue.path.join('.')}, Message: ${issue.message}`).join('; ');
-        return { sections: [{ name: `Error: AI output did not match expected structure. Details: ${errorMessages.substring(0,150)}...` }] };
+        return { sections: [{ name: `Error: AI output structure invalid. Details: ${errorMessages.substring(0,150)}...` }] };
       }
       
       const validateNamesRecursive = (secs: OutlineSection[]): boolean => {
@@ -153,7 +166,7 @@ const parseTextToOutlineFlow = ai.defineFlow(
 
       if (!parsedOutput.data.sections || (parsedOutput.data.sections.length > 0 && !validateNamesRecursive(parsedOutput.data.sections))) {
         console.error("parseTextToOutlineFlow: AI parsing returned items without names or invalid section structure after Zod success:", parsedOutput.data);
-        return { sections: [{ name: "Error: AI returned an invalid outline structure (e.g., missing names). Please check your text format or simplify."}] };
+        return { sections: [{ name: "Error: AI returned an invalid outline (e.g., missing names). Please check text format or simplify."}] };
       }
       
       console.log("parseTextToOutlineFlow: Successfully parsed AI output.");
@@ -169,3 +182,4 @@ const parseTextToOutlineFlow = ai.defineFlow(
     }
   }
 );
+
