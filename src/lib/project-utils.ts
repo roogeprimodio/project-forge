@@ -108,13 +108,9 @@ export function addSubSectionById(
                 prompt: newSubSectionData.prompt || `Generate content for ${newSubSectionData.name} as part of ${section.name}.`,
             };
             
-            // Ensure the new sub-section has a default child if it's not a specialized item
-            // const processedSubSection = ensureDefaultSubSection(subSectionToAdd, `${currentNumbering}.${(section.subSections || []).length + 1}`);
-
             return {
                 ...section,
-                // subSections: [...(section.subSections || []), processedSubSection],
-                subSections: [...(section.subSections || []), subSectionToAdd], // Add as is, default child creation handled by AI outline or editor
+                subSections: [...(section.subSections || []), subSectionToAdd], 
             };
         }
         if (section.subSections) {
@@ -136,13 +132,12 @@ export function deleteSectionById(sections: HierarchicalProjectSection[], id: st
         }
         if (section.subSections) {
             const updatedSubSections = deleteSectionById(section.subSections, id);
-            // Only push if subSections changed or it wasn't empty before and now is (edge case)
             if (updatedSubSections !== section.subSections || (section.subSections.length > 0 && updatedSubSections.length === 0)) {
                  acc.push({ ...section, subSections: updatedSubSections });
-            } else if (updatedSubSections.length > 0 || section.subSections.length === 0 ) { // if no subsections or subsections still exist
+            } else if (updatedSubSections.length > 0 || section.subSections.length === 0 ) { 
                  acc.push({ ...section, subSections: updatedSubSections });
             } else {
-                 acc.push(section); // No change in subsections, push original
+                 acc.push(section); 
             }
         } else {
             acc.push(section);
@@ -153,69 +148,53 @@ export function deleteSectionById(sections: HierarchicalProjectSection[], id: st
 
 // Function to parse text-based outline into OutlineSection[]
 export function parseTextToOutlineStructure(text: string): OutlineSection[] | null {
-    const lines = text.split('\n').filter(line => line.trim() !== '');
-    if (lines.length === 0) return [];
+    const rawLines = text.split('\n');
+    if (rawLines.length === 0) return [];
+
+    const TAB_SPACE_EQUIVALENT = 4; // Number of spaces one tab equals
+
+    const processedLines = rawLines.map(line => {
+        // Replace leading tabs with spaces
+        const normalizedTabs = line.replace(/^\t+/g, match => ' '.repeat(match.length * TAB_SPACE_EQUIVALENT));
+        // Get leading spaces count and the actual content
+        const leadingSpacesMatch = normalizedTabs.match(/^(\s*)/);
+        const leadingSpaces = leadingSpacesMatch ? leadingSpacesMatch[0].length : 0;
+        const content = normalizedTabs.substring(leadingSpaces).trim();
+        return { originalLine: line, leadingSpaces, content };
+    }).filter(line => line.content !== ''); // Filter out lines that are empty after trimming
+
+    if (processedLines.length === 0) return [];
+
+    // Determine the indentation unit (smallest non-zero indent)
+    let indentUnit = 0;
+    const indents = processedLines.map(l => l.leadingSpaces).filter(s => s > 0);
+    if (indents.length > 0) {
+        let potentialUnit = Math.min(...indents);
+        if (potentialUnit === 0 && indents.some(i => i > 0)) { // If min is 0 but other indents exist
+            potentialUnit = Math.min(...indents.filter(i => i > 0));
+        }
+        // Check if all other indents are multiples of this unit or 0
+        const isConsistent = indents.every(i => i === 0 || i % potentialUnit === 0);
+        indentUnit = isConsistent && potentialUnit > 0 ? potentialUnit : (indents.includes(2) ? 2 : (indents.includes(4) ? 4 : (potentialUnit > 0 ? potentialUnit : 2)));
+         if (indentUnit === 0 && processedLines.some(l => l.leadingSpaces > 0)) indentUnit = 2; // Final fallback if only >0 indents exist but unit calc failed
+    }
+     if (indentUnit === 0 && processedLines.length > 1) indentUnit = 2; // Default if no indents found but multiple lines exist (might be flat list)
+     if (indentUnit === 0 && processedLines.length === 1) indentUnit = 1; // Single line, indent unit doesn't matter much but avoid division by zero
+
 
     const result: OutlineSection[] = [];
     const stack: { level: number; section: OutlineSection }[] = [];
 
-    let indentSize = 0;
-    let indentType: 'space' | 'tab' | null = null;
-
-    // Attempt to determine indentation style and size from the first few indented lines
-    for (const line of lines) {
-        if (line.trim() === '') continue; // Skip blank lines for indent detection
-        const match = line.match(/^(\s+)/);
-        if (match) {
-            const leadingSpace = match[0];
-            if (leadingSpace.includes('\t')) {
-                indentType = 'tab';
-                indentSize = 1; // Typically, one tab is one level
-                break;
-            } else if (leadingSpace.includes(' ')) {
-                indentType = 'space';
-                // Try common space indentations or the first one found
-                if (leadingSpace.length % 4 === 0) indentSize = 4;
-                else if (leadingSpace.length % 2 === 0) indentSize = 2;
-                else indentSize = leadingSpace.length; // Fallback to the exact space count if not typical
-                break;
-            }
-        }
-    }
-
-    // If no indentation detected, assume flat list or default to a common space indent
-    if (!indentType) {
-        indentType = 'space';
-        indentSize = 2; // Default if no indentation is found or lines are all at root
-    }
-
-    const getIndentationLevel = (line: string): number => {
-        if (line.trim() === '') return -1; // Indicate blank line to be skipped later
-        const match = line.match(/^(\s*)/);
-        if (match) {
-            const leadingSpace = match[0];
-            if (indentType === 'tab') {
-                return leadingSpace.split('\t').length - 1;
-            } else if (indentType === 'space' && indentSize > 0) {
-                return Math.floor(leadingSpace.length / indentSize);
-            }
-        }
-        return 0; // No indentation
-    };
-    
     const cleanName = (rawName: string): string => {
         // Remove common list markers (hyphens, asterisks, numbers followed by dot/paren and space)
-        // and leading/trailing whitespace.
-        return rawName.replace(/^(\s*[-*]|\s*\d+[\.\)]\s*)/, '').trim();
+        return rawName.replace(/^([-*]|\d+[\.\)]\s*)/, '').trim();
     };
 
+    for (const { leadingSpaces, content } of processedLines) {
+        if (!content) continue;
 
-    for (const line of lines) {
-        const trimmedLine = line.trimRight(); // Keep leading spaces for indent detection
-        if (trimmedLine.trim() === '') continue; // Skip effectively blank lines
-
-        const level = getIndentationLevel(trimmedLine);
-        const name = cleanName(trimmedLine);
+        const level = indentUnit > 0 ? Math.floor(leadingSpaces / indentUnit) : 0;
+        const name = cleanName(content);
 
         if (!name) continue;
 
@@ -237,7 +216,6 @@ export function parseTextToOutlineStructure(text: string): OutlineSection[] | nu
         stack.push({ level, section: newSection });
     }
     
-    // Ensure `subSections` key is omitted if empty, as per AI output expectations
     const cleanEmptySubSections = (sections: OutlineSection[]): void => {
         for (const section of sections) {
             if (section.subSections) {
@@ -307,7 +285,6 @@ export const updateProject = (
         if (currentProjectIndex !== -1) {
             projectToUpdate = currentProjectsArray[currentProjectIndex];
         } else if (currentProjectState) {
-            // This case might occur if history is ahead of the main 'projects' list
             projectToUpdate = currentProjectState;
         }
 
@@ -322,34 +299,29 @@ export const updateProject = (
             ? updatedData(projectToUpdate)
             : { ...projectToUpdate, ...updatedData };
 
-        // Always set a new updatedAt timestamp for any meaningful change
         const newProjectState = { ...newProjectData, updatedAt: new Date().toISOString() };
 
 
         if (saveToHistory) {
             setHistory(prevHistory => {
                 const newHistorySlice = prevHistory.slice(0, historyIndex + 1);
-                // Only add to history if the new state is actually different from the current top of history
                 if (newHistorySlice.length === 0 || JSON.stringify(newHistorySlice[newHistorySlice.length - 1]) !== JSON.stringify(newProjectState)) {
                     const updatedHistory = [...newHistorySlice, newProjectState];
                     const finalHistory = updatedHistory.length > maxHistoryLength ? updatedHistory.slice(-maxHistoryLength) : updatedHistory;
                     setHistoryIndex(finalHistory.length - 1);
                     return finalHistory;
                 }
-                // If the new state is identical to the current history top, don't add a duplicate
                 setHistoryIndex(newHistorySlice.length - 1); 
                 return newHistorySlice;
             });
         } else {
-            // If not saving to history (e.g., intermediate typing), update the current history state
             setHistory(prevHistory => {
                 const newHistory = [...prevHistory];
                 if (historyIndex >= 0 && historyIndex < newHistory.length) {
-                     // Only update if different to avoid re-renders
                     if (JSON.stringify(newHistory[historyIndex]) !== JSON.stringify(newProjectState)) {
                         newHistory[historyIndex] = newProjectState;
                     }
-                } else if (newHistory.length === 0) { // Handle empty history
+                } else if (newHistory.length === 0) { 
                     newHistory.push(newProjectState);
                     setHistoryIndex(0);
                 }
@@ -359,21 +331,19 @@ export const updateProject = (
 
         const updatedProjectsArray = [...currentProjectsArray];
         if (currentProjectIndex !== -1) {
-             // Only update if different to avoid re-renders
             if (JSON.stringify(updatedProjectsArray[currentProjectIndex]) !== JSON.stringify(newProjectState)) {
                  updatedProjectsArray[currentProjectIndex] = newProjectState;
                 return updatedProjectsArray;
             }
-        } else if (currentProjectState && saveToHistory) { // Project might not be in 'projects' if coming from history
-             // Add if not present and intended for history save (implies it should be in projects list too)
+        } else if (currentProjectState && saveToHistory) { 
              if (!updatedProjectsArray.some(p => p.id === projectId)) {
                 updatedProjectsArray.push(newProjectState);
                 return updatedProjectsArray;
              }
         }
-        // If no actual change to the project in the list, return the original array to avoid re-render
         return currentProjectsArray; 
     });
 
     requestAnimationFrame(() => { isUpdatingHistory.current = false; });
 };
+
