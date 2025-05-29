@@ -5,17 +5,27 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useLocalStorage } from '@/hooks/use-local-storage';
-import type { Project } from '@/types/project';
+import type { Project, HierarchicalProjectSection } from '@/types/project';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Loader2, ChevronLeft, Download, CloudOff, Home, FileWarning, Eye } from 'lucide-react';
-import { jsPDF } from "jspdf";
+import { jsPDF, HTMLOptionImage } from "jspdf"; // Import HTMLOptionImage for addImage
 import 'jspdf-autotable';
 import { marked } from 'marked';
 import { useToast } from '@/hooks/use-toast';
+
+// Import server actions for standard page generation
+import {
+  generateCoverPageAction,
+  generateCertificateAction,
+  generateDeclarationAction,
+  generateAbstractAction,
+  generateAcknowledgementAction,
+} from '@/app/actions';
+import { STANDARD_REPORT_PAGES, TOC_SECTION_NAME } from '@/types/project';
 
 
 declare module 'jspdf' {
@@ -34,7 +44,7 @@ export default function ExportPage() {
   const [projects] = useLocalStorage<Project[]>('projects', []);
   const [isProjectFound, setIsProjectFound] = useState<boolean | null>(null);
   const [format, setFormat] = useState<'markdown' | 'pdf'>('pdf');
-  const [includeTitlePage, setIncludeTitlePage] = useState(true);
+  const [includeTitlePage, setIncludeTitlePage] = useState(true); // This now refers to the Cover Page standard page
   const [includeToc, setIncludeToc] = useState(true);
   const [addHeadersFooters, setAddHeadersFooters] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
@@ -51,125 +61,315 @@ export default function ExportPage() {
     }
   }, [projects, projectId, isProjectFound]);
 
-  const generateMarkdown = () => {
+  const generateMarkdownForExport = () => {
     if (!project) return '';
     let markdown = '';
-    if (includeTitlePage) {
-        markdown += `# ${project.title}\n\n`;
-        if (project.instituteName) markdown += `**Institute:** ${project.instituteName}\n`;
-        if (project.branch) markdown += `**Branch:** ${project.branch}\n`;
-        if (project.semester) markdown += `**Semester:** ${project.semester}\n`;
-        if (project.subject) markdown += `**Subject:** ${project.subject}\n`;
-        if (project.teamId) markdown += `**Team ID:** ${project.teamId}\n`;
-        if (project.teamDetails) markdown += `**Team Members:**\n${project.teamDetails.split('\n').filter(Boolean).map(line => `- ${line}`).join('\n')}\n`;
-        if (project.guideName) markdown += `**Guide:** ${project.guideName}\n\n`;
-        markdown += '---\n\n';
+
+    // Simplified Markdown generation - Standard pages are complex HTML, difficult to convert back accurately
+    // For Markdown export, we'll primarily focus on project details and report sections' raw Markdown.
+    markdown += `# ${project.title}\n\n`;
+    if (project.instituteName) markdown += `**Institute:** ${project.instituteName}\n`;
+    if (project.branch) markdown += `**Branch:** ${project.branch}\n`;
+    // Add other relevant project details...
+    markdown += '---\n\n';
+
+    if (includeToc) {
+        const tocSection = project.sections.find(s => s.name === TOC_SECTION_NAME);
+        if (tocSection) {
+            markdown += `## ${TOC_SECTION_NAME}\n\n${tocSection.content || '[ToC not generated]'}\n\n---\n\n`;
+        }
     }
-    project.sections.forEach(section => {
-        if (!includeToc && section.name === 'Table of Contents') return;
-        markdown += `## ${section.name}\n\n${section.content || '[Content not generated]'}\n\n---\n\n`;
-    });
+
+    const renderHierarchicalSectionsMd = (sections: HierarchicalProjectSection[], level = 0): string => {
+        let md = '';
+        sections.forEach(section => {
+            if (section.name === TOC_SECTION_NAME && includeToc) return; // Already handled
+            md += `${'#'.repeat(level + 2)} ${section.name}\n\n`;
+            // For specialized items, you might want to output their prompt or a placeholder
+            const nameLower = section.name.toLowerCase();
+            if (nameLower.startsWith("diagram:") || nameLower.startsWith("flowchart:")) {
+                md += `\`\`\`mermaid\n${section.content || `[Mermaid diagram: ${section.name}]`}\n\`\`\`\n\n`;
+            } else if (nameLower.startsWith("figure:")) {
+                md += `![Figure: ${section.name}](${section.content || 'placeholder.png'})\n_Prompt: ${section.prompt}_\n\n`;
+            } else if (nameLower.startsWith("table:")) {
+                md += `${section.content || `[Table data for: ${section.name}]`}\n\n`; // Assuming content is Markdown table
+            } else {
+                md += `${section.content || '[Content not generated]'}\n\n`;
+            }
+            if (section.subSections && section.subSections.length > 0) {
+                md += renderHierarchicalSectionsMd(section.subSections, level + 1);
+            }
+            md += '---\n\n';
+        });
+        return md;
+    };
+    markdown += renderHierarchicalSectionsMd(project.sections.filter(s => s.name !== TOC_SECTION_NAME));
     return markdown;
   };
+
+  const addHtmlToPdf = async (doc: jsPDF, htmlContent: string, yPosSignal: { y: number }, options: { isStandardPage?: boolean } = {}) => {
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 15;
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = htmlContent;
+    // Basic styling for PDF rendering consistency for standard pages
+    if (options.isStandardPage) {
+        tempDiv.style.fontFamily = "'Times New Roman', serif";
+        tempDiv.style.fontSize = "12pt";
+        tempDiv.style.lineHeight = "1.5";
+        tempDiv.style.color = "#000000";
+        const allElements = tempDiv.querySelectorAll('*');
+        allElements.forEach((el) => {
+            const htmlEl = el as HTMLElement;
+            htmlEl.style.fontFamily = "'Times New Roman', serif";
+            htmlEl.style.color = "#000000";
+            if (htmlEl.tagName === 'H1') htmlEl.style.fontSize = "20pt";
+            if (htmlEl.tagName === 'H2') htmlEl.style.fontSize = "18pt";
+            if (htmlEl.tagName === 'P') htmlEl.style.fontSize = "12pt";
+        });
+    }
+
+    // Append to body to allow jsPDF to calculate dimensions, then remove
+    tempDiv.style.position = 'absolute';
+    tempDiv.style.left = '-9999px'; // Position off-screen
+    tempDiv.style.width = `${doc.internal.pageSize.getWidth() - 2 * margin}px`; // A4 width minus margins
+    document.body.appendChild(tempDiv);
+
+    try {
+        await doc.html(tempDiv, {
+            callback: function (doc) {
+                // yPosSignal.y is updated by jsPDF's html method's internal cursor
+            },
+            x: margin,
+            y: yPosSignal.y,
+            autoPaging: 'text', // Changed to 'text' for better flow control
+            width: doc.internal.pageSize.getWidth() - 2 * margin,
+            windowWidth: doc.internal.pageSize.getWidth() - 2 * margin,
+            margin: [0,0,0,0] // internal margins handled by x,y and width
+        });
+    } catch (e) {
+        console.error("Error rendering HTML to PDF with doc.html:", e);
+        toast({ variant: "destructive", title: "PDF HTML Error", description: "Could not render some HTML content."});
+         // Fallback to simple text rendering if doc.html fails
+        doc.setFontSize(10);
+        doc.text("Error rendering complex HTML. Content follows as plain text:", margin, yPosSignal.y);
+        yPosSignal.y += 7;
+        const lines = doc.splitTextToSize(tempDiv.innerText || "Content placeholder", doc.internal.pageSize.getWidth() - 2 * margin);
+        lines.forEach((line: string) => {
+            if (yPosSignal.y > pageHeight - margin) {
+                doc.addPage();
+                yPosSignal.y = margin;
+            }
+            doc.text(line, margin, yPosSignal.y);
+            yPosSignal.y += 7;
+        });
+    } finally {
+        document.body.removeChild(tempDiv);
+    }
+    
+    if (yPosSignal.y > pageHeight - margin - 10) { // Ensure some space before adding next element
+        doc.addPage();
+        yPosSignal.y = margin;
+    } else {
+        yPosSignal.y += 5; // Add some spacing
+    }
+};
+
 
   const createPdfDocument = async (project: Project): Promise<jsPDF> => {
     const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
     const pageHeight = doc.internal.pageSize.getHeight();
     const pageWidth = doc.internal.pageSize.getWidth();
     const margin = 15;
-    let yPos = margin;
-    let currentPage = 1;
+    let yPosSignal = { y: margin }; // Use an object to pass yPos by reference
 
-    const addHeaderFooter = (currentPageNum: number, totalPagesNum: number, sectionName?: string) => {
+    const addHeaderFooterToAllPages = (mainProjectTitle: string) => {
         if (!addHeadersFooters) return;
-        const headerText = `${project.title} ${sectionName ? `- ${sectionName}` : ''}`;
-        const footerText = `Page ${currentPageNum} of ${totalPagesNum}`;
-        doc.setFontSize(8);
-        doc.setTextColor(150);
-        const maxHeaderWidth = pageWidth - 2 * margin;
-        const truncatedHeaderText = doc.splitTextToSize(headerText, maxHeaderWidth)[0];
-        doc.text(truncatedHeaderText, margin, margin / 2, { align: 'left' });
-        doc.text(footerText, pageWidth / 2, pageHeight - margin / 2, { align: 'center' });
-        doc.setTextColor(0);
-        doc.setFontSize(12);
-    };
-
-    const checkAndAddPage = (requiredHeight: number = 10) => {
-      if (yPos + requiredHeight > pageHeight - margin) {
-        doc.addPage();
-        currentPage++;
-        yPos = margin;
-      }
-    };
-
-    const addFormattedText = async (
-        text: string,
-        size: number,
-        style: 'normal' | 'bold' | 'italic' | 'bolditalic' = 'normal',
-        options: { align?: 'left' | 'center' | 'right'; isHtml?: boolean } = {}
-    ) => {
-        const maxWidth = pageWidth - 2 * margin;
-        doc.setFontSize(size);
-        doc.setFont('helvetica', style);
-        let textToAdd = text;
-        if (options.isHtml) {
-            textToAdd = textToAdd
-                .replace(/<\/?(div|p|br)[^>]*>/gi, '\n')
-                .replace(/<\/?b[^>]*>|<\/?strong[^>]*>/gi, '**')
-                .replace(/<\/?i[^>]*>|<\/?em[^>]*>/gi, '_')
-                .replace(/<[^>]+>/g, '')
-                .replace(/&nbsp;/g, ' ')
-                .replace(/\n{3,}/g, '\n\n')
-                .trim();
-        }
-        const lines = doc.splitTextToSize(textToAdd, maxWidth);
-        lines.forEach((line: string) => {
-            const lineHeight = size * 0.35 * 1.2;
-            checkAndAddPage(lineHeight);
-            doc.text(line, options.align === 'center' ? pageWidth / 2 : margin, yPos, { align: options.align || 'left' });
-            yPos += lineHeight;
-        });
-        checkAndAddPage(5);
-        yPos += 5;
-    };
-
-    if (includeTitlePage) {
-      checkAndAddPage(40);
-      await addFormattedText(project.title, 22, 'bold', { align: 'center' });
-      yPos += 10;
-      if (project.instituteName) await addFormattedText(`Institute: ${project.instituteName}`, 12);
-      if (project.branch) await addFormattedText(`Branch: ${project.branch}`, 12);
-      if (project.semester) await addFormattedText(`Semester: ${project.semester}`, 12);
-      if (project.subject) await addFormattedText(`Subject: ${project.subject}`, 12);
-      if (project.teamId) await addFormattedText(`Team ID: ${project.teamId}`, 12);
-      if (project.teamDetails) await addFormattedText(`Team Members:\n${project.teamDetails.split('\n').filter(Boolean).join('\n')}`, 12);
-      if (project.guideName) await addFormattedText(`Faculty Guide: ${project.guideName}`, 12);
-      doc.addPage();
-      currentPage++;
-      yPos = margin;
-    }
-
-    for (const section of project.sections) {
-      if (!includeToc && section.name === 'Table of Contents') continue;
-      checkAndAddPage(20);
-      await addFormattedText(section.name, 16, 'bold');
-      yPos += 2;
-      const content = section.content || '[Content not generated]';
-      const parsedHtmlAttempt = await marked.parse(content);
-      checkAndAddPage(10);
-      await addFormattedText(parsedHtmlAttempt, 12, 'normal', { isHtml: true });
-      checkAndAddPage(5);
-      yPos += 5;
-    }
-
-     if (addHeadersFooters) {
-        const totalPages = doc.internal.pages.length - 1;
+        const totalPages = doc.getNumberOfPages();
         for (let i = 1; i <= totalPages; i++) {
             doc.setPage(i);
-            addHeaderFooter(i, totalPages);
+            doc.setFontSize(8);
+            doc.setTextColor(150);
+            const headerText = mainProjectTitle;
+            const footerText = `Page ${i} of ${totalPages}`;
+            const maxHeaderWidth = pageWidth - 2 * margin;
+            const truncatedHeaderText = doc.splitTextToSize(headerText, maxHeaderWidth)[0];
+            doc.text(truncatedHeaderText, margin, margin / 2, { align: 'left' });
+            doc.text(footerText, pageWidth / 2, pageHeight - margin / 2, { align: 'center' });
+            doc.setTextColor(0);
         }
-        doc.setPage(totalPages);
-     }
+        doc.setPage(totalPages); // Return to the last page
+        yPosSignal.y = doc.internal.pageSize.getHeight() - margin; // Ensure yPos is at bottom if it was the last op
+        if (yPosSignal.y < margin + 10) yPosSignal.y = margin; // Reset yPos if it ended up too high on a new page.
+    };
+    
+    const checkAndAddPage = (requiredHeight: number = 10) => {
+        if (yPosSignal.y + requiredHeight > pageHeight - margin) {
+            doc.addPage();
+            yPosSignal.y = margin;
+        }
+    };
+
+    // 1. Standard Pages
+    const standardPageActions = {
+        "Cover Page": generateCoverPageAction,
+        "Certificate": generateCertificateAction,
+        "Declaration": generateDeclarationAction,
+        "Abstract": generateAbstractAction,
+        "Acknowledgement": generateAcknowledgementAction,
+    };
+
+    for (const pageName of STANDARD_REPORT_PAGES) {
+        if (pageName === TOC_SECTION_NAME && !includeToc) continue;
+        // Skip ToC here, will be handled with report sections if enabled.
+        // Also skip List of Figures, Tables, Abbreviations as AI doesn't generate these currently.
+        if (["List of Figures", "List of Tables", "Abbreviations", TOC_SECTION_NAME].includes(pageName)) continue;
+
+        const action = standardPageActions[pageName as keyof typeof standardPageActions];
+        if (action) {
+            toast({title: `Generating ${pageName}...`, description: "Please wait."});
+            checkAndAddPage(pageHeight - (2 * margin)); // Assume standard page might take full page
+            const result = await action({
+                projectTitle: project.title,
+                teamDetails: project.teamDetails || "",
+                degree: project.degree,
+                branch: project.branch,
+                instituteName: project.instituteName,
+                universityName: project.universityName,
+                submissionDate: project.submissionDate,
+                universityLogoUrl: project.universityLogoUrl,
+                collegeLogoUrl: project.collegeLogoUrl,
+                guideName: project.guideName,
+                hodName: project.hodName,
+                submissionYear: project.submissionYear,
+                // For abstract and acknowledgement
+                projectContext: project.projectContext || "",
+                keyFindings: project.keyFindings,
+                additionalThanks: project.additionalThanks,
+            });
+            
+            let htmlContent = "";
+            if (result && 'error' in result && result.error) {
+                htmlContent = `<p style="color: red;">Error generating ${pageName}: ${result.error}</p>`;
+                 toast({variant: "destructive", title: `Error: ${pageName}`, description: result.error});
+            } else if (result) {
+                if ('coverPageMarkdown' in result) htmlContent = result.coverPageMarkdown;
+                else if ('certificateMarkdown' in result) htmlContent = result.certificateMarkdown;
+                else if ('declarationMarkdown' in result) htmlContent = result.declarationMarkdown;
+                else if ('abstractMarkdown' in result) htmlContent = result.abstractMarkdown;
+                else if ('acknowledgementMarkdown' in result) htmlContent = result.acknowledgementMarkdown;
+            }
+            
+            if (htmlContent) {
+                 await addHtmlToPdf(doc, htmlContent, yPosSignal, {isStandardPage: true});
+                 if (doc.getNumberOfPages() > 0) { // if addHtmlToPdf added pages
+                    const lastPage = doc.getNumberOfPages();
+                    doc.setPage(lastPage);
+                    // This is tricky: doc.html doesn't give a precise finalY.
+                    // We might need to estimate or add a manual page break if content is long.
+                    // For now, just ensure yPos is reset if it's a new page after html rendering.
+                    const currentYAfterHtml = (doc.internal as any).getCurrentPageInfo().pageContext.cursor.y;
+                    yPosSignal.y = currentYAfterHtml > margin ? currentYAfterHtml : margin;
+                 }
+                 doc.addPage(); // Ensure each standard page starts on a new page
+                 yPosSignal.y = margin;
+            }
+        }
+    }
+
+
+    // 2. Table of Contents (if included and exists)
+    if (includeToc) {
+        const tocSection = project.sections.find(s => s.name === TOC_SECTION_NAME);
+        if (tocSection?.content) {
+            toast({title: "Adding Table of Contents..."});
+            checkAndAddPage(pageHeight - (2*margin)); // Assume ToC might take full page
+            await addHtmlToPdf(doc, marked.parse(tocSection.content), yPosSignal);
+            doc.addPage();
+            yPosSignal.y = margin;
+        }
+    }
+
+    // 3. Hierarchical Report Sections
+    toast({title: "Processing Report Sections..."});
+    const renderHierarchicalSectionsPdf = async (sections: HierarchicalProjectSection[], currentLevel: number, numberingPrefix: string) => {
+        for (let i = 0; i < sections.length; i++) {
+            const section = sections[i];
+            if (section.name === TOC_SECTION_NAME) continue; // Skip ToC section itself here
+
+            const currentNumber = `${numberingPrefix}${i + 1}`;
+            const headingSize = Math.max(10, 18 - currentLevel * 2);
+            
+            checkAndAddPage(headingSize * 0.5 + 5); // Estimate heading height
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(headingSize);
+            doc.text(`${currentNumber}. ${section.name}`, margin, yPosSignal.y);
+            yPosSignal.y += headingSize * 0.5 + 3; // Space after heading
+
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(12);
+
+            const nameLower = section.name.toLowerCase();
+            if (section.content && section.content.trim()) {
+                checkAndAddPage(10); // Min space for content start
+                if (nameLower.startsWith("diagram:") || nameLower.startsWith("flowchart:")) {
+                    doc.text(`[Mermaid Diagram: ${section.name.substring(nameLower.indexOf(":") + 1).trim()}]`, margin, yPosSignal.y, { maxWidth: pageWidth - 2 * margin });
+                    yPosSignal.y += 7; // Placeholder height
+                    doc.text(`\`\`\`mermaid\n${section.content}\n\`\`\``, margin, yPosSignal.y, { maxWidth: pageWidth - 2 * margin});
+                    yPosSignal.y += (doc.splitTextToSize(section.content, pageWidth - 2 * margin).length + 2) * 5;
+
+                } else if (nameLower.startsWith("figure:")) {
+                    if (section.content.startsWith('data:image')) {
+                        try {
+                             // Estimate image height, this is very rough
+                            const imgHeight = 80; // Assume a fixed height or derive from aspect ratio if known
+                            checkAndAddPage(imgHeight + 10);
+                            doc.addImage(section.content, 'PNG', margin, yPosSignal.y, 100, imgHeight, undefined, 'FAST'); // Adjust width/height as needed
+                            yPosSignal.y += imgHeight + 5;
+                        } catch (e) {
+                            console.error("Error adding image to PDF:", e);
+                            doc.text(`[Error displaying image: ${section.name}]`, margin, yPosSignal.y);
+                            yPosSignal.y += 7;
+                        }
+                    } else {
+                        doc.text(`[Figure: ${section.name.substring(nameLower.indexOf(":") + 1).trim()}] - Prompt: ${section.prompt}`, margin, yPosSignal.y, { maxWidth: pageWidth - 2 * margin });
+                        yPosSignal.y += 7;
+                    }
+                } else if (nameLower.startsWith("table:")) {
+                    try {
+                        const tableHtml = marked.parse(section.content);
+                        // Strip p tags that marked might add around table for autoTable
+                        const tableElement = document.createElement('div');
+                        tableElement.innerHTML = tableHtml;
+                        const actualTable = tableElement.querySelector('table');
+                        if (actualTable) {
+                            (doc as any).autoTable({ html: actualTable, startY: yPosSignal.y });
+                            yPosSignal.y = (doc as any).lastAutoTable.finalY + 10;
+                        } else {
+                             await addHtmlToPdf(doc, tableHtml, yPosSignal);
+                        }
+                    } catch (e) {
+                        console.error("Error rendering table to PDF:", e);
+                        doc.text(`[Error rendering table: ${section.name}] \n ${section.content}`, margin, yPosSignal.y, { maxWidth: pageWidth - 2 * margin });
+                        yPosSignal.y += 14;
+                    }
+                } else {
+                    const htmlContent = marked.parse(section.content);
+                    await addHtmlToPdf(doc, htmlContent, yPosSignal);
+                }
+            }
+            
+            if (section.subSections && section.subSections.length > 0) {
+                 await renderHierarchicalSectionsPdf(section.subSections, currentLevel + 1, `${currentNumber}.`);
+            }
+            checkAndAddPage(10); // Add some space before next top/sibling section
+            yPosSignal.y += 5;
+        }
+    };
+
+    await renderHierarchicalSectionsPdf(project.sections.filter(s => s.name !== TOC_SECTION_NAME), 0, '');
+
+    addHeaderFooterToAllPages(project.title);
     return doc;
   };
 
@@ -203,7 +403,7 @@ export default function ExportPage() {
     try {
       switch (format) {
         case 'markdown':
-          const mdContent = generateMarkdown();
+          const mdContent = generateMarkdownForExport();
           const mdBlob = new Blob([mdContent], { type: 'text/markdown;charset=utf-8' });
           downloadBlob(mdBlob, `${project.title.replace(/ /g, '_')}_report.md`);
           toast({ title: "Export Successful", description: `Report exported as ${format.toUpperCase()}.` });
@@ -264,19 +464,20 @@ export default function ExportPage() {
                 <SelectItem value="docx" disabled>DOCX (.docx) - Soon</SelectItem>
               </SelectContent>
             </Select>
-             {format === 'pdf' && <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1"><FileWarning className="h-3 w-3 text-amber-500"/> PDF formatting may vary.</p>}
+             {format === 'pdf' && <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1"><FileWarning className="h-3 w-3 text-amber-500"/> PDF formatting may vary. Complex layouts/styles might not render perfectly.</p>}
           </div>
 
           <div className="space-y-3 sm:space-y-4">
              <Label className="text-sm">Include</Label>
+             {/* "Include Title Page" now refers to the standard Cover Page for PDF */}
              <div className="flex items-center space-x-2">
                 <Checkbox
                   id="include-title"
-                  checked={includeTitlePage}
+                  checked={includeTitlePage} // This can be kept for MD, or re-purposed for PDF's standard "Cover Page"
                   onCheckedChange={(checked) => setIncludeTitlePage(!!checked)}
                 />
                 <Label htmlFor="include-title" className="text-sm font-normal cursor-pointer">
-                  Title Page / Project Details
+                  Standard Cover Page (PDF) / Basic Title (MD)
                 </Label>
             </div>
             <div className="flex items-center space-x-2">
@@ -286,7 +487,7 @@ export default function ExportPage() {
                   onCheckedChange={(checked) => setIncludeToc(!!checked)}
                 />
                 <Label htmlFor="include-toc" className="text-sm font-normal cursor-pointer">
-                  Table of Contents (if generated)
+                  Table of Contents (if generated in sections)
                 </Label>
              </div>
              {format === 'pdf' && (
@@ -327,3 +528,4 @@ export default function ExportPage() {
     </div>
   );
 }
+
