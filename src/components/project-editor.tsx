@@ -11,7 +11,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, Eye, Projector, BrainCircuit, Plus, Minus, CheckCircle, Edit3, ChevronRight, BookOpen, HelpCircle, ImageIcon, Table as TableIcon, Eraser, FileUp, FileJson, Info } from 'lucide-react';
 import Link from 'next/link';
-import type { Project, HierarchicalProjectSection, GeneratedSectionOutline, SectionIdentifier, OutlineSection } from '@/types/project';
+import type { Project, HierarchicalProjectSection, GeneratedSectionOutline, SectionIdentifier, OutlineSection } from '@/types/project'; // Use hierarchical type
 import { findSectionById, updateSectionById, deleteSectionById, STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, TOC_SECTION_NAME, ensureDefaultSubSection, getSectionNumbering, addSubSectionById } from '@/lib/project-utils';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { useToast } from '@/hooks/use-toast';
@@ -22,12 +22,11 @@ import { cn } from '@/lib/utils';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogClose, DialogContent as DialogModalContent, DialogDescription as DialogModalDescription, DialogFooter as DialogModalFooter, DialogHeader as DialogModalHeader, DialogTitle as DialogModalTitle, DialogTrigger as DialogModalTrigger } from "@/components/ui/dialog"; // Renamed imports
-import { marked } from 'marked';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { v4 as uuidv4 } from 'uuid';
 import AiDiagramGenerator from '@/components/ai-diagram-generator';
-import MermaidDiagram from './mermaid-diagram';
+import MermaidDiagram from '@/components/mermaid-diagram';
 import { ProjectSidebarContent } from '@/components/project-sidebar-content';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { updateProject as updateProjectHelper } from '@/lib/project-utils';
@@ -263,9 +262,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [isGeneratingOutline, setIsGeneratingOutline] = useState(false);
-  const [isSuggesting, setIsSuggesting] = useState(false);
-  const [suggestionInput, setSuggestionInput] = useState('');
-  const [suggestions, setSuggestions] = useState<string | null>(null);
   const [isProjectFound, setIsProjectFound] = useState<boolean | null>(null);
   const [isMobileSheetOpen, setIsMobileSheetOpen] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
@@ -568,7 +564,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
 
     const proceedWithOutlinePreviewGeneration = useCallback(async () => {
-        if (!project || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting) return;
+        if (!project || isGenerating || isSummarizing || isGeneratingOutline ) return;
         setIsGeneratingOutline(true);
         setPreviewedOutline(null);
         try {
@@ -613,10 +609,10 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         } finally {
             setIsGeneratingOutline(false);
         }
-    }, [project, isGenerating, isSummarizing, isGeneratingOutline, isSuggesting, toast]);
+    }, [project, isGenerating, isSummarizing, isGeneratingOutline, toast]);
 
     const handleGenerateTocClick = () => {
-        if (!project || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting) return;
+        if (!project || isGenerating || isSummarizing || isGeneratingOutline ) return;
         const contextLength = project.projectContext?.trim().length || 0;
         const contextWords = project.projectContext?.trim().split(/\s+/).filter(Boolean).length || 0;
 
@@ -629,7 +625,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
     const handleGenerateSection = async (sectionIdToGenerate: string) => {
       const targetSection = project ? findSectionById(project.sections, sectionIdToGenerate) : null;
-      if (!project || !targetSection || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting || isGeneratingDiagram || isGeneratingImage) return;
+      if (!project || !targetSection || isGenerating || isSummarizing || isGeneratingOutline || isGeneratingDiagram || isGeneratingImage) return;
 
         const nameLower = targetSection.name.toLowerCase();
         const isDiagram = nameLower.startsWith("diagram:") || nameLower.startsWith("flowchart:");
@@ -664,7 +660,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             setIsGeneratingImage(true);
             try {
                 const imageGenPrompt = targetSection.prompt || `An image depicting: ${targetSection.name.replace(/^Figure \d+:\s*/i, '')}`;
-                const result = await generateImageForSlideAction({ prompt: imageGenPrompt }); // Reusing slide action for now
+                const result = await generateImageForSlideAction({ prompt: imageGenPrompt }); 
                 if (result.error) {
                     throw new Error(result.error);
                 }
@@ -776,7 +772,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
     const handleSummarizeSection = async (sectionIdToSummarize: string) => {
         const targetSection = project ? findSectionById(project.sections, sectionIdToSummarize) : null;
-        if (!project || !targetSection || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting) return;
+        if (!project || !targetSection || isGenerating || isSummarizing || isGeneratingOutline ) return;
 
         const nameLower = targetSection.name.toLowerCase();
         const isDiagram = nameLower.startsWith("diagram:") || nameLower.startsWith("flowchart:");
@@ -818,54 +814,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         }
     };
 
-    const handleGetSuggestions = async () => {
-        if (!project || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting) return;
-        setIsSuggesting(true);
-        setSuggestions(null);
-        try {
-            const flattenSections = (sections: HierarchicalProjectSection[], level = 0): string => {
-                 return sections.map(s => {
-                    let sectionStr = `${'#'.repeat(level + 2)} ${s.name}\n\n`;
-                    if (s.name.toLowerCase().startsWith("diagram:") || s.name.toLowerCase().startsWith("flowchart:")) {
-                        sectionStr += `Mermaid Diagram Code:\n\`\`\`mermaid\n${s.content || '[No diagram code]'}\n\`\`\`\n\n`;
-                    } else if (s.name.toLowerCase().startsWith("figure ")) {
-                        sectionStr += `Image: ${s.content || '[No image URL or prompt]'}\n\n`;
-                    } else if (s.name.toLowerCase().startsWith("table:")) {
-                        sectionStr += `Table Content (Markdown):\n${s.content || '[No table data]'}\n\n`;
-                    } else {
-                        sectionStr += `${s.content || '[Empty Section]'}\n\n`;
-                    }
-                    if (s.subSections && s.subSections.length > 0) {
-                         sectionStr += flattenSections(s.subSections, level + 1);
-                    }
-                    return sectionStr;
-                }).join('---\n\n');
-            };
-
-            const currentSectionsContent = project.sections ? flattenSections(project.sections) : '';
-
-            const suggestionActionInput = {
-                projectTitle: project.title,
-                projectContext: project.projectContext,
-                allSectionsContent: currentSectionsContent,
-                focusArea: suggestionInput || undefined,
-                existingSections: project.sections.map(s => getSectionNumbering(project.sections, s.id) + " " + s.name).join(', '),
-                projectType: project.projectType,
-            };
-
-            const result = await suggestImprovementsAction(suggestionActionInput);
-            if ('error' in result) {
-                throw new Error(result.error);
-            }
-            setSuggestions(result.suggestions);
-            toast({ title: "AI Suggestions Ready", description: "Suggestions for improvement generated." });
-        } catch (error) {
-            console.error("Suggestion generation failed:", error);
-            toast({ variant: "destructive", title: "Suggestion Failed", description: error instanceof Error ? error.message : "Could not generate suggestions." });
-        } finally {
-            setIsSuggesting(false);
-        }
-    };
 
      const handleEditSectionName = (id: string, newName: string) => {
          if (!project) return;
@@ -909,13 +857,15 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
              lastGenerated: undefined,
              subSections: [],
          };
+         const sectionWithDefaultSub = ensureDefaultSubSection(newSection, String(newSectionNumber));
+
          updateProject(prev => ({
              ...prev,
-             sections: [...prev.sections, newSection],
+             sections: [...prev.sections, sectionWithDefaultSub],
          }), true);
-         toast({ title: "Section Added", description: `"${newSection.name}" added.` });
+         toast({ title: "Section Added", description: `"${sectionWithDefaultSub.name}" added.` });
          setActiveSectionId(newSection.id);
-         setActiveSubSectionId(null); 
+         setActiveSubSectionId(sectionWithDefaultSub.subSections[0]?.id || null); 
          setPreviewedOutline(null);
      };
 
@@ -1258,7 +1208,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                          <div className="flex items-center space-x-2 sm:col-span-2">
                              <Switch
                                  id="ai-outline-constrained-toggle"
-                                 checked={project.isAiOutlineConstrained ?? true}
+                                 checked={isAiOutlineConstrained}
                                  onCheckedChange={(checked) => {
                                      handleProjectDetailChange('isAiOutlineConstrained', checked);
                                      handleProjectDetailBlur(); 
@@ -1266,7 +1216,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                                  aria-label="Toggle AI Outline Constraints"
                              />
                              <Label htmlFor="ai-outline-constrained-toggle" className="text-sm cursor-pointer">
-                                 {project.isAiOutlineConstrained ?? true ? "Constrain AI Outline (Uses Counters)" : "AI Freedom for Outline (Ignores Counters)"}
+                                 {isAiOutlineConstrained ? "Constrain AI Outline (Uses Counters)" : "AI Freedom for Outline (Ignores Counters)"}
                              </Label>
                          </div>
                      </div>
@@ -1301,7 +1251,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                     </div>
                 </CardContent>
                 <CardFooter className="flex flex-col items-start gap-4">
-                     <Button variant="default" size="sm" onClick={handleGenerateTocClick} disabled={isGeneratingOutline || isGenerating || isSummarizing || isSuggesting || !project.projectContext?.trim()} className="hover:glow-primary focus-visible:glow-primary">
+                     <Button variant="default" size="sm" onClick={handleGenerateTocClick} disabled={isGeneratingOutline || isGenerating || isSummarizing  || !project.projectContext?.trim()} className="hover:glow-primary focus-visible:glow-primary">
                         {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
                         {isGeneratingOutline ? 'Generating Outline...' : 'Generate Outline Preview'}
                      </Button>
@@ -1490,7 +1440,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                                     className="mt-1 min-h-[80px] focus-visible:glow-primary"
                                 />
                             </div>
-                            <Button onClick={() => handleImagePromptSubmit(itemToRender.prompt, itemToRender.id)} disabled={isGeneratingImage || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting} className="hover:glow-primary focus-visible:glow-primary">
+                            <Button onClick={() => handleImagePromptSubmit(itemToRender.prompt, itemToRender.id)} disabled={isGeneratingImage || isGenerating || isSummarizing || isGeneratingOutline } className="hover:glow-primary focus-visible:glow-primary">
                                 {isGeneratingImage ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
                                 {isGeneratingImage ? 'Generating Image...' : 'Generate Image with AI'}
                             </Button>
@@ -1526,7 +1476,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                                     className="mt-1 min-h-[80px] focus-visible:glow-primary"
                                 />
                             </div>
-                            <Button onClick={() => handleGenerateSection(itemToRender.id)} disabled={isGenerating || isSummarizing || isGeneratingOutline || isSuggesting} className="hover:glow-primary focus-visible:glow-primary">
+                            <Button onClick={() => handleGenerateSection(itemToRender.id)} disabled={isGenerating || isSummarizing || isGeneratingOutline } className="hover:glow-primary focus-visible:glow-primary">
                                 {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
                                 {isGenerating ? 'Generating Table...' : 'Generate Table with AI'}
                             </Button>
@@ -1561,7 +1511,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                           <Label htmlFor={`section-prompt-${itemToRender.id}`}>Generation Prompt</Label>
                           <Textarea id={`section-prompt-${itemToRender.id}`} value={itemToRender.prompt} onChange={(e) => handleSectionPromptChange(itemToRender.id, e.target.value)} onBlur={handleSectionPromptBlur} placeholder="Instructions for the AI to generate content for this sub-section..." className="mt-1 min-h-[100px] font-mono text-sm focus-visible:glow-primary" />
                         </div>
-                        <Button onClick={() => handleGenerateSection(itemToRender.id)} disabled={isGenerating || isSummarizing || isGeneratingOutline || isSuggesting || isGeneratingDiagram || isGeneratingImage} className="hover:glow-primary focus-visible:glow-primary">
+                        <Button onClick={() => handleGenerateSection(itemToRender.id)} disabled={isGenerating || isSummarizing || isGeneratingOutline || isGeneratingDiagram || isGeneratingImage} className="hover:glow-primary focus-visible:glow-primary">
                           {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
                           {isGenerating ? 'Generating...' : 'Generate Content'}
                         </Button>
@@ -1596,7 +1546,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                          </Tabs>
                        </CardContent>
                        <CardFooter className="flex justify-end">
-                         <Button variant="outline" size="sm" onClick={() => handleSummarizeSection(itemToRender.id)} disabled={isSummarizing || isGenerating || isGeneratingOutline || isSuggesting || !itemToRender.content?.trim()} className="hover:glow-accent focus-visible:glow-accent">
+                         <Button variant="outline" size="sm" onClick={() => handleSummarizeSection(itemToRender.id)} disabled={isSummarizing || isGenerating || isGeneratingOutline  || !itemToRender.content?.trim()} className="hover:glow-accent focus-visible:glow-accent">
                            {isSummarizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ScrollText className="mr-2 h-4 w-4" />}
                            {isSummarizing ? 'Summarizing...' : 'Summarize'}
                          </Button>
@@ -1622,7 +1572,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                       </CardHeader>
                       <CardContent className="mt-4 space-y-4">
                          <p className="text-sm">Go to <Button variant="link" className="p-0 h-auto text-base" onClick={() => handleSetActiveSection(String(-1))}>Project Details</Button>, provide context, then click "Generate Outline Preview".</p>
-                        <Button variant="default" size="sm" onClick={handleGenerateTocClick} disabled={isGeneratingOutline || isGenerating || isSummarizing || isSuggesting || !project.projectContext?.trim()} className="hover:glow-primary focus-visible:glow-primary">
+                        <Button variant="default" size="sm" onClick={handleGenerateTocClick} disabled={isGeneratingOutline || isGenerating || isSummarizing  || !project.projectContext?.trim()} className="hover:glow-primary focus-visible:glow-primary">
                           {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
                           {isGeneratingOutline ? 'Generating Outline...' : 'Generate Outline Preview'}
                         </Button>
@@ -1633,7 +1583,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             );
         }
     }
-
 
   return (
     <Sheet open={isMobileSheetOpen} onOpenChange={setIsMobileSheetOpen}>
@@ -1653,7 +1602,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 isGeneratingOutline={isGeneratingOutline}
                 isGenerating={isGenerating}
                 isSummarizing={isSummarizing}
-                isSuggesting={isSuggesting}
                 handleSaveOnline={handleSaveOnline}
                 canUndo={canUndo}
                 handleUndo={handleUndo}
@@ -1693,16 +1641,15 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 isGeneratingOutline={isGeneratingOutline}
                 isGenerating={isGenerating}
                 isSummarizing={isSummarizing}
-                isSuggesting={isSuggesting}
                 handleSaveOnline={handleSaveOnline}
-                canUndo={canUndo}
+                canUndo={handleUndo}
                 handleUndo={handleUndo}
                 onCloseSheet={() => setIsMobileSheetOpen(false)}
                 isEditingSections={isEditingSections}
                 setIsEditingSections={setIsEditingSections}
                 onEditSectionName={handleEditSectionName}
                 onDeleteSection={handleDeleteSection}
-                onAddSubSection={(parentId) => {
+                 onAddSubSection={(parentId) => {
                     if (!project) return;
                      const parentSection = findSectionById(project.sections, parentId);
                     if (!parentSection) return;
@@ -1739,28 +1686,6 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
           <ScrollArea className="flex-1 p-3 sm:p-4 md:p-6">
               {activeViewContent}
-             <Card className="shadow-md mt-6">
-                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg md:text-xl text-primary text-glow-primary"><Sparkles className="w-5 h-5" /> AI Suggestions</CardTitle>
-                    <CardDescription className="text-sm">Ask the AI for feedback on your report. Provide specific focus areas for targeted suggestions based on the current sections.</CardDescription>
-                 </CardHeader>
-                 <CardContent className="space-y-4">
-                    <div>
-                        <Label htmlFor="suggestion-input">Focus area (Optional)</Label>
-                        <Input id="suggestion-input" value={suggestionInput} onChange={(e) => setSuggestionInput(e.target.value)} placeholder="e.g., Improve flow, Check clarity, Add technical details..." className="mt-1 focus-visible:glow-primary" />
-                    </div>
-                    <Button onClick={handleGetSuggestions} disabled={isSuggesting || isGenerating || isSummarizing || isGeneratingOutline || isGeneratingDiagram || isGeneratingImage} className="hover:glow-primary focus-visible:glow-primary">
-                        {isSuggesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquareQuote className="mr-2 h-4 w-4" />}
-                        {isSuggesting ? 'Getting Suggestions...' : 'Get Suggestions'}
-                    </Button>
-                    {suggestions && (
-                        <div className="mt-4 p-4 border rounded-md bg-muted/30">
-                            <h4 className="font-semibold mb-2 text-foreground">Suggestions:</h4>
-                            <div className="prose prose-sm max-w-none dark:prose-invert text-foreground" dangerouslySetInnerHTML={{ __html: marked.parse(suggestions) }} />
-                        </div>
-                    )}
-                 </CardContent>
-             </Card>
           </ScrollArea>
         </div>
 
@@ -1844,6 +1769,3 @@ const validateOutlineStructure = (sections: any[] | undefined, currentDepth = 0,
         return true;
     });
 };
-
-
-
