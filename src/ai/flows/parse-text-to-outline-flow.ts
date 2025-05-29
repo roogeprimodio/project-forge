@@ -56,7 +56,7 @@ Input Text Outline:
     *   Extract the meaningful name for each section/sub-section.
     *   Strip any leading list markers (e.g., '-', '*', '1.', 'A)', 'i.') and their subsequent spaces from the name.
     *   Trim leading/trailing whitespace from the extracted name.
-3.  **`subSections` Key:**
+3.  subSections Key:
     *   If a section has child items, represent them as an array in a \`subSections\` key.
     *   **CRITICAL: If a section has NO children, COMPLETELY OMIT the \`subSections\` key for that object in the JSON. Do NOT include \`"subSections": []\` for leaf nodes.**
 4.  **Output Format:**
@@ -128,4 +128,3 @@ const parseTextToOutlineFlow = ai.defineFlow(
     return output;
   }
 );
-`
