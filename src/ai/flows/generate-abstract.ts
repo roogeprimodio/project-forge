@@ -1,8 +1,9 @@
+
 'use server';
 /**
  * @fileOverview AI agent to generate a project report abstract.
  *
- * - generateAbstract - Generates Markdown content for an abstract.
+ * - generateAbstract - Generates HTML content for an abstract.
  * - GenerateAbstractInput - Input type for the generation flow.
  * - GenerateAbstractOutput - Output type for the generation flow.
  */
@@ -71,7 +72,6 @@ const prompt = ai.definePrompt({
   Fill in the "[Generated Abstract Paragraph(s) Here]" and "[Suggest 3-5 relevant keywords...]" parts, or use placeholders as instructed.
   `,
   helpers: {
-    // Helper to check if context is not the specific placeholder string
     isSufficientContext: (context: string | undefined) => {
       return context !== "[Abstract content cannot be generated due to insufficient project context. Please provide more details.]";
     }
@@ -87,8 +87,9 @@ const generateAbstractFlow = ai.defineFlow(
   async (rawInput) => {
     let processedProjectContext = rawInput.projectContext?.trim() || "";
     const insufficientContextPlaceholder = "[Abstract content cannot be generated due to insufficient project context. Please provide more details.]";
+    const minContextLengthForGeneration = 50; // Minimum characters for project context to be considered sufficient
 
-    if (processedProjectContext.length < 50) {
+    if (processedProjectContext.length < minContextLengthForGeneration) {
         processedProjectContext = insufficientContextPlaceholder;
     }
 

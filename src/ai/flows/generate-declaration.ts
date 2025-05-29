@@ -1,8 +1,9 @@
+
 'use server';
 /**
  * @fileOverview AI agent to generate a project report declaration.
  *
- * - generateDeclaration - Generates Markdown content for a declaration.
+ * - generateDeclaration - Generates HTML content for a declaration.
  * - GenerateDeclarationInput - Input type for the generation flow.
  * - GenerateDeclarationOutput - Output type for the generation flow.
  */
@@ -47,9 +48,9 @@ const prompt = ai.definePrompt({
     - {{this}}
     {{/each}}
     {{else if teamDetails}}
-    **{{{teamDetails}}}**
+    {{{teamDetails}}} <!-- Render placeholder if teamDetailsLines is empty -->
     {{else}}
-    **[Team Member Names & Enrollment Numbers Placeholder]**
+    [Team Member Names & Enrollment Numbers Placeholder]
     {{/if}}
   - Pronoun to use (I/We): {{{pronoun}}}
   - Object Pronoun (me/us): {{{objectPronoun}}}
@@ -59,20 +60,19 @@ const prompt = ai.definePrompt({
   - Date: {{{submissionDate}}}
 
   **Instructions:**
-  1.  Output ONLY the HTML content for the declaration. Do NOT wrap it in Markdown code fences like \`\`\`markdown ... \`\`\`. Do not include any other text, explanations, or conversational elements.
+  1.  Output ONLY the HTML content for the declaration. Do NOT wrap it in Markdown code fences. No other text.
   2.  Replace placeholders like \`{{{projectTitle}}}\` with the actual data.
-  3.  **Placeholder Usage:** If a piece of information is not provided or is an empty string, **the system will provide a specific placeholder string for that field. Your task is to output *this exact placeholder string* as provided in the input if no actual data is available. Do not replace these system-provided placeholders with "N/A" or try to invent information.**
-      *   For Project Title: Use the value of \`{{{projectTitle}}}\`.
-      *   For Team Details: Use the value of \`{{{teamDetails}}}\` or the \`teamDetailsLines\`.
-      *   For Degree: Use the value of \`{{{degree}}}\`.
-      *   For Branch: Use the value of \`{{{branch}}}\`.
-      *   For Institute Name: Use the value of \`{{{instituteName}}}\`.
-      *   For Submission Date: Use the value of \`{{{submissionDate}}}\`.
+  3.  **Placeholder Usage:** If a piece of information is not provided or is an empty string, **the system will provide a specific placeholder string. Output *this exact placeholder string* if no actual data is available.**
+      *   For Project Title: Use \`{{{projectTitle}}}\`.
+      *   For Team Details: Use \`teamDetailsLines\` if available, otherwise \`{{{teamDetails}}}\`.
+      *   For Degree: Use \`{{{degree}}}\`.
+      *   For Branch: Use \`{{{branch}}}\`.
+      *   For Institute Name: Use \`{{{instituteName}}}\`.
+      *   For Submission Date: Use \`{{{submissionDate}}}\`.
       *   For Place (City/Town): Always use "[City/Town Placeholder]" as this is not an input.
   4.  Use the determined pronoun ({{{pronoun}}}) for "We, the undersigned" or "I, the undersigned".
   5.  Use the determined object pronoun ({{{objectPronoun}}}) for "work done by us/me".
-  6.  Ensure text alignment and formatting (bold, headings) match the provided HTML structure.
-  7.  Signature blocks should list student names and enrollment numbers as provided in \`teamDetailsLines\` if available, otherwise from \`teamDetails\`.
+  6.  List student names and enrollment numbers for signatures from \`teamDetailsLines\` if available, otherwise use \`{{{teamDetails}}}\`.
 
   **Required Output Structure (HTML content):**
   <div style="font-family: 'Times New Roman', serif; padding: 20px; margin: 20px; page-break-after: always;">
@@ -129,25 +129,26 @@ const generateDeclarationFlow = ai.defineFlow(
     outputSchema: GenerateDeclarationOutputSchema,
   },
   async (rawInput) => {
-    // Explicitly use placeholders if raw input fields are empty or just whitespace
     const input = {
       projectTitle: rawInput.projectTitle?.trim() || "[Project Title Placeholder]",
       teamDetails: rawInput.teamDetails?.trim() || "[Team Member Names & Enrollment Numbers Placeholder]",
       degree: rawInput.degree?.trim() || "[Degree Placeholder]",
       branch: rawInput.branch?.trim() || "[Branch Placeholder]",
       instituteName: rawInput.instituteName?.trim() || "[Institute Name Placeholder]",
-      submissionDate: rawInput.submissionDate?.trim() || "[Submission Date Placeholder]",
+      submissionDate: rawInput.submissionDate?.trim() || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
     };
     
-    const teamDetailsLines = input.teamDetails !== "[Team Member Names & Enrollment Numbers Placeholder]" ? input.teamDetails.split('\n').filter(line => line.trim() !== '') : [];
-    const isPlural = teamDetailsLines.length > 1 || (teamDetailsLines.length === 0 && input.teamDetails.includes('\n'));
+    const teamDetailsLines = input.teamDetails !== "[Team Member Names & Enrollment Numbers Placeholder]" 
+      ? input.teamDetails.split('\n').filter(line => line.trim() !== '') 
+      : [];
+    const isPlural = teamDetailsLines.length > 1 || (teamDetailsLines.length === 0 && input.teamDetails.includes('\n')); // Check if raw input implies plural
 
     const processedInput = {
       ...input,
       teamDetailsLines: teamDetailsLines.length > 0 ? teamDetailsLines : undefined,
-      teamDetails: teamDetailsLines.length > 0 ? undefined : input.teamDetails,
+      teamDetails: teamDetailsLines.length === 0 ? input.teamDetails : undefined,
       pronoun: isPlural ? "We" : "I",
-      objectPronoun: isPlural ? "us" : "me", // Calculate object pronoun here
+      objectPronoun: isPlural ? "us" : "me",
     };
     const { output } = await prompt(processedInput);
     return output!;
