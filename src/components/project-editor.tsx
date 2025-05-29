@@ -9,10 +9,10 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, Eye, Projector, BrainCircuit, Plus, Minus, CheckCircle, Edit3, ChevronRight, BookOpen, HelpCircle, ImageIcon, Table as TableIcon } from 'lucide-react';
+import { Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, Eye, Projector, BrainCircuit, Plus, Minus, CheckCircle, Edit3, ChevronRight, BookOpen, HelpCircle, ImageIcon, Table as TableIcon, Eraser } from 'lucide-react';
 import Link from 'next/link';
-import type { Project, HierarchicalProjectSection, GeneratedSectionOutline, SectionIdentifier, OutlineSection, ExplainConceptOutput } from '@/types/project'; // Use hierarchical type
-import { findSectionById, updateSectionById, deleteSectionById, STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, TOC_SECTION_NAME, ensureDefaultSubSection, getSectionNumbering, addSubSectionById as addSubSectionUtil } from '@/lib/project-utils';
+import type { Project, HierarchicalProjectSection, GeneratedSectionOutline, SectionIdentifier, OutlineSection, ExplanationSlide, ExplainConceptOutput } from '@/types/project'; // Use hierarchical type
+import { findSectionById, updateSectionById, deleteSectionById, STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, TOC_SECTION_NAME, ensureDefaultSubSection, getSectionNumbering, addSubSectionById as addSubSectionUtil, parseTextToOutlineStructure } from '@/lib/project-utils'; // Added parseTextToOutlineStructure
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { useToast } from '@/hooks/use-toast';
 import { generateSectionAction, summarizeSectionAction, generateOutlineAction, suggestImprovementsAction, generateDiagramAction, explainConceptAction, generateImageForSlideAction } from '@/app/actions';
@@ -24,7 +24,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTr
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { marked } from 'marked';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Switch } from "@/components/ui/switch"; // Import Switch
+import { Switch } from "@/components/ui/switch";
 import { v4 as uuidv4 } from 'uuid';
 import AiDiagramGenerator from '@/components/ai-diagram-generator';
 import MermaidDiagram from './mermaid-diagram';
@@ -54,7 +54,7 @@ const OutlinePreviewItem: React.FC<{ item: OutlineSection; level: number }> = ({
       {hasSubSections && (
         <div className="border-l border-muted/30 ml-2 pl-2">
           {item.subSections.map((subItem, index) => (
-            <OutlinePreviewItem key={`${item.name}-${index}`} item={subItem} level={level +1} />
+            <OutlinePreviewItem key={`${item.name}-${index}-${level}`} item={subItem} level={level +1} />
           ))}
         </div>
       )}
@@ -286,6 +286,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const [sectionToDelete, setSectionToDelete] = useState<string | null>(null);
   const contentTextAreaRef = useRef<HTMLTextAreaElement>(null);
   const [aiImagePrompt, setAiImagePrompt] = useState("");
+  const [textOutlineInput, setTextOutlineInput] = useState(''); // For text-based outline input
 
 
     // State for AI Concept Explainer
@@ -577,9 +578,10 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             const outlineInput: GenerateProjectOutlineInput = {
                 projectTitle: project.title,
                 projectContext: project.projectContext || '',
+                isAiOutlineConstrained: project.isAiOutlineConstrained ?? true, // Pass the toggle state
             };
             // Only pass constraints if the toggle is ON
-            if (isAiOutlineConstrained) {
+            if (project.isAiOutlineConstrained ?? true) {
                 outlineInput.minSections = project.minSections ?? 5;
                 outlineInput.maxSubSectionsPerSection = project.maxSubSectionsPerSection ?? 2;
             }
@@ -593,7 +595,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 return;
             }
 
-            if (!result || !Array.isArray(result.sections) || !validateOutlineStructure(result.sections, 0, isAiOutlineConstrained ? project.maxSubSectionsPerSection : undefined)) {
+            if (!result || !Array.isArray(result.sections) || !validateOutlineStructure(result.sections, 0, (project.isAiOutlineConstrained ?? true) ? project.maxSubSectionsPerSection : undefined)) {
                  console.error("Invalid outline structure received from AI:", result);
                  toast({ variant: "destructive", title: "Outline Generation Failed", description: "AI did not return the expected hierarchical section structure. Please check the console for details and try again." });
                  setIsGeneratingOutline(false);
@@ -615,7 +617,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
         } finally {
             setIsGeneratingOutline(false);
         }
-    }, [project, isGenerating, isSummarizing, isGeneratingOutline, isSuggesting, toast, isAiOutlineConstrained]);
+    }, [project, isGenerating, isSummarizing, isGeneratingOutline, isSuggesting, toast]);
 
     const handleGenerateTocClick = () => {
         if (!project || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting) return;
@@ -675,6 +677,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                     ...prev,
                     sections: updateSectionById(prev.sections, sectionIdToGenerate, {
                         content: result.generatedImageUrl, 
+                        prompt: imageGenPrompt, 
                         lastGenerated: new Date().toISOString(),
                     }),
                 }), true);
@@ -1141,6 +1144,21 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
       }
   };
 
+  const handleParseTextOutline = () => {
+    if (!project || !textOutlineInput.trim()) {
+        toast({ variant: "destructive", title: "No Text Provided", description: "Please paste or type your outline into the text area." });
+        return;
+    }
+    const parsed = parseTextToOutlineStructure(textOutlineInput);
+    if (parsed && parsed.length > 0) {
+        setPreviewedOutline({ sections: parsed });
+        toast({ title: "Text Outline Parsed", description: "Review the preview below and click 'Apply Outline' if it looks correct." });
+        setTextOutlineInput(''); // Clear input after successful parse
+    } else {
+        toast({ variant: "destructive", title: "Parsing Failed", description: "Could not parse the provided text into a valid outline structure. Please check formatting (indentation, list markers)." });
+    }
+  };
+
 
   if (!hasMounted || isProjectFound === null) {
     return (
@@ -1165,10 +1183,10 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
     let activeViewContent: React.ReactNode = null;
     let activeViewName = project.title ?? 'Project';
     
-    const selectedSectionInfo = activeSectionId ? findSectionById(project.sections, activeSectionId) : null;
-    let selectedSectionLevel = -1; 
+    const selectedItemInfo = activeSectionId ? findSectionById(project.sections, activeSectionId) : null;
+    let selectedItemLevel = -1; 
 
-    if (selectedSectionInfo) {
+    if (selectedItemInfo) {
         const findLevel = (sections: HierarchicalProjectSection[], targetId: string, currentLevel: number): number => {
             for (const s of sections) {
                 if (s.id === targetId) return currentLevel;
@@ -1179,7 +1197,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
             }
             return -1;
         };
-        selectedSectionLevel = findLevel(project.sections, activeSectionId!, 0); 
+        selectedItemLevel = findLevel(project.sections, activeSectionId!, 0); 
     }
 
 
@@ -1275,8 +1293,23 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 <CardFooter className="flex flex-col items-start gap-4">
                      <Button variant="default" size="sm" onClick={handleGenerateTocClick} disabled={isGeneratingOutline || isGenerating || isSummarizing || isSuggesting || !project.projectContext?.trim()} className="hover:glow-primary focus-visible:glow-primary">
                         {isGeneratingOutline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
-                        {isGeneratingOutline ? 'Generating Outline...' : 'Generate Outline Preview'}
+                        {isGeneratingOutline ? 'Generating Outline...' : 'Generate AI Outline Preview'}
                      </Button>
+                     <Separator />
+                     <div>
+                         <Label htmlFor="text-outline-input">Paste Text Outline</Label>
+                         <Textarea
+                             id="text-outline-input"
+                             value={textOutlineInput}
+                             onChange={(e) => setTextOutlineInput(e.target.value)}
+                             placeholder="Paste your outline here (use indentation for hierarchy)..."
+                             className="mt-1 min-h-[100px] focus-visible:glow-primary"
+                         />
+                         <Button variant="outline" size="sm" onClick={handleParseTextOutline} className="mt-2">
+                             <Eraser className="mr-2 h-4 w-4" /> Parse & Preview Text Outline
+                         </Button>
+                     </div>
+
                      {previewedOutline && (
                          <div className="w-full p-4 border rounded-md bg-muted/30 space-y-3">
                              <h4 className="font-semibold text-foreground">Generated Outline Preview:</h4>
@@ -1309,42 +1342,42 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 </CardFooter>
             </Card>
         );
-    } else if (selectedSectionInfo) {
-        activeViewName = selectedSectionInfo.name;
-        const nameLower = selectedSectionInfo.name.toLowerCase();
+    } else if (selectedItemInfo) {
+        activeViewName = selectedItemInfo.name;
+        const nameLower = selectedItemInfo.name.toLowerCase();
         const isDiagram = nameLower.startsWith("diagram:") || nameLower.startsWith("flowchart:");
         const isFigure = nameLower.startsWith("figure ");
         const isTable = nameLower.startsWith("table:");
 
-        if (selectedSectionLevel === 0 && !isDiagram && !isFigure && !isTable && selectedSectionInfo.subSections.length > 0) {
-            activeViewContent = <CombinedSectionPreview section={selectedSectionInfo} projectTitle={project.title} />;
+        if (selectedItemLevel === 0 && !isDiagram && !isFigure && !isTable && selectedItemInfo.subSections.length > 0) {
+            activeViewContent = <CombinedSectionPreview section={selectedItemInfo} projectTitle={project.title} />;
         } else if (isDiagram) {
             activeViewContent = (
                <div className="space-y-6">
                    <Card className="shadow-md">
                      <CardHeader>
-                       <CardTitle className="flex items-center gap-2 text-lg md:text-xl text-primary text-glow-primary"> <Projector className="w-5 h-5"/> {selectedSectionInfo.name}</CardTitle>
-                       {selectedSectionInfo.lastGenerated && ( <CardDescription className="text-xs md:text-sm">Last generated: {new Date(selectedSectionInfo.lastGenerated).toLocaleString()}</CardDescription> )}
+                       <CardTitle className="flex items-center gap-2 text-lg md:text-xl text-primary text-glow-primary"> <Projector className="w-5 h-5"/> {selectedItemInfo.name}</CardTitle>
+                       {selectedItemInfo.lastGenerated && ( <CardDescription className="text-xs md:text-sm">Last generated: {new Date(selectedItemInfo.lastGenerated).toLocaleString()}</CardDescription> )}
                      </CardHeader>
                      <CardContent className="space-y-4">
                        <p className="text-sm text-muted-foreground">Use the AI generator below to create the diagram content. The generated Mermaid code will be stored for this item.</p>
                        <AiDiagramGenerator
                             onDiagramGenerated={handleDiagramGeneratedInSection}
-                            initialDescription={selectedSectionInfo.prompt.replace(/^(Generate Mermaid code for:|Diagram:|Flowchart \d+:)\s*/i, '').trim()}
-                            projectContext={`For project: ${project.title}. Section: ${selectedSectionInfo.name}.`}
+                            initialDescription={selectedItemInfo.prompt.replace(/^(Generate Mermaid code for:|Diagram:|Flowchart \d+:)\s*/i, '').trim()}
+                            projectContext={`For project: ${project.title}. Section: ${selectedItemInfo.name}.`}
                         />
-                       <Button onClick={() => handleGenerateSection(selectedSectionInfo.id)} disabled={isGeneratingDiagram || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting} className="hover:glow-primary focus-visible:glow-primary mt-2">
+                       <Button onClick={() => handleGenerateSection(selectedItemInfo.id)} disabled={isGeneratingDiagram || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting} className="hover:glow-primary focus-visible:glow-primary mt-2">
                          {isGeneratingDiagram ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BrainCircuit className="mr-2 h-4 w-4" />}
                          {isGeneratingDiagram ? 'Generating Diagram...' : 'Generate/Update Diagram with AI'}
                        </Button>
-                        {selectedSectionInfo.content && (
+                        {selectedItemInfo.content && (
                            <div className="mt-4 space-y-2">
                                <Label>Current Diagram:</Label>
-                               <MermaidDiagram chart={selectedSectionInfo.content} id={`diagram-${selectedSectionInfo.id}`} />
+                               <MermaidDiagram chart={selectedItemInfo.content} id={`diagram-${selectedItemInfo.id}`} />
                                <details className="mt-2 text-xs">
                                    <summary className="cursor-pointer text-muted-foreground hover:text-foreground">Show Mermaid Code</summary>
                                    <pre className="mt-1 p-2 bg-muted rounded-md text-muted-foreground overflow-x-auto max-h-40 text-[10px] md:text-xs">
-                                     <code>{selectedSectionInfo.content}</code>
+                                     <code>{selectedItemInfo.content}</code>
                                    </pre>
                                </details>
                            </div>
@@ -1358,30 +1391,30 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 <div className="space-y-6">
                     <Card className="shadow-md">
                         <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-lg md:text-xl text-primary text-glow-primary"><ImageIcon className="w-5 h-5" /> {selectedSectionInfo.name}</CardTitle>
-                             {selectedSectionInfo.lastGenerated && ( <CardDescription className="text-xs md:text-sm">Last updated: {new Date(selectedSectionInfo.lastGenerated).toLocaleString()}</CardDescription> )}
+                            <CardTitle className="flex items-center gap-2 text-lg md:text-xl text-primary text-glow-primary"><ImageIcon className="w-5 h-5" /> {selectedItemInfo.name}</CardTitle>
+                             {selectedItemInfo.lastGenerated && ( <CardDescription className="text-xs md:text-sm">Last updated: {new Date(selectedItemInfo.lastGenerated).toLocaleString()}</CardDescription> )}
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div>
-                                <Label htmlFor={`image-prompt-${selectedSectionInfo.id}`}>AI Image Generation Prompt</Label>
+                                <Label htmlFor={`image-prompt-${selectedItemInfo.id}`}>AI Image Generation Prompt</Label>
                                 <Textarea
-                                    id={`image-prompt-${selectedSectionInfo.id}`}
-                                    value={selectedSectionInfo.prompt.replace(/^Provide a detailed description or prompt for an AI to generate an image for:\s*/i, '').trim()}
-                                    onChange={(e) => handleSectionPromptChange(selectedSectionInfo.id, `Provide a detailed description or prompt for an AI to generate an image for: ${e.target.value}`)}
+                                    id={`image-prompt-${selectedItemInfo.id}`}
+                                    value={selectedItemInfo.prompt.replace(/^Provide a detailed description or prompt for an AI to generate an image for:\s*/i, '').trim()}
+                                    onChange={(e) => handleSectionPromptChange(selectedItemInfo.id, `Provide a detailed description or prompt for an AI to generate an image for: ${e.target.value}`)}
                                     onBlur={handleSectionPromptBlur}
                                     placeholder="e.g., A futuristic cityscape with flying cars under a neon sky."
                                     className="mt-1 min-h-[80px] focus-visible:glow-primary"
                                 />
                             </div>
-                            <Button onClick={() => handleImagePromptSubmit(selectedSectionInfo.prompt)} disabled={isGeneratingImage || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting} className="hover:glow-primary focus-visible:glow-primary">
+                            <Button onClick={() => handleImagePromptSubmit(selectedItemInfo.prompt)} disabled={isGeneratingImage || isGenerating || isSummarizing || isGeneratingOutline || isSuggesting} className="hover:glow-primary focus-visible:glow-primary">
                                 {isGeneratingImage ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
                                 {isGeneratingImage ? 'Generating Image...' : 'Generate Image with AI'}
                             </Button>
-                            {selectedSectionInfo.content && (
+                            {selectedItemInfo.content && (
                                 <div className="mt-4 space-y-2">
                                     <Label>Current Image:</Label>
                                     <div className="relative w-full max-w-md aspect-video border rounded-md overflow-hidden bg-muted">
-                                        <Image src={selectedSectionInfo.content} alt={selectedSectionInfo.name} layout="fill" objectFit="contain" data-ai-hint="generated illustration" />
+                                        <Image src={selectedItemInfo.content} alt={selectedItemInfo.name} layout="fill" objectFit="contain" data-ai-hint="generated illustration" />
                                     </div>
                                 </div>
                             )}
@@ -1395,37 +1428,37 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 <div className="space-y-6">
                     <Card className="shadow-md">
                         <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-lg md:text-xl text-primary text-glow-primary"><TableIcon className="w-5 h-5" /> {selectedSectionInfo.name}</CardTitle>
-                            {selectedSectionInfo.lastGenerated && ( <CardDescription className="text-xs md:text-sm">Last generated: {new Date(selectedSectionInfo.lastGenerated).toLocaleString()}</CardDescription> )}
+                            <CardTitle className="flex items-center gap-2 text-lg md:text-xl text-primary text-glow-primary"><TableIcon className="w-5 h-5" /> {selectedItemInfo.name}</CardTitle>
+                            {selectedItemInfo.lastGenerated && ( <CardDescription className="text-xs md:text-sm">Last generated: {new Date(selectedItemInfo.lastGenerated).toLocaleString()}</CardDescription> )}
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div>
-                                <Label htmlFor={`table-prompt-${selectedSectionInfo.id}`}>AI Table Generation Prompt</Label>
+                                <Label htmlFor={`table-prompt-${selectedItemInfo.id}`}>AI Table Generation Prompt</Label>
                                 <Textarea
-                                    id={`table-prompt-${selectedSectionInfo.id}`}
-                                    value={selectedSectionInfo.prompt.replace(/^Generate Markdown table data for:\s*/i, '').trim()}
-                                    onChange={(e) => handleSectionPromptChange(selectedSectionInfo.id, `Generate Markdown table data for: ${e.target.value}`)}
+                                    id={`table-prompt-${selectedItemInfo.id}`}
+                                    value={selectedItemInfo.prompt.replace(/^Generate Markdown table data for:\s*/i, '').trim()}
+                                    onChange={(e) => handleSectionPromptChange(selectedItemInfo.id, `Generate Markdown table data for: ${e.target.value}`)}
                                     onBlur={handleSectionPromptBlur}
                                     placeholder="e.g., A table comparing features of product A, B, and C including price, rating, and availability."
                                     className="mt-1 min-h-[80px] focus-visible:glow-primary"
                                 />
                             </div>
-                            <Button onClick={() => handleGenerateSection(selectedSectionInfo.id)} disabled={isGenerating || isSummarizing || isGeneratingOutline || isSuggesting} className="hover:glow-primary focus-visible:glow-primary">
+                            <Button onClick={() => handleGenerateSection(selectedItemInfo.id)} disabled={isGenerating || isSummarizing || isGeneratingOutline || isSuggesting} className="hover:glow-primary focus-visible:glow-primary">
                                 {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
                                 {isGenerating ? 'Generating Table...' : 'Generate Table with AI'}
                             </Button>
-                            {selectedSectionInfo.content && (
+                            {selectedItemInfo.content && (
                                 <div className="mt-4 space-y-2">
                                     <Label>Current Table (Markdown):</Label>
                                     <Textarea
-                                        value={selectedSectionInfo.content}
-                                        onChange={(e) => handleSectionContentChange(selectedSectionInfo.id, e.target.value)}
+                                        value={selectedItemInfo.content}
+                                        onChange={(e) => handleSectionContentChange(selectedItemInfo.id, e.target.value)}
                                         onBlur={handleSectionContentBlur}
                                         className="min-h-[150px] font-mono text-sm focus-visible:glow-primary"
                                         placeholder="Markdown table content appears here..."
                                     />
                                     <h4 className="text-sm font-medium mt-2">Preview:</h4>
-                                    <MarkdownPreview content={selectedSectionInfo.content} />
+                                    <MarkdownPreview content={selectedItemInfo.content} />
                                 </div>
                             )}
                         </CardContent>
@@ -1437,15 +1470,15 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                 <div className="space-y-6">
                     <Card className="shadow-md">
                       <CardHeader>
-                        <CardTitle className="text-primary text-glow-primary text-lg md:text-xl">{selectedSectionInfo.name} - AI Prompt</CardTitle>
-                        {selectedSectionInfo.lastGenerated && ( <CardDescription className="text-xs md:text-sm">Last generated: {new Date(selectedSectionInfo.lastGenerated).toLocaleString()}</CardDescription> )}
+                        <CardTitle className="text-primary text-glow-primary text-lg md:text-xl">{selectedItemInfo.name} - AI Prompt</CardTitle>
+                        {selectedItemInfo.lastGenerated && ( <CardDescription className="text-xs md:text-sm">Last generated: {new Date(selectedItemInfo.lastGenerated).toLocaleString()}</CardDescription> )}
                       </CardHeader>
                       <CardContent className="space-y-4">
                         <div>
-                          <Label htmlFor={`section-prompt-${selectedSectionInfo.id}`}>Generation Prompt</Label>
-                          <Textarea id={`section-prompt-${selectedSectionInfo.id}`} value={selectedSectionInfo.prompt} onChange={(e) => handleSectionPromptChange(selectedSectionInfo.id, e.target.value)} onBlur={handleSectionPromptBlur} placeholder="Instructions for the AI to generate content for this sub-section..." className="mt-1 min-h-[100px] font-mono text-sm focus-visible:glow-primary" />
+                          <Label htmlFor={`section-prompt-${selectedItemInfo.id}`}>Generation Prompt</Label>
+                          <Textarea id={`section-prompt-${selectedItemInfo.id}`} value={selectedItemInfo.prompt} onChange={(e) => handleSectionPromptChange(selectedItemInfo.id, e.target.value)} onBlur={handleSectionPromptBlur} placeholder="Instructions for the AI to generate content for this sub-section..." className="mt-1 min-h-[100px] font-mono text-sm focus-visible:glow-primary" />
                         </div>
-                        <Button onClick={() => handleGenerateSection(selectedSectionInfo.id)} disabled={isGenerating || isSummarizing || isGeneratingOutline || isSuggesting || isGeneratingDiagram || isGeneratingImage} className="hover:glow-primary focus-visible:glow-primary">
+                        <Button onClick={() => handleGenerateSection(selectedItemInfo.id)} disabled={isGenerating || isSummarizing || isGeneratingOutline || isSuggesting || isGeneratingDiagram || isGeneratingImage} className="hover:glow-primary focus-visible:glow-primary">
                           {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
                           {isGenerating ? 'Generating...' : 'Generate Content'}
                         </Button>
@@ -1453,7 +1486,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                     </Card>
                     <Card className="shadow-md mb-6">
                        <CardHeader>
-                         <CardTitle className="text-lg md:text-xl">{selectedSectionInfo.name} - Content</CardTitle>
+                         <CardTitle className="text-lg md:text-xl">{selectedItemInfo.name} - Content</CardTitle>
                          <CardDescription className="text-sm">Edit the content using Markdown and preview the output.</CardDescription>
                        </CardHeader>
                        <CardContent>
@@ -1465,17 +1498,17 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                            </TabsList>
                            <TabsContent value="edit" className="space-y-4">
                                <Textarea
-                                   id={`section-content-${selectedSectionInfo.id}`}
+                                   id={`section-content-${selectedItemInfo.id}`}
                                    ref={contentTextAreaRef}
-                                   value={selectedSectionInfo.content}
-                                   onChange={(e) => handleSectionContentChange(selectedSectionInfo.id, e.target.value)}
+                                   value={selectedItemInfo.content}
+                                   onChange={(e) => handleSectionContentChange(selectedItemInfo.id, e.target.value)}
                                    onBlur={handleSectionContentBlur}
                                    placeholder={"Generated content appears here. Use Markdown for formatting..."}
                                    className="min-h-[300px] md:min-h-[400px] text-sm md:text-base focus-visible:glow-primary font-mono"
                                 />
                            </TabsContent>
                            <TabsContent value="preview">
-                               <MarkdownPreview content={selectedSectionInfo.content || ''} />
+                               <MarkdownPreview content={selectedItemInfo.content || ''} />
                            </TabsContent>
                          </Tabs>
                        </CardContent>
@@ -1483,7 +1516,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
                           <Button variant="outline" size="sm" onClick={handleOpenExplainer} className="hover:glow-accent focus-visible:glow-accent text-xs px-2 sm:px-3">
                              <BookOpen className="mr-1 h-3 w-3 sm:h-4 sm:w-4" /> Explain Selected Text
                           </Button>
-                         <Button variant="outline" size="sm" onClick={() => handleSummarizeSection(selectedSectionInfo.id)} disabled={isSummarizing || isGenerating || isGeneratingOutline || isSuggesting || !selectedSectionInfo.content?.trim()} className="hover:glow-accent focus-visible:glow-accent">
+                         <Button variant="outline" size="sm" onClick={() => handleSummarizeSection(selectedItemInfo.id)} disabled={isSummarizing || isGenerating || isGeneratingOutline || isSuggesting || !selectedItemInfo.content?.trim()} className="hover:glow-accent focus-visible:glow-accent">
                            {isSummarizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ScrollText className="mr-2 h-4 w-4" />}
                            {isSummarizing ? 'Summarizing...' : 'Summarize'}
                          </Button>
@@ -1678,23 +1711,31 @@ const validateOutlineStructure = (sections: any[] | undefined, currentDepth = 0,
         console.warn("Validation failed: Main sections property is not an array.");
         return false;
     }
-    return sections.every(section => {
+    return sections.every((section, index) => {
         if (typeof section !== 'object' || !section || typeof section.name !== 'string' || !section.name.trim()) {
-            console.warn("Validation failed: Section missing name or is not an object:", section);
+            console.warn(`Outline Validation Failed (Depth ${currentDepth}): Section at index ${index} is invalid (missing name or not an object):`, JSON.stringify(section));
             return false;
         }
-         if (maxDepth !== undefined && currentDepth >= maxDepth && section.subSections && section.subSections.length > 0) {
-            console.warn(`Validation failed: Section "${section.name}" at depth ${currentDepth} has subSections, exceeding max depth ${maxDepth}.`);
-            return false;
+        if (maxDepth !== undefined && currentDepth >= maxDepth) {
+            if (section.subSections && Array.isArray(section.subSections) && section.subSections.length > 0) {
+                console.warn(`Outline Validation Failed (Depth ${currentDepth}): Section "${section.name}" at max depth ${maxDepth} has subSections.`);
+                return false;
+            }
         }
         if (section.hasOwnProperty('subSections')) {
             if (!Array.isArray(section.subSections)) {
-                console.warn("Validation failed: subSections exists but is not an array for section:", section.name, section);
+                console.warn(`Outline Validation Failed (Depth ${currentDepth}): subSections for "${section.name}" exists but is not an array:`, section.subSections);
                 return false;
             }
-            if (section.subSections.length > 0 && !validateOutlineStructure(section.subSections, currentDepth + 1, maxDepth)) {
-                 console.warn("Validation failed: Invalid structure within subSections of:", section.name);
-                 return false;
+            if (section.subSections.length > 0) {
+                if (maxDepth !== undefined && currentDepth + 1 > maxDepth) {
+                     console.warn(`Outline Validation Failed (Depth ${currentDepth}): Section "${section.name}" has subSections that would exceed max depth ${maxDepth}. Children count: ${section.subSections.length}`);
+                     return false;
+                }
+                if (!validateOutlineStructure(section.subSections, currentDepth + 1, maxDepth)) {
+                    console.warn(`Outline Validation Failed: Invalid structure within subSections of "${section.name}" (Depth ${currentDepth}).`);
+                    return false;
+                }
             }
         }
         return true;

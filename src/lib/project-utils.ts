@@ -151,6 +151,100 @@ export function deleteSectionById(sections: HierarchicalProjectSection[], id: st
     }, [] as HierarchicalProjectSection[]);
 }
 
+// Function to parse text-based outline into OutlineSection[]
+export function parseTextToOutlineStructure(text: string): OutlineSection[] | null {
+    const lines = text.split('\n').filter(line => line.trim() !== '');
+    if (lines.length === 0) return [];
+
+    const result: OutlineSection[] = [];
+    const stack: { level: number; section: OutlineSection }[] = [];
+
+    // Determine indentation type and size from the first indented line
+    let indentSize = 2; // Default to 2 spaces
+    let indentType: 'space' | 'tab' | null = null;
+
+    for (const line of lines) {
+        const firstChar = line[0];
+        if (firstChar === ' ') {
+            indentType = 'space';
+            let count = 0;
+            while (line[count] === ' ') count++;
+            if (count > 0) indentSize = count; // Assume first indent sets the size
+            break;
+        } else if (firstChar === '\t') {
+            indentType = 'tab';
+            indentSize = 1; // Tabs are typically 1 unit of indentation
+            break;
+        }
+    }
+     if (indentType === null && lines.length > 1 && (lines[1].startsWith(' ') || lines[1].startsWith('\t'))) {
+        // If first line has no indent but second does, re-check from second
+        const firstCharSecond = lines[1][0];
+         if (firstCharSecond === ' ') {
+            indentType = 'space';
+            let count = 0;
+            while (lines[1][count] === ' ') count++;
+            if (count > 0) indentSize = count;
+        } else if (firstCharSecond === '\t') {
+            indentType = 'tab';
+            indentSize = 1;
+        }
+    }
+
+
+    const getIndentationLevel = (line: string): number => {
+        if (indentType === 'space') {
+            const match = line.match(/^(\s*)/);
+            return match ? Math.floor(match[0].length / indentSize) : 0;
+        } else if (indentType === 'tab') {
+            const match = line.match(/^(\t*)/);
+            return match ? match[0].length : 0;
+        }
+        return 0; // No indentation or mixed
+    };
+
+    for (const line of lines) {
+        const level = getIndentationLevel(line);
+        const name = line.trim().replace(/^(- |\* |\d+\.?\s*)/, '').trim(); // Clean list markers and numbers
+
+        if (!name) continue; // Skip empty lines after trimming markers
+
+        const newSection: OutlineSection = { name }; // Initialize subSections as undefined
+
+        while (stack.length > 0 && stack[stack.length - 1].level >= level) {
+            stack.pop();
+        }
+
+        if (stack.length === 0) {
+            result.push(newSection);
+        } else {
+            const parent = stack[stack.length - 1].section;
+            if (!parent.subSections) { 
+                parent.subSections = []; // Initialize if it's the first child
+            }
+            parent.subSections.push(newSection);
+        }
+        stack.push({ level, section: newSection });
+    }
+    
+    // Clean up empty subSections arrays to match AI flow expectation (omit key if empty)
+    // This also ensures consistency: if subSections has items, it's an array; otherwise, the key is omitted.
+    const cleanEmptySubSections = (sections: OutlineSection[]): void => {
+        for (const section of sections) {
+            if (section.subSections) {
+                if (section.subSections.length === 0) {
+                    delete section.subSections;
+                } else {
+                    cleanEmptySubSections(section.subSections);
+                }
+            }
+        }
+    };
+    cleanEmptySubSections(result);
+    return result.length > 0 ? result : null;
+}
+
+
 // Constants for standard pages and their indices
 export const TOC_SECTION_NAME = "Table of Contents";
 
