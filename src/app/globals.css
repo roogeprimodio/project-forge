@@ -21,11 +21,11 @@ body {
 @layer base {
   :root {
     /* Light Theme - Beige/Bone White Palette */
-    --background: 0 0% 96.1%; /* Light Gray #F5F5F5 - Keeping for a clean base */
+    --background: 45 40% 98%; /* VERY LIGHT BONE WHITE/BEIGE - Main Background */
     --foreground: 35 15% 25%; /* Dark Brown for text */
-    --card: 45 30% 97%; /* Very Light Bone White/Off-White for cards */
+    --card: 45 35% 97%; /* Slightly Deeper Bone White/Beige for cards */
     --card-foreground: 35 15% 25%; /* Dark Brown text on cards */
-    --popover: 45 30% 97%; /* Very Light Bone White/Off-White for popovers */
+    --popover: 45 35% 97%; /* Slightly Deeper Bone White/Beige for popovers */
     --popover-foreground: 35 15% 25%;
     --primary: 35 35% 50%; /* Muted Earthy Brown */
     --primary-foreground: 35 30% 95%; /* Very Light Beige/Cream for text on primary */
@@ -38,7 +38,7 @@ body {
     --destructive: 0 70% 55%; /* A slightly softer Red */
     --destructive-foreground: 0 0% 98%; /* White */
     --border: 40 25% 88%; /* Softer Beige Border */
-    --input: 45 40% 98%; /* Very Light Bone White for input background */
+    --input: 45 40% 98%; /* Very Light Bone White for input background (can be same as main bg or slightly off) */
     --input-foreground: 35 15% 25%; /* Dark Brown input text */
     --ring: 35 35% 50%; /* Muted Earthy Brown ring (matching primary) */
     
