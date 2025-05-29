@@ -15,7 +15,7 @@ import type { OutlineSection, GeneratedSectionOutline } from '@/types/project';
 // Recursive schema for sections and sub-sections
 const OutlineSectionSchema: z.ZodType<OutlineSection> = z.lazy(() =>
   z.object({
-    name: z.string().describe('The full name of the section or sub-section. Original numbering/markers should be stripped.'),
+    name: z.string().min(1).describe('The full name of the section or sub-section. Original numbering/markers MUST be stripped. This name is MANDATORY.'), // Enforce non-empty name
     subSections: z.array(OutlineSectionSchema).optional().describe('An optional array of sub-sections. OMIT this key if there are no sub-items.'),
   })
 );
@@ -52,13 +52,14 @@ Input Text Outline:
 1.  **Hierarchy:** Accurately interpret the indentation to determine parent-child relationships.
     *   Lines with less indentation are parents to subsequent lines with more indentation.
     *   Lines with the same indentation level (after a parent) are siblings.
-2.  **Section Names:**
-    *   Extract the meaningful name for each section/sub-section.
+2.  **Section Names (CRITICAL):**
+    *   Extract the meaningful name for each section/sub-section. This name field is MANDATORY.
     *   Strip any leading list markers (e.g., '-', '*', '1.', 'A)', 'i.') and their subsequent spaces from the name.
     *   Trim leading/trailing whitespace from the extracted name.
+    *   Ensure EVERY section and sub-section object has a non-empty 'name' property.
 3.  subSections Key:
-    *   If a section has child items, represent them as an array in a \`subSections\` key.
-    *   **CRITICAL: If a section has NO children, COMPLETELY OMIT the \`subSections\` key for that object in the JSON. Do NOT include \`"subSections": []\` for leaf nodes.**
+    *   If a section has child items, represent them as an array in a 'subSections' key.
+    *   **CRITICAL: If a section has NO children, COMPLETELY OMIT the 'subSections' key for that object in the JSON. Do NOT include \`"subSections": []\` for leaf nodes.**
 4.  **Output Format:**
     *   The entire output MUST be a single JSON object matching the 'ParseTextToOutlineOutputSchema'.
     *   The root of this object must have a "sections" key, which is an array of top-level OutlineSection objects.
@@ -74,7 +75,7 @@ Input Text Outline:
   - Subtopic 2.1
 \`\`\`
 
-**Corresponding Example JSON Output:**
+**Corresponding Example JSON Output (Ensure EVERY item has a 'name'):**
 \`\`\`json
 {
   "sections": [
@@ -105,7 +106,7 @@ Input Text Outline:
   ]
 }
 \`\`\`
-Process the provided "{{{textOutline}}}" now.
+Process the provided "{{{textOutline}}}" now. Ensure all generated section objects have a 'name' property.
 `,
 });
 
@@ -125,6 +126,19 @@ const parseTextToOutlineFlow = ai.defineFlow(
         // Attempt to provide a fallback or indicate error
         return { sections: [{ name: "Error: AI failed to parse the outline. Please check your text format."}] };
     }
+    // Additional validation to ensure all items have names (though Zod should catch this)
+    const validateNames = (secs: OutlineSection[]): boolean => {
+        return secs.every(s => {
+            if (typeof s.name !== 'string' || !s.name.trim()) return false;
+            if (s.subSections && !validateNames(s.subSections)) return false;
+            return true;
+        });
+    };
+    if (!validateNames(output.sections)) {
+        console.error("AI parsing returned items without names:", output);
+        return { sections: [{ name: "Error: AI returned some items without names. Please check your text format."}] };
+    }
+
     return output;
   }
 );

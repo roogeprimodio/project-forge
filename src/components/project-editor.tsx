@@ -15,7 +15,7 @@ import type { Project, HierarchicalProjectSection, GeneratedSectionOutline, Sect
 import { findSectionById, updateSectionById, deleteSectionById, STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, TOC_SECTION_NAME, ensureDefaultSubSection, getSectionNumbering, addSubSectionById } from '@/lib/project-utils';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { useToast } from '@/hooks/use-toast';
-import { generateSectionAction, summarizeSectionAction, generateOutlineAction, suggestImprovementsAction, generateDiagramAction, explainConceptAction, generateImageForSlideAction, parseTextOutlineAction } from '@/app/actions'; // Added parseTextOutlineAction
+import { generateSectionAction, summarizeSectionAction, generateOutlineAction, suggestImprovementsAction, generateDiagramAction, explainConceptAction, generateImageForSlideAction, parseTextOutlineAction } from '@/app/actions';
 import type { GenerateDiagramMermaidInput } from '@/ai/flows/generate-diagram-mermaid';
 import type { ExplainConceptInput } from '@/ai/flows/explain-concept-flow';
 import { useRouter } from 'next/navigation';
@@ -43,18 +43,20 @@ import Image from 'next/image';
 // Recursive component to render the preview outline
 const OutlinePreviewItem: React.FC<{ item: OutlineSection; level: number }> = ({ item, level }) => {
   const hasSubSections = item.subSections && item.subSections.length > 0;
-  const isDiagram = item.name.toLowerCase().startsWith("diagram:") || item.name.toLowerCase().startsWith("figure:") || item.name.toLowerCase().startsWith("table:") || item.name.toLowerCase().startsWith("flowchart:");
+  // Defensive check for item.name
+  const itemName = typeof item.name === 'string' ? item.name : "[Unnamed Section]";
+  const isDiagram = itemName.toLowerCase().startsWith("diagram:") || itemName.toLowerCase().startsWith("figure:") || itemName.toLowerCase().startsWith("table:") || itemName.toLowerCase().startsWith("flowchart:");
 
   return (
     <div className="text-sm">
       <div className="flex items-center" style={{ paddingLeft: `${level * 1.5}rem` }}>
         <span className="mr-2 text-muted-foreground">-</span>
-        <span className={cn(isDiagram && "italic text-muted-foreground")}>{item.name}</span>
+        <span className={cn(isDiagram && "italic text-muted-foreground")}>{itemName}</span>
       </div>
       {hasSubSections && (
         <div className="border-l border-muted/30 ml-2 pl-2">
           {item.subSections.map((subItem, index) => (
-            <OutlinePreviewItem key={`${item.name}-${index}-${level}`} item={subItem} level={level +1} />
+            <OutlinePreviewItem key={`${itemName}-${index}-${level}`} item={subItem} level={level +1} />
           ))}
         </div>
       )}
@@ -937,7 +939,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
         updateProject(prev => ({
             ...prev,
-            sections: addSubSectionUtil(prev.sections, parentId, newSubData, parentNumbering)
+            sections: addSubSectionById(prev.sections, parentId, newSubData, parentNumbering)
         }), true);
 
         toast({ title: "Sub-Item Added", description: `"${newSubSectionName}" added under "${parentSection.name}".` });
@@ -1728,7 +1730,11 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
 const validateOutlineStructure = (sections: any[] | undefined, currentDepth = 0, maxDepth?: number): sections is OutlineSection[] => {
     if (!Array.isArray(sections)) {
-        console.warn("Validation failed: Main sections property is not an array.");
+        console.warn(`Outline Validation Failed (Depth ${currentDepth}): Root 'sections' is not an array.`);
+        return false;
+    }
+    if (sections.length === 0 && currentDepth === 0) {
+        console.warn(`Outline Validation Failed: Root 'sections' array is empty.`);
         return false;
     }
     return sections.every((section, index) => {
@@ -1761,5 +1767,3 @@ const validateOutlineStructure = (sections: any[] | undefined, currentDepth = 0,
         return true;
     });
 };
-
-      
