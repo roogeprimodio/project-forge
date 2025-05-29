@@ -10,27 +10,26 @@
 
 import { ai } from '@/ai/ai-instance'; // Assuming your global AI instance is here
 import { z } from 'genkit';
-import type { OutlineSection, GeneratedSectionOutline } from '@/types/project';
+import type { OutlineSection } from '@/types/project'; // Ensure this matches the expected structure
 
 // Recursive schema for sections and sub-sections
 const OutlineSectionSchema: z.ZodType<OutlineSection> = z.lazy(() =>
   z.object({
-    name: z.string().min(1).describe('The full name of the section or sub-section. Original numbering/markers MUST be stripped. This name is MANDATORY and must not be empty.'),
-    subSections: z.array(OutlineSectionSchema).optional().describe('An optional array of sub-sections. OMIT this key if there are no sub-items.'),
+    name: z.string().min(1).describe('The full name of the section or sub-section, extracted verbatim from the input text after stripping list markers. THIS IS MANDATORY and must not be empty.'),
+    subSections: z.array(OutlineSectionSchema).optional().describe('An optional array of sub-sections. OMIT this key completely if there are no sub-items. DO NOT provide an empty array like "subSections": [].'),
   })
 );
+
+// Output schema matches GeneratedSectionOutline from types/project.ts
+const ParseTextToOutlineOutputSchema = z.object({
+  sections: z.array(OutlineSectionSchema).describe('An ordered, hierarchical list of sections parsed from the text. If parsing fails or text is empty/unparseable, return an empty array: { "sections": [] } or a single error section: { "sections": [{ "name": "Error: Parsing failed..." }] }.'),
+});
+export type ParseTextToOutlineOutput = z.infer<typeof ParseTextToOutlineOutputSchema>;
 
 const ParseTextToOutlineInputSchema = z.object({
   textOutline: z.string().describe('The raw text outline provided by the user. It may use spaces or tabs for indentation, and various list markers (-, *, 1., a., etc.).'),
 });
 export type ParseTextToOutlineInput = z.infer<typeof ParseTextToOutlineInputSchema>;
-
-// Output schema matches GeneratedSectionOutline from types/project.ts
-const ParseTextToOutlineOutputSchema = z.object({
-  sections: z.array(OutlineSectionSchema).describe('An ordered, hierarchical list of sections parsed from the text. Return an empty array if parsing fails or text is empty.'),
-});
-export type ParseTextToOutlineOutput = z.infer<typeof ParseTextToOutlineOutputSchema>;
-
 
 export async function parseTextToOutline(input: ParseTextToOutlineInput): Promise<ParseTextToOutlineOutput> {
   return parseTextToOutlineFlow(input);
@@ -40,30 +39,32 @@ const prompt = ai.definePrompt({
   name: 'parseTextToOutlinePrompt',
   input: { schema: ParseTextToOutlineInputSchema },
   output: { schema: ParseTextToOutlineOutputSchema },
-  prompt: `You are an expert text processor. Your task is to convert a raw text-based outline into a structured hierarchical JSON format.
-The user will provide a text outline where hierarchy is typically indicated by indentation (spaces or tabs) and possibly list markers (like '-', '*', '1.', 'a.', etc.).
+  prompt: `You are an expert text processor. Your SOLE TASK is to convert the following raw text-based outline into a structured hierarchical JSON format based EXACTLY on the provided schema.
+DO NOT add, remove, rephrase, or interpret the content of the section names. Your job is purely structural transformation.
 
 Input Text Outline:
 \`\`\`text
 {{{textOutline}}}
 \`\`\`
 
-**CRITICAL Instructions for JSON Conversion:**
-1.  **Hierarchy:** Accurately interpret the indentation to determine parent-child relationships.
+**CRITICAL Instructions for JSON Conversion (Adhere Strictly):**
+1.  **Hierarchy Determination:**
+    *   Accurately interpret indentation (spaces or tabs) to determine parent-child relationships.
     *   Lines with less indentation are parents to subsequent lines with more indentation.
     *   Lines with the same indentation level (after a parent) are siblings.
-2.  **Section Names (MANDATORY):**
-    *   For EVERY item in the outline (section or sub-section), you MUST extract a meaningful 'name'.
-    *   Strip any leading list markers (e.g., '-', '*', '1.', 'A)', 'i.') and their subsequent spaces from the name.
+2.  **Section Names (MANDATORY 'name' field):**
+    *   For EVERY item in the outline (section or sub-section), you MUST extract its name.
+    *   STRIP any leading list markers (e.g., '-', '*', '1.', 'A)', 'i.', '#', '##') and any subsequent spaces from the name.
+    *   The extracted name becomes the value for the 'name' string property.
     *   Trim leading/trailing whitespace from the extracted name.
-    *   Ensure EVERY section and sub-section object in the output JSON has a non-empty 'name' string property. If a line seems to be only indentation or markers with no actual text, it should be ignored or you should try to infer a placeholder name like "[Unnamed Item]".
-3.  **'subSections' Key:**
-    *   If a section has child items, represent them as an array in a 'subSections' key.
+    *   **Ensure EVERY section object in the output JSON has a non-empty 'name' string property.** If a line seems to be only indentation or markers with no actual text, it should be ignored or you should try to infer a placeholder name like "[Unnamed Item]".
+3.  **'subSections' Key (Conditional):**
+    *   If a section has child items (items indented further beneath it), represent these children as an array in a 'subSections' key for that parent section.
     *   **CRITICAL: If a section has NO children, COMPLETELY OMIT the 'subSections' key for that object in the JSON. Do NOT include \`"subSections": []\` for leaf nodes.**
 4.  **Output Format:**
-    *   The entire output MUST be a single JSON object matching the 'ParseTextToOutlineOutputSchema'.
+    *   The entire output MUST be a single JSON object precisely matching the 'ParseTextToOutlineOutputSchema'.
     *   The root of this object must have a "sections" key, which is an array of top-level OutlineSection objects.
-    *   If the input text is empty, invalid, or cannot be parsed into a meaningful outline with named sections, return an empty "sections" array: \`{ "sections": [] }\`.
+    *   If the input text is empty, invalid, or cannot be parsed into a meaningful outline, return an object with an empty "sections" array: \`{ "sections": [] }\`. DO NOT return conversational text or explanations.
 
 **Example Input Text:**
 \`\`\`text
@@ -75,7 +76,7 @@ Input Text Outline:
   - Subtopic 2.1
 \`\`\`
 
-**Corresponding Example JSON Output (Ensure EVERY item has a 'name'):**
+**Corresponding Example JSON Output (Ensure EVERY item has a 'name' and 'subSections' is omitted for leaves):**
 \`\`\`json
 {
   "sections": [
@@ -106,7 +107,8 @@ Input Text Outline:
   ]
 }
 \`\`\`
-Process the provided "{{{textOutline}}}" now. Ensure all generated section objects have a 'name' property.
+Process the provided "{{{textOutline}}}" now. Adhere STRICTLY to all instructions and the JSON output format.
+Only output the JSON object.
 `,
 });
 
@@ -118,16 +120,29 @@ const parseTextToOutlineFlow = ai.defineFlow(
   },
   async (input): Promise<ParseTextToOutlineOutput> => {
     if (!input.textOutline || input.textOutline.trim() === '') {
-      return { sections: [] }; // Return empty if input is empty
+      console.log("parseTextToOutlineFlow: Empty input text, returning empty sections.");
+      return { sections: [] };
     }
     try {
+      console.log("parseTextToOutlineFlow: Calling AI prompt with text outline:", input.textOutline.substring(0, 100) + "...");
       const { output: rawOutput } = await prompt(input);
 
-      // Validate the raw output from AI against the Zod schema
-      // This will throw an error if the structure is incorrect (e.g., missing 'name')
-      const parsedOutput = ParseTextToOutlineOutputSchema.parse(rawOutput);
+      if (!rawOutput) {
+        console.error("parseTextToOutlineFlow: AI returned null or undefined output.");
+        return { sections: [{ name: "Error: AI returned no output. Please try again." }] };
+      }
 
-      // Additional explicit check for names, although Zod should catch it.
+      console.log("parseTextToOutlineFlow: Raw AI output:", JSON.stringify(rawOutput).substring(0, 200) + "...");
+
+      // Try to parse the AI's output
+      const parsedOutput = ParseTextToOutlineOutputSchema.safeParse(rawOutput);
+
+      if (!parsedOutput.success) {
+        console.error("parseTextToOutlineFlow: Zod validation failed for AI output.", parsedOutput.error.issues);
+        const errorMessages = parsedOutput.error.issues.map(issue => `Path: ${issue.path.join('.')}, Message: ${issue.message}`).join('; ');
+        return { sections: [{ name: `Error: AI output did not match expected structure. Details: ${errorMessages.substring(0,150)}...` }] };
+      }
+      
       const validateNamesRecursive = (secs: OutlineSection[]): boolean => {
         return secs.every(s => {
           if (typeof s.name !== 'string' || !s.name.trim()) return false;
@@ -136,24 +151,20 @@ const parseTextToOutlineFlow = ai.defineFlow(
         });
       };
 
-      if (!parsedOutput.sections || !validateNamesRecursive(parsedOutput.sections)) {
-        console.error("AI parsing returned items without names or invalid section structure:", parsedOutput);
+      if (!parsedOutput.data.sections || (parsedOutput.data.sections.length > 0 && !validateNamesRecursive(parsedOutput.data.sections))) {
+        console.error("parseTextToOutlineFlow: AI parsing returned items without names or invalid section structure after Zod success:", parsedOutput.data);
         return { sections: [{ name: "Error: AI returned an invalid outline structure (e.g., missing names). Please check your text format or simplify."}] };
       }
-
-      return parsedOutput;
+      
+      console.log("parseTextToOutlineFlow: Successfully parsed AI output.");
+      return parsedOutput.data;
 
     } catch (error: any) {
-      console.error("Error in parseTextToOutlineFlow:", error);
+      console.error("parseTextToOutlineFlow: Critical error in flow execution:", error);
       let errorMessage = "AI failed to parse the outline. Please check your text format or try again.";
-      if (error instanceof z.ZodError) {
-        errorMessage = `AI returned data in an unexpected format. Details: ${error.errors.map(e => `${e.path.join('.')} - ${e.message}`).join(', ')}`;
-        // Limit length of Zod error details in toast
-        if (errorMessage.length > 200) errorMessage = errorMessage.substring(0, 197) + "...";
-      } else if (error.message) {
-        errorMessage = error.message.substring(0,200); // Limit length for toast
+      if (error.message) {
+        errorMessage = error.message.substring(0,200);
       }
-      // Return a valid structure with an error message
       return { sections: [{ name: `Error: ${errorMessage}` }] };
     }
   }
