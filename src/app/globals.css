@@ -143,7 +143,7 @@ body {
    }
 
    /* Add transition for smooth effect */
-    button, a, input, textarea, select {
+    button, a, input, textarea, select, div[role="button"], div[role="link"] { /* Added div roles for cards */
         @apply transition-all duration-200 ease-in-out;
     }
 

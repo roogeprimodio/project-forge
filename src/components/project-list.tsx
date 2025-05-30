@@ -45,8 +45,8 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, onDeleteProj
             <Card
               key={project.id}
               className={cn(
-                "group flex flex-col justify-between overflow-hidden rounded-lg border bg-card text-card-foreground shadow-md transition-all duration-300 ease-in-out hover:shadow-xl hover:border-primary/50",
-                "focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 focus-within:ring-offset-background" // Added focus state for accessibility
+                "group flex flex-col justify-between overflow-hidden rounded-lg border bg-card text-card-foreground shadow-md transition-all duration-300 ease-in-out hover:shadow-xl hover:border-primary/50 hover:scale-[1.02] transform", // Added transform and hover:scale
+                "focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 focus-within:ring-offset-background"
               )}
             >
               <Link href={`/project/${project.id}`} className="flex flex-col flex-grow h-full focus:outline-none">
