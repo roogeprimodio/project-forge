@@ -1,7 +1,7 @@
 
 import {genkit} from 'genkit';
 import {googleAI} from '@genkit-ai/googleai';
-import {openai} from '@genkit-ai/openai'; // Ensure OpenAI plugin is imported
+// import {openai} from '@genkit-ai/openai'; // Ensure OpenAI plugin is imported
 
 // Main AI instance.
 // Flows will dynamically select the model (Gemini or OpenAI) and
@@ -20,10 +20,10 @@ export const ai = genkit({
     }),
     // Initialize OpenAI plugin so it can be selected by flows.
     // No API key here; flows will pass it or it will error if user doesn't provide one.
-    openai({
-      // Similar to googleAI, no default API key.
-      // apiKey: "USER_KEY_EXPECTED_FOR_OPENAI" // Placeholder if needed for init
-    }),
+    // openai({
+    //   // Similar to googleAI, no default API key.
+    //   // apiKey: "USER_KEY_EXPECTED_FOR_OPENAI" // Placeholder if needed for init
+    // }),
   ],
   // Default model for generic `ai.generate` if not specified in the call itself.
   // However, our flows will explicitly set the model.
@@ -35,4 +35,3 @@ export const ai = genkit({
 export const geminiModel = 'googleai/gemini-2.0-flash';
 export const openAiModel = 'openai/gpt-4-turbo'; // Example OpenAI model, adjust as needed
 // export const openAiModel = 'openai/gpt-3.5-turbo';
-
