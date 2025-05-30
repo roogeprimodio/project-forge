@@ -9,9 +9,9 @@
 
 import { ai } from '@/ai/ai-instance';
 import { z } from 'genkit';
+import { BaseAiInputSchema, getModel, getConfig, getMissingApiKeyError } from './common';
 
-// Updated input schema to include more context
-const SuggestImprovementsInputSchema = z.object({
+const SuggestImprovementsInputSchemaInternal = z.object({
   projectTitle: z.string().describe('The title of the project.'),
   projectContext: z
     .string()
@@ -24,34 +24,43 @@ const SuggestImprovementsInputSchema = z.object({
     .string()
     .optional()
     .describe('Specific area or question the user wants suggestions on (e.g., "Improve clarity of introduction", "Suggest missing sections").'),
-  // ** NEW: Add existing section names for structural context **
   existingSections: z
     .string()
     .optional()
     .describe('Comma-separated list of the current top-level section names.'),
-  // ** NEW: Add project type for context **
   projectType: z.enum(['mini-project', 'internship']).optional().describe('The type of project (mini-project or internship).'),
 });
+
+export const SuggestImprovementsInputSchema = SuggestImprovementsInputSchemaInternal.merge(BaseAiInputSchema);
 export type SuggestImprovementsInput = z.infer<typeof SuggestImprovementsInputSchema>;
 
 const SuggestImprovementsOutputSchema = z.object({
   suggestions: z
     .string()
     .describe('Constructive feedback and actionable suggestions for improving the project report, formatted in Markdown. Focus on clarity, structure, completeness, and potential additions or refinements based on the provided content and context.'),
+  error: z.string().optional(),
 });
 export type SuggestImprovementsOutput = z.infer<typeof SuggestImprovementsOutputSchema>;
 
 export async function suggestImprovements(
   input: SuggestImprovementsInput
 ): Promise<SuggestImprovementsOutput> {
+  const apiKeyError = getMissingApiKeyError(
+    input.aiModel || 'gemini',
+    input.userApiKey,
+    !!process.env.GOOGLE_GENAI_API_KEY,
+    !!process.env.OPENAI_API_KEY
+  );
+  if (apiKeyError) {
+    return { suggestions: '', error: apiKeyError };
+  }
   return suggestImprovementsFlow(input);
 }
 
-// Updated prompt to use the new context fields
-const prompt = ai.definePrompt({
+const suggestImprovementsPrompt = ai.definePrompt({
   name: 'suggestImprovementsPrompt',
   input: {
-    schema: SuggestImprovementsInputSchema, // Use updated schema
+    schema: SuggestImprovementsInputSchemaInternal,
   },
   output: {
     schema: SuggestImprovementsOutputSchema,
@@ -82,24 +91,30 @@ const prompt = ai.definePrompt({
   `,
 });
 
-const suggestImprovementsFlow = ai.defineFlow<
-  typeof SuggestImprovementsInputSchema,
-  typeof SuggestImprovementsOutputSchema
->({
-  name: 'suggestImprovementsFlow',
-  inputSchema: SuggestImprovementsInputSchema,
-  outputSchema: SuggestImprovementsOutputSchema,
-},
-async (input) => {
-  if (!input.allSectionsContent?.trim() && !input.projectContext?.trim()) {
-      return { suggestions: "Please provide some project context or section content to get suggestions." };
-  }
-  const { output } = await prompt(input);
+const suggestImprovementsFlow = ai.defineFlow(
+  {
+    name: 'suggestImprovementsFlow',
+    inputSchema: SuggestImprovementsInputSchema,
+    outputSchema: SuggestImprovementsOutputSchema,
+  },
+  async (input) => {
+    const { userApiKey, aiModel, ...promptData } = input;
+    const model = getModel({ aiModel, userApiKey });
+    const config = getConfig({ aiModel, userApiKey });
 
-  if (!output?.suggestions) {
-    // Fallback if AI returns empty suggestions
-    return { suggestions: "Could not generate suggestions at this time. Please ensure your content is sufficient." };
-  }
+    if (!promptData.allSectionsContent?.trim() && !promptData.projectContext?.trim()) {
+        return { suggestions: "Please provide some project context or section content to get suggestions.", error: "Insufficient input." };
+    }
+    try {
+      const { output } = await suggestImprovementsPrompt(promptData, { model, config });
 
-  return output;
-});
+      if (!output?.suggestions) {
+        return { suggestions: "Could not generate suggestions at this time. Please ensure your content is sufficient.", error: "AI returned no suggestions." };
+      }
+      return output;
+    } catch (e: any) {
+      console.error("Error in suggestImprovementsFlow:", e);
+      return { suggestions: '', error: `AI generation failed: ${e.message || 'Unknown error'}` };
+    }
+  }
+);

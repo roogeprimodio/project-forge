@@ -10,26 +10,39 @@
 
 import { ai } from '@/ai/ai-instance';
 import { z } from 'genkit';
+import { BaseAiInputSchema, getModel, getConfig, getMissingApiKeyError } from './common';
 
-const GenerateAbstractInputSchema = z.object({
+const GenerateAbstractInputSchemaInternal = z.object({
   projectTitle: z.string().describe('The full title of the project.'),
   projectContext: z.string().describe('A detailed description of the project, its goals, scope, target audience, key features, technologies used, and methodology. This is crucial for a good abstract.'),
   keyFindings: z.string().optional().describe('Brief summary of the main results or findings of the project. If not provided, AI should infer from context.'),
 });
+
+export const GenerateAbstractInputSchema = GenerateAbstractInputSchemaInternal.merge(BaseAiInputSchema);
 export type GenerateAbstractInput = z.infer<typeof GenerateAbstractInputSchema>;
 
 const GenerateAbstractOutputSchema = z.object({
   abstractMarkdown: z.string().describe('The generated HTML content for the abstract. Should be a concise summary of the project (typically 150-300 words).'),
+  error: z.string().optional(),
 });
 export type GenerateAbstractOutput = z.infer<typeof GenerateAbstractOutputSchema>;
 
 export async function generateAbstract(input: GenerateAbstractInput): Promise<GenerateAbstractOutput> {
+  const apiKeyError = getMissingApiKeyError(
+    input.aiModel || 'gemini',
+    input.userApiKey,
+    !!process.env.GOOGLE_GENAI_API_KEY,
+    !!process.env.OPENAI_API_KEY
+  );
+  if (apiKeyError) {
+    return { abstractMarkdown: '', error: apiKeyError };
+  }
   return generateAbstractFlow(input);
 }
 
-const prompt = ai.definePrompt({
+const generateAbstractPrompt = ai.definePrompt({
   name: 'generateAbstractPrompt',
-  input: { schema: GenerateAbstractInputSchema },
+  input: { schema: GenerateAbstractInputSchemaInternal },
   output: { schema: GenerateAbstractOutputSchema },
   prompt: `You are an AI assistant tasked with writing a concise and informative abstract for a student project report. The output must be the HTML content for the abstract, ready to be rendered.
 
@@ -87,19 +100,28 @@ const generateAbstractFlow = ai.defineFlow(
   async (rawInput) => {
     let processedProjectContext = rawInput.projectContext?.trim() || "";
     const insufficientContextPlaceholder = "[Abstract content cannot be generated due to insufficient project context. Please provide more details.]";
-    const minContextLengthForGeneration = 50; // Minimum characters for project context to be considered sufficient
+    const minContextLengthForGeneration = 50;
 
     if (processedProjectContext.length < minContextLengthForGeneration) {
         processedProjectContext = insufficientContextPlaceholder;
     }
 
-    const input = {
-      projectTitle: rawInput.projectTitle?.trim() || "[Project Title Placeholder]",
+    const { userApiKey, aiModel, ...promptData } = rawInput;
+    const model = getModel({ aiModel, userApiKey });
+    const config = getConfig({ aiModel, userApiKey });
+
+    const finalInput = {
+      projectTitle: promptData.projectTitle?.trim() || "[Project Title Placeholder]",
       projectContext: processedProjectContext,
-      keyFindings: rawInput.keyFindings,
+      keyFindings: promptData.keyFindings,
     };
 
-    const { output } = await prompt(input);
-    return output!;
+    try {
+      const { output } = await generateAbstractPrompt(finalInput, { model, config });
+      return output!;
+    } catch (e: any) {
+      console.error("Error in generateAbstractFlow:", e);
+      return { abstractMarkdown: '', error: `AI generation failed: ${e.message || 'Unknown error'}` };
+    }
   }
 );

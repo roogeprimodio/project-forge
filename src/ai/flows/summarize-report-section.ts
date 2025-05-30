@@ -8,59 +8,69 @@
  * - SummarizeReportSectionOutput - The return type for the summarizeReportSection function.
  */
 
-import {ai} from '@/ai/ai-instance';
-import {z} from 'genkit';
+import { ai } from '@/ai/ai-instance';
+import { z } from 'genkit';
+import { BaseAiInputSchema, getModel, getConfig, getMissingApiKeyError } from './common';
 
-const SummarizeReportSectionInputSchema = z.object({
+const SummarizeReportSectionInputSchemaInternal = z.object({
   sectionText: z
     .string()
     .describe('The text of the project report section to summarize.'),
   projectTitle: z.string().describe('The title of the project.'),
 });
-export type SummarizeReportSectionInput = z.infer<
-  typeof SummarizeReportSectionInputSchema
->;
+
+export const SummarizeReportSectionInputSchema = SummarizeReportSectionInputSchemaInternal.merge(BaseAiInputSchema);
+export type SummarizeReportSectionInput = z.infer<typeof SummarizeReportSectionInputSchema>;
 
 const SummarizeReportSectionOutputSchema = z.object({
   summary: z.string().describe('The summarized text of the report section.'),
+  error: z.string().optional(),
 });
-export type SummarizeReportSectionOutput = z.infer<
-  typeof SummarizeReportSectionOutputSchema
->;
+export type SummarizeReportSectionOutput = z.infer<typeof SummarizeReportSectionOutputSchema>;
 
 export async function summarizeReportSection(
   input: SummarizeReportSectionInput
 ): Promise<SummarizeReportSectionOutput> {
+  const apiKeyError = getMissingApiKeyError(
+    input.aiModel || 'gemini',
+    input.userApiKey,
+    !!process.env.GOOGLE_GENAI_API_KEY,
+    !!process.env.OPENAI_API_KEY
+  );
+  if (apiKeyError) {
+    return { summary: '', error: apiKeyError };
+  }
   return summarizeReportSectionFlow(input);
 }
 
-const prompt = ai.definePrompt({
+const summarizeReportSectionPrompt = ai.definePrompt({
   name: 'summarizeReportSectionPrompt',
   input: {
-    schema: z.object({
-      sectionText: z
-        .string()
-        .describe('The text of the project report section to summarize.'),
-      projectTitle: z.string().describe('The title of the project.'),
-    }),
+    schema: SummarizeReportSectionInputSchemaInternal,
   },
   output: {
-    schema: z.object({
-      summary: z.string().describe('The summarized text of the report section.'),
-    }),
+    schema: SummarizeReportSectionOutputSchema,
   },
   prompt: `You are an AI assistant helping a student write their final year project report. Summarize the following section of the report, focusing on the key information and main points. The project title is {{{projectTitle}}}.\n\nSection Text: {{{sectionText}}}`,
 });
 
-const summarizeReportSectionFlow = ai.defineFlow<
-  typeof SummarizeReportSectionInputSchema,
-  typeof SummarizeReportSectionOutputSchema
->({
-  name: 'summarizeReportSectionFlow',
-  inputSchema: SummarizeReportSectionInputSchema,
-  outputSchema: SummarizeReportSectionOutputSchema,
-},
-async input => {
-  const {output} = await prompt(input);
-  return output!;
-});
+const summarizeReportSectionFlow = ai.defineFlow(
+  {
+    name: 'summarizeReportSectionFlow',
+    inputSchema: SummarizeReportSectionInputSchema,
+    outputSchema: SummarizeReportSectionOutputSchema,
+  },
+  async (input) => {
+    const { userApiKey, aiModel, ...promptData } = input;
+    const model = getModel({ aiModel, userApiKey });
+    const config = getConfig({ aiModel, userApiKey });
+
+    try {
+      const { output } = await summarizeReportSectionPrompt(promptData, { model, config });
+      return output!;
+    } catch (e: any) {
+      console.error("Error in summarizeReportSectionFlow:", e);
+      return { summary: '', error: `AI generation failed: ${e.message || 'Unknown error'}` };
+    }
+  }
+);

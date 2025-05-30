@@ -10,8 +10,9 @@
 
 import { ai } from '@/ai/ai-instance';
 import { z } from 'genkit';
+import { BaseAiInputSchema, getModel, getConfig, getMissingApiKeyError } from './common';
 
-const GenerateCoverPageInputSchema = z.object({
+const GenerateCoverPageInputSchemaInternal = z.object({
   projectTitle: z.string().describe('The full title of the project.'),
   teamDetails: z.string().describe('Team member names and their enrollment numbers (e.g., "John Doe - 123456\\nJane Smith - 654321"). Each member on a new line.'),
   degree: z.string().optional().default('Bachelor of Engineering').describe('The degree for which the project is submitted (e.g., "Bachelor of Engineering", "Master of Technology").'),
@@ -22,20 +23,32 @@ const GenerateCoverPageInputSchema = z.object({
   universityLogoUrl: z.string().optional().describe('URL or Base64 Data URI of the university logo. If provided, include it.'),
   collegeLogoUrl: z.string().optional().describe('URL or Base64 Data URI of the college logo. If provided, include it below the university logo or as appropriate.'),
 });
+
+export const GenerateCoverPageInputSchema = GenerateCoverPageInputSchemaInternal.merge(BaseAiInputSchema);
 export type GenerateCoverPageInput = z.infer<typeof GenerateCoverPageInputSchema>;
 
 const GenerateCoverPageOutputSchema = z.object({
   coverPageMarkdown: z.string().describe('The generated HTML content for the cover page. Should be well-formatted and include all relevant details.'),
+  error: z.string().optional(),
 });
 export type GenerateCoverPageOutput = z.infer<typeof GenerateCoverPageOutputSchema>;
 
 export async function generateCoverPage(input: GenerateCoverPageInput): Promise<GenerateCoverPageOutput> {
+   const apiKeyError = getMissingApiKeyError(
+    input.aiModel || 'gemini',
+    input.userApiKey,
+    !!process.env.GOOGLE_GENAI_API_KEY,
+    !!process.env.OPENAI_API_KEY
+  );
+  if (apiKeyError) {
+    return { coverPageMarkdown: '', error: apiKeyError };
+  }
   return generateCoverPageFlow(input);
 }
 
-const prompt = ai.definePrompt({
+const generateCoverPagePrompt = ai.definePrompt({
   name: 'generateCoverPagePrompt',
-  input: { schema: GenerateCoverPageInputSchema.extend({ teamDetailsLines: z.array(z.string()).optional() }) },
+  input: { schema: GenerateCoverPageInputSchemaInternal.extend({ teamDetailsLines: z.array(z.string()).optional() }) },
   output: { schema: GenerateCoverPageOutputSchema },
   prompt: `You are an AI assistant tasked with generating a professional cover page for a student project report. The output must be the HTML content for the cover page, ready to be rendered.
 
@@ -47,9 +60,9 @@ const prompt = ai.definePrompt({
       - {{this}}
       {{/each}}
     {{else if teamDetails}}
-      {{{teamDetails}}} <!-- This will render the placeholder string if teamDetailsLines is empty but teamDetails (placeholder) is provided -->
+      {{{teamDetails}}}
     {{else}}
-      [Team Member Names & Enrollment Numbers Placeholder] <!-- Fallback if absolutely nothing provided -->
+      [Team Member Names & Enrollment Numbers Placeholder]
     {{/if}}
   - Degree: {{{degree}}}
   - Branch: {{{branch}}}
@@ -60,66 +73,50 @@ const prompt = ai.definePrompt({
   {{#if universityName}}- University (Affiliated to): {{{universityName}}}{{/if}}
 
   **Instructions:**
-  1.  Output ONLY the HTML content for the cover page. Do NOT wrap it in Markdown code fences like \`\`\`markdown ... \`\`\`. Do NOT include any other text, explanations, or conversational elements.
-  2.  Replace dynamic placeholders like \`{{{projectTitle}}}\`, \`{{{teamDetailsLines}}}\`, etc., with the actual data provided for those fields.
-  3.  **Placeholder Usage for Dynamic Fields:** If a dynamic piece of information is not provided or is an empty string, **the system will provide a specific placeholder string for that field (e.g., \`[Team Member Names & Enrollment Numbers Placeholder]\`). Your task is to output *this exact placeholder string* as provided in the input if no actual data is available. Do not replace these system-provided placeholders with "N/A" or try to invent information.**
-      *   For Project Title: Use the value of \`{{{projectTitle}}}\`.
-      *   For Team Details: Use the values from \`teamDetailsLines\` if available. If not, use the value of \`{{{teamDetails}}}\` (which might be the placeholder string).
-      *   For Degree: Use the value of \`{{{degree}}}\`.
-      *   For Branch: Use the value of \`{{{branch}}}\`.
-      *   For Institute Name: Use the value of \`{{{instituteName}}}\`.
-      *   For University Name (if applicable): Use the value of \`{{{universityName}}}\`.
-      *   For Submission Date: Use the value of \`{{{submissionDate}}}\`.
-  4.  If a logo URL (\`universityLogoUrl\` or \`collegeLogoUrl\`) is provided, embed it using an \`<img>\` tag with an appropriate \`alt\` attribute and basic styling (e.g., \`style="height: 80px; margin-bottom: 15px;"\`). If not provided, omit the \`<img>\` tag entirely.
-  5.  Ensure all text is properly centered or aligned as indicated in the HTML structure. The entire page should be visually balanced and professional.
+  1.  Output ONLY the HTML content for the cover page. Do NOT wrap it in Markdown code fences.
+  2.  Replace dynamic placeholders with actual data. If data is missing, use the exact placeholder string provided in the input (e.g., "[Project Title Placeholder]").
+  3.  Embed logos using \`<img>\` tags with \`alt\` and basic styling (\`height: 80px/70px; margin-bottom: 15px/25px;\`). Omit if no URL.
 
   **Required Output Structure (HTML content):**
   <div style="text-align: center; font-family: 'Times New Roman', serif; page-break-after: always; border: 1px solid #ccc; padding: 20px; min-height: 250mm; display: flex; flex-direction: column; justify-content: space-between;">
-
-  <div>
-    {{#if universityLogoUrl}}
-    <img src="{{{universityLogoUrl}}}" alt="University Logo" data-ai-hint="university logo" style="height: 80px; margin-bottom: 15px; margin-top: 30px;">
-    <br>
-    {{/if}}
-    {{#if collegeLogoUrl}}
-    <img src="{{{collegeLogoUrl}}}" alt="College Logo" data-ai-hint="college logo" style="height: 70px; margin-bottom: 25px;">
-    <br>
-    {{/if}}
-  </div>
-
-  <div style="flex-grow: 1; display: flex; flex-direction: column; justify-content: center;">
-    <h1 style="font-size: 24pt; font-weight: bold; margin-top: 10px; margin-bottom: 30px;">{{{projectTitle}}}</h1>
-
-    <p style="font-size: 12pt; margin-bottom: 5px;"><em>A Project Report Submitted By</em></p>
-    <div style="font-size: 14pt; font-weight: bold; margin-bottom: 20px;">
-    {{#if teamDetailsLines.length}}
-      {{#each teamDetailsLines}}
-      {{this}}<br>
-      {{/each}}
-    {{else if teamDetails}}
-      {{{teamDetails}}} <!-- Renders the placeholder if provided -->
-    {{else}}
-      [Team Member Names & Enrollment Numbers Placeholder] <!-- Fallback -->
-    {{/if}}
+    <div>
+      {{#if universityLogoUrl}}
+      <img src="{{{universityLogoUrl}}}" alt="University Logo" data-ai-hint="university logo" style="height: 80px; margin-bottom: 15px; margin-top: 30px;"><br>
+      {{/if}}
+      {{#if collegeLogoUrl}}
+      <img src="{{{collegeLogoUrl}}}" alt="College Logo" data-ai-hint="college logo" style="height: 70px; margin-bottom: 25px;"><br>
+      {{/if}}
     </div>
-    <p style="font-size: 12pt; margin-bottom: 5px;"><em>In partial fulfillment for the award of the degree of</em></p>
-    <p style="font-size: 16pt; font-weight: bold; margin-bottom: 5px;">{{{degree}}}</p>
-    <p style="font-size: 12pt; margin-bottom: 5px;"><em>In</em></p>
-    <p style="font-size: 14pt; font-weight: bold; margin-bottom: 20px;">{{{branch}}}</p>
-    <p style="font-size: 12pt; margin-bottom: 5px;"><em>At</em></p>
-    <p style="font-size: 14pt; font-weight: bold;">{{{instituteName}}}</p>
-    {{#if universityName}}
-    <p style="font-size: 12pt; margin-bottom: 30px;">(Affiliated to {{{universityName}}})</p>
-    {{else}}
-    <div style="margin-bottom: 30px;"></div>
-    {{/if}}
+    <div style="flex-grow: 1; display: flex; flex-direction: column; justify-content: center;">
+      <h1 style="font-size: 24pt; font-weight: bold; margin-top: 10px; margin-bottom: 30px;">{{{projectTitle}}}</h1>
+      <p style="font-size: 12pt; margin-bottom: 5px;"><em>A Project Report Submitted By</em></p>
+      <div style="font-size: 14pt; font-weight: bold; margin-bottom: 20px;">
+      {{#if teamDetailsLines.length}}
+        {{#each teamDetailsLines}}
+        {{this}}<br>
+        {{/each}}
+      {{else if teamDetails}}
+        {{{teamDetails}}}
+      {{else}}
+        [Team Member Names & Enrollment Numbers Placeholder]
+      {{/if}}
+      </div>
+      <p style="font-size: 12pt; margin-bottom: 5px;"><em>In partial fulfillment for the award of the degree of</em></p>
+      <p style="font-size: 16pt; font-weight: bold; margin-bottom: 5px;">{{{degree}}}</p>
+      <p style="font-size: 12pt; margin-bottom: 5px;"><em>In</em></p>
+      <p style="font-size: 14pt; font-weight: bold; margin-bottom: 20px;">{{{branch}}}</p>
+      <p style="font-size: 12pt; margin-bottom: 5px;"><em>At</em></p>
+      <p style="font-size: 14pt; font-weight: bold;">{{{instituteName}}}</p>
+      {{#if universityName}}
+      <p style="font-size: 12pt; margin-bottom: 30px;">(Affiliated to {{{universityName}}})</p>
+      {{else}}
+      <div style="margin-bottom: 30px;"></div>
+      {{/if}}
+    </div>
+    <div style="margin-top: auto;">
+      <p style="font-size: 12pt;">{{{submissionDate}}}</p>
+    </div>
   </div>
-
-  <div style="margin-top: auto;">
-    <p style="font-size: 12pt;">{{{submissionDate}}}</p>
-  </div>
-  </div>
-
   Generate the HTML content now.
   `,
 });
@@ -131,29 +128,38 @@ const generateCoverPageFlow = ai.defineFlow(
     outputSchema: GenerateCoverPageOutputSchema,
   },
   async (rawInput) => {
-    const input = {
-      projectTitle: rawInput.projectTitle?.trim() || "[Project Title Placeholder]",
-      teamDetails: rawInput.teamDetails?.trim() || "[Team Member Names & Enrollment Numbers Placeholder]",
-      degree: rawInput.degree?.trim() || "[Degree Placeholder]",
-      branch: rawInput.branch?.trim() || "[Branch Placeholder]",
-      instituteName: rawInput.instituteName?.trim() || "[Institute Name Placeholder]",
-      universityName: rawInput.universityName?.trim() || undefined,
-      submissionDate: rawInput.submissionDate?.trim() || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
-      universityLogoUrl: rawInput.universityLogoUrl,
-      collegeLogoUrl: rawInput.collegeLogoUrl,
+    const { userApiKey, aiModel, ...promptData } = rawInput;
+    const model = getModel({ aiModel, userApiKey });
+    const config = getConfig({ aiModel, userApiKey });
+
+    const inputForTemplate = {
+      projectTitle: promptData.projectTitle?.trim() || "[Project Title Placeholder]",
+      teamDetails: promptData.teamDetails?.trim() || "[Team Member Names & Enrollment Numbers Placeholder]",
+      degree: promptData.degree?.trim() || "[Degree Placeholder]",
+      branch: promptData.branch?.trim() || "[Branch Placeholder]",
+      instituteName: promptData.instituteName?.trim() || "[Institute Name Placeholder]",
+      universityName: promptData.universityName?.trim() || undefined,
+      submissionDate: promptData.submissionDate?.trim() || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+      universityLogoUrl: promptData.universityLogoUrl,
+      collegeLogoUrl: promptData.collegeLogoUrl,
     };
 
-    const teamDetailsLines = input.teamDetails !== "[Team Member Names & Enrollment Numbers Placeholder]"
-      ? input.teamDetails.split('\n').filter(line => line.trim() !== '') // Changed from \\n to \n
+    const teamDetailsLines = inputForTemplate.teamDetails !== "[Team Member Names & Enrollment Numbers Placeholder]"
+      ? inputForTemplate.teamDetails.split('\n').filter(line => line.trim() !== '')
       : [];
 
-    const processedInput = {
-      ...input,
-      teamDetailsLines: teamDetailsLines.length > 0 ? teamDetailsLines : undefined, // Pass lines if available
-      teamDetails: teamDetailsLines.length === 0 ? input.teamDetails : undefined, // Pass raw placeholder string only if no lines
+    const finalInput = {
+      ...inputForTemplate,
+      teamDetailsLines: teamDetailsLines.length > 0 ? teamDetailsLines : undefined,
+      teamDetails: teamDetailsLines.length === 0 ? inputForTemplate.teamDetails : undefined,
     };
 
-    const { output } = await prompt(processedInput);
-    return output!;
+    try {
+      const { output } = await generateCoverPagePrompt(finalInput, { model, config });
+      return output!;
+    } catch (e: any) {
+      console.error("Error in generateCoverPageFlow:", e);
+      return { coverPageMarkdown: '', error: `AI generation failed: ${e.message || 'Unknown error'}` };
+    }
   }
 );

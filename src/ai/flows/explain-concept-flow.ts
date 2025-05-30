@@ -9,17 +9,18 @@
 
 import { ai } from '@/ai/ai-instance';
 import { z } from 'genkit';
-import type { ExplanationSlide, ExplainConceptOutput } from '@/types/project'; // Import shared types
+import type { ExplanationSlide, ExplainConceptOutput } from '@/types/project';
+import { BaseAiInputSchema, getModel, getConfig, getMissingApiKeyError } from './common';
 
-const ExplainConceptInputSchema = z.object({
+const ExplainConceptInputSchemaInternal = z.object({
   concept: z.string().describe('The concept, term, or phrase to be explained.'),
   projectContext: z.string().optional().describe('Optional context from the project to tailor the explanation (e.g., "Explain this in the context of software engineering for e-sports management.").'),
   complexityLevel: z.enum(['simple', 'detailed', 'expert']).optional().default('simple').describe('The desired level of complexity for the explanation.'),
-  // maxSlides removed as per user request for no limit
 });
+
+export const ExplainConceptInputSchema = ExplainConceptInputSchemaInternal.merge(BaseAiInputSchema);
 export type ExplainConceptInput = z.infer<typeof ExplainConceptInputSchema>;
 
-// Define Zod schema for a single slide (matches ExplanationSlide interface)
 const ExplanationSlideSchema = z.object({
   title: z.string().optional().describe('A concise title for the slide.'),
   content: z.string().describe('The main textual explanation for this slide, formatted in Markdown. Should be clear and easy to understand. Aim for comprehensive coverage if complexity is high.'),
@@ -30,19 +31,29 @@ const ExplanationSlideSchema = z.object({
   interactiveElementPlaceholderText: z.string().optional().describe('Optional: A brief description of a simple interactive element (e.g., "Quiz: What are the three states of matter?", "Clickable diagram of a plant cell") that could make this slide more engaging. Provide just the descriptive text.'),
 });
 
-// Define Zod schema for the overall output
 const ExplainConceptOutputSchema = z.object({
   slides: z.array(ExplanationSlideSchema).describe('An array of slides, each explaining a part of the concept. Ordered logically. Generate as many slides as necessary to explain the concept thoroughly based on the complexity level.'),
   conceptTitle: z.string().describe('The original concept that was explained.'),
+  error: z.string().optional(),
 });
 
 export async function explainConcept(input: ExplainConceptInput): Promise<ExplainConceptOutput> {
+  const apiKeyError = getMissingApiKeyError(
+    input.aiModel || 'gemini',
+    input.userApiKey,
+    !!process.env.GOOGLE_GENAI_API_KEY,
+    !!process.env.OPENAI_API_KEY
+  );
+
+  if (apiKeyError) {
+    return { conceptTitle: input.concept, slides: [], error: apiKeyError };
+  }
   return explainConceptFlow(input);
 }
 
-const prompt = ai.definePrompt({
+const explainConceptPrompt = ai.definePrompt({
   name: 'explainConceptPrompt',
-  input: { schema: ExplainConceptInputSchema },
+  input: { schema: ExplainConceptInputSchemaInternal }, // Use internal schema for prompt template
   output: { schema: ExplainConceptOutputSchema },
   prompt: `You are an AI assistant specialized in breaking down complex topics into engaging, slide-like explanations.
 Your task is to explain the given concept: "{{{concept}}}".
@@ -71,18 +82,6 @@ Your task is to explain the given concept: "{{{concept}}}".
 7.  **Overall Flow:** Ensure slides progress logically and provide a complete explanation.
 8.  **Output Format:** A single JSON object matching 'ExplainConceptOutputSchema'.
 
-**Example of a single slide object within the 'slides' array (YOU SHOULD NOT INCLUDE generatedImageUrl):**
-\`\`\`json
-{
-  "title": "What is a Variable?",
-  "content": "- A variable is like a container that stores information.\\n- It has a name and can hold different values (numbers, text, etc.).\\n- The value stored in a variable can change during the execution of a program.\\n- Variables are fundamental for making programs dynamic and flexible.",
-  "mermaidDiagram": "graph LR\\nA[Container: Variable Name] -- stores --> B(Data: Value);",
-  "imagePromptForGeneration": "A colorful illustration of a treasure chest labeled 'myVariable' containing different jewels representing 'Values' like the number 42 and the text 'Hello World'.",
-  "videoPlaceholderText": "Short animation of a box (labeled 'variable') where different items (values like numbers, text) are placed inside and taken out, demonstrating how its content can change.",
-  "interactiveElementPlaceholderText": "Interactive: Drag and drop values (e.g., number 5, text 'hello') into a box labeled 'myVariable' and see the current value displayed."
-}
-\`\`\`
-
 Explain "{{{concept}}}" now, adhering to all instructions and the JSON output format. Generate as many slides as needed for a thorough explanation. Ensure \`generatedImageUrl\` is NEVER populated by you.
 `,
 });
@@ -94,33 +93,46 @@ const explainConceptFlow = ai.defineFlow(
     outputSchema: ExplainConceptOutputSchema,
   },
   async (input) => {
-    const processedInput = {
-        ...input,
-        complexityLevel: input.complexityLevel || 'simple',
-        // maxSlides removed
-    };
-    const { output } = await prompt(processedInput);
+    const { userApiKey, aiModel, ...promptData } = input;
+    const model = getModel({ aiModel, userApiKey });
+    const config = getConfig({ aiModel, userApiKey });
 
-    if (!output || !Array.isArray(output.slides) || typeof output.conceptTitle !== 'string') {
-      console.error("AI returned an invalid structure for concept explanation:", output);
+    const processedInput = {
+        ...promptData,
+        complexityLevel: promptData.complexityLevel || 'simple',
+    };
+
+    try {
+      const { output } = await explainConceptPrompt(processedInput, { model, config });
+
+      if (!output || !Array.isArray(output.slides) || typeof output.conceptTitle !== 'string') {
+        console.error("AI returned an invalid structure for concept explanation:", output);
+        return {
+          conceptTitle: input.concept,
+          slides: [{
+            title: "Error",
+            content: "Failed to generate explanation. The AI did not return the expected data structure. Please try again."
+          }],
+          error: "AI returned an invalid structure."
+        };
+      }
+
+      const validatedSlides = output.slides.map(slide => {
+          const { generatedImageUrl, ...restOfSlide } = slide;
+          if (generatedImageUrl !== undefined && generatedImageUrl !== null && generatedImageUrl !== '') {
+              console.warn(`AI incorrectly populated generatedImageUrl for slide: "${slide.title || 'Untitled'}". Removing.`);
+          }
+          return { ...restOfSlide, generatedImageUrl: undefined };
+      });
+
+      return { ...output, slides: validatedSlides };
+    } catch (e: any) {
+      console.error("Error in explainConceptFlow:", e);
       return {
         conceptTitle: input.concept,
-        slides: [{
-          title: "Error",
-          content: "Failed to generate explanation. The AI did not return the expected data structure. Please try again."
-        }]
+        slides: [],
+        error: `AI generation failed: ${e.message || 'Unknown error'}`
       };
     }
-
-    // Validate and ensure generatedImageUrl is not populated by the AI
-    const validatedSlides = output.slides.map(slide => {
-        const { generatedImageUrl, ...restOfSlide } = slide;
-        if (generatedImageUrl !== undefined && generatedImageUrl !== null && generatedImageUrl !== '') {
-            console.warn(`AI incorrectly populated generatedImageUrl for slide: "${slide.title || 'Untitled'}". Removing.`);
-        }
-        return { ...restOfSlide, generatedImageUrl: undefined }; // Explicitly set to undefined
-    });
-
-    return { ...output, slides: validatedSlides };
   }
 );

@@ -10,8 +10,9 @@
 
 import { ai } from '@/ai/ai-instance';
 import { z } from 'genkit';
+import { BaseAiInputSchema, getModel, getConfig, getMissingApiKeyError } from './common';
 
-const GenerateCertificateInputSchema = z.object({
+const GenerateCertificateInputSchemaInternal = z.object({
   projectTitle: z.string().describe('The full title of the project.'),
   teamDetails: z.string().describe('Team member names and their enrollment numbers (e.g., "John Doe - 123456\\nJane Smith - 654321"). Each member on a new line.'),
   degree: z.string().optional().default('Bachelor of Engineering').describe('The degree for which the project is submitted.'),
@@ -22,20 +23,32 @@ const GenerateCertificateInputSchema = z.object({
   submissionYear: z.string().optional().default(new Date().getFullYear().toString()).describe('The academic year or submission year (e.g., "2023-2024"). Defaults to current year.'),
   collegeLogoUrl: z.string().optional().describe('URL or Base64 Data URI of the college logo. If provided, include it.'),
 });
+
+export const GenerateCertificateInputSchema = GenerateCertificateInputSchemaInternal.merge(BaseAiInputSchema);
 export type GenerateCertificateInput = z.infer<typeof GenerateCertificateInputSchema>;
 
 const GenerateCertificateOutputSchema = z.object({
   certificateMarkdown: z.string().describe('The generated HTML content for the certificate. Should be well-formatted and official-looking.'),
+  error: z.string().optional(),
 });
 export type GenerateCertificateOutput = z.infer<typeof GenerateCertificateOutputSchema>;
 
 export async function generateCertificate(input: GenerateCertificateInput): Promise<GenerateCertificateOutput> {
+  const apiKeyError = getMissingApiKeyError(
+    input.aiModel || 'gemini',
+    input.userApiKey,
+    !!process.env.GOOGLE_GENAI_API_KEY,
+    !!process.env.OPENAI_API_KEY
+  );
+  if (apiKeyError) {
+    return { certificateMarkdown: '', error: apiKeyError };
+  }
   return generateCertificateFlow(input);
 }
 
-const prompt = ai.definePrompt({
+const generateCertificatePrompt = ai.definePrompt({
   name: 'generateCertificatePrompt',
-  input: { schema: GenerateCertificateInputSchema.extend({ teamDetailsLines: z.array(z.string()).optional() }) },
+  input: { schema: GenerateCertificateInputSchemaInternal.extend({ teamDetailsLines: z.array(z.string()).optional() }) },
   output: { schema: GenerateCertificateOutputSchema },
   prompt: `You are an AI assistant tasked with generating a project certificate. The output must be the HTML content for the certificate, ready to be rendered.
 
@@ -104,25 +117,25 @@ const prompt = ai.definePrompt({
     {{this}}<br>
     {{/each}}
   {{else if teamDetails}}
-    {{{teamDetails}}} <!-- Renders placeholder if no lines -->
+    {{{teamDetails}}}
   {{else}}
     [Team Member Names & Enrollment Numbers Placeholder]
   {{/if}}
   </div>
-  
+
   <p style="font-size: 12pt; line-height: 1.6; text-align: justify; margin-bottom: 30px;">
   in partial fulfillment of the requirements for the award of the degree of <strong>{{{degree}}}</strong> in <strong>{{{branch}}}</strong> during the academic year {{{submissionYear}}}.
   </p>
 
   <div style="display: flex; justify-content: space-between; margin-top: 70px; font-size: 12pt;">
     <div style="text-align: left;">
-      <div style="height: 30px;"> </div> <!-- Space for signature -->
+      <div style="height: 30px;"> </div>
       <hr style="border-top: 1px solid #000; width: 150px; margin-bottom: 5px;">
       <strong>{{{guideName}}}</strong><br>
       (Project Guide)
     </div>
     <div style="text-align: right;">
-      <div style="height: 30px;"> </div> <!-- Space for signature -->
+      <div style="height: 30px;"> </div>
       <hr style="border-top: 1px solid #000; width: 150px; margin-bottom: 5px;">
       <strong>{{#if hodName}}{{{hodName}}}{{else}}[HOD Name Placeholder]{{/if}}</strong><br>
       (Head of Department)
@@ -141,28 +154,37 @@ const generateCertificateFlow = ai.defineFlow(
     outputSchema: GenerateCertificateOutputSchema,
   },
   async (rawInput) => {
-    const input = {
-      projectTitle: rawInput.projectTitle?.trim() || "[Project Title Placeholder]",
-      teamDetails: rawInput.teamDetails?.trim() || "[Team Member Names & Enrollment Numbers Placeholder]",
-      degree: rawInput.degree?.trim() || "[Degree Placeholder]",
-      branch: rawInput.branch?.trim() || "[Branch Placeholder]",
-      instituteName: rawInput.instituteName?.trim() || "[Institute Name Placeholder]",
-      guideName: rawInput.guideName?.trim() || "[Guide Name Placeholder]",
-      hodName: rawInput.hodName?.trim() || undefined, // Pass undefined, template handles placeholder
-      submissionYear: rawInput.submissionYear?.trim() || new Date().getFullYear().toString(),
-      collegeLogoUrl: rawInput.collegeLogoUrl,
+    const { userApiKey, aiModel, ...promptData } = rawInput;
+    const model = getModel({ aiModel, userApiKey });
+    const config = getConfig({ aiModel, userApiKey });
+
+    const inputForTemplate = {
+      projectTitle: promptData.projectTitle?.trim() || "[Project Title Placeholder]",
+      teamDetails: promptData.teamDetails?.trim() || "[Team Member Names & Enrollment Numbers Placeholder]",
+      degree: promptData.degree?.trim() || "[Degree Placeholder]",
+      branch: promptData.branch?.trim() || "[Branch Placeholder]",
+      instituteName: promptData.instituteName?.trim() || "[Institute Name Placeholder]",
+      guideName: promptData.guideName?.trim() || "[Guide Name Placeholder]",
+      hodName: promptData.hodName?.trim() || undefined,
+      submissionYear: promptData.submissionYear?.trim() || new Date().getFullYear().toString(),
+      collegeLogoUrl: promptData.collegeLogoUrl,
     };
 
-    const teamDetailsLines = input.teamDetails !== "[Team Member Names & Enrollment Numbers Placeholder]" 
-      ? input.teamDetails.split('\n').filter(line => line.trim() !== '') 
+    const teamDetailsLines = inputForTemplate.teamDetails !== "[Team Member Names & Enrollment Numbers Placeholder]"
+      ? inputForTemplate.teamDetails.split('\n').filter(line => line.trim() !== '')
       : [];
-    
-    const processedInput = {
-      ...input,
+
+    const finalInput = {
+      ...inputForTemplate,
       teamDetailsLines: teamDetailsLines.length > 0 ? teamDetailsLines : undefined,
-      teamDetails: teamDetailsLines.length === 0 ? input.teamDetails : undefined,
+      teamDetails: teamDetailsLines.length === 0 ? inputForTemplate.teamDetails : undefined,
     };
-    const { output } = await prompt(processedInput);
-    return output!;
+    try {
+      const { output } = await generateCertificatePrompt(finalInput, { model, config });
+      return output!;
+    } catch (e: any) {
+      console.error("Error in generateCertificateFlow:", e);
+      return { certificateMarkdown: '', error: `AI generation failed: ${e.message || 'Unknown error'}` };
+    }
   }
 );

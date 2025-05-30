@@ -9,10 +9,13 @@
 
 import { ai } from '@/ai/ai-instance';
 import { z } from 'genkit';
+import { BaseAiInputSchema, getConfig, getMissingApiKeyError } from './common'; // Assuming getModel is not needed if model is hardcoded
 
-const GenerateImageFromPromptInputSchema = z.object({
+const GenerateImageFromPromptInputSchemaInternal = z.object({
   prompt: z.string().describe('A detailed text prompt to guide the image generation. E.g., "A photorealistic image of a cat wearing a wizard hat."'),
 });
+
+export const GenerateImageFromPromptInputSchema = GenerateImageFromPromptInputSchemaInternal.merge(BaseAiInputSchema);
 export type GenerateImageFromPromptInput = z.infer<typeof GenerateImageFromPromptInputSchema>;
 
 const GenerateImageFromPromptOutputSchema = z.object({
@@ -22,6 +25,16 @@ const GenerateImageFromPromptOutputSchema = z.object({
 export type GenerateImageFromPromptOutput = z.infer<typeof GenerateImageFromPromptOutputSchema>;
 
 export async function generateImageFromPrompt(input: GenerateImageFromPromptInput): Promise<GenerateImageFromPromptOutput> {
+  // Image generation specific model 'gemini-2.0-flash-exp' uses Gemini, so check Gemini key
+  const apiKeyError = getMissingApiKeyError(
+    'gemini', // Hardcode 'gemini' as this flow uses a specific Gemini model
+    input.userApiKey,
+    !!process.env.GOOGLE_GENAI_API_KEY,
+    !!process.env.OPENAI_API_KEY // Still pass this for consistency, though not used for model selection here
+  );
+  if (apiKeyError) {
+    return { generatedImageUrl: '', error: apiKeyError };
+  }
   return generateImageFromPromptFlow(input);
 }
 
@@ -32,19 +45,22 @@ const generateImageFromPromptFlow = ai.defineFlow(
     outputSchema: GenerateImageFromPromptOutputSchema,
   },
   async (input) => {
+    const { userApiKey, aiModel, ...promptData } = input; // aiModel is not used here for model selection
+    const config = getConfig({ aiModel: 'gemini', userApiKey }); // Force 'gemini' for config, pass userApiKey
+
     try {
-      if (!input.prompt || input.prompt.trim().length === 0) {
+      if (!promptData.prompt || promptData.prompt.trim().length === 0) {
         return { generatedImageUrl: '', error: 'Image prompt cannot be empty.' };
       }
 
-      console.log(`Generating image with prompt: "${input.prompt}"`);
+      console.log(`Generating image with prompt: "${promptData.prompt}"`);
 
       const { media } = await ai.generate({
-        model: 'googleai/gemini-2.0-flash-exp', // Use the model capable of image generation
-        prompt: input.prompt,
+        model: 'googleai/gemini-2.0-flash-exp', // Specific model for image generation
+        prompt: promptData.prompt,
         config: {
-          responseModalities: ['IMAGE', 'TEXT'], // Must include TEXT even if only image is primarily expected
-          // You can add other generation parameters here if needed, e.g., number of candidates
+          ...config, // Spread the config which might contain userApiKey
+          responseModalities: ['IMAGE', 'TEXT'],
         },
       });
 

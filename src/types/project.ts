@@ -51,6 +51,7 @@ export interface Project {
   minSections?: number; // Minimum sections AI should aim for
   maxSubSectionsPerSection?: number; // Max depth of sub-sections AI should generate
   isAiOutlineConstrained?: boolean; // Toggle for AI outline constraints
+  preferredAiModel?: 'gemini' | 'openai'; // User's preferred AI model for this project
 }
 
 // AI Concept Explainer Types
@@ -85,6 +86,6 @@ export const STANDARD_REPORT_PAGES = [
 
 export const STANDARD_PAGE_INDICES: { [key: string]: number } = {};
 STANDARD_REPORT_PAGES.forEach((page, index) => {
-  STANDARD_PAGE_INDICES[page] = -(index + 2); // Start from -2 (-1 is Project Details)
+  STANDARD_PAGE_INDICES[page] = -(index + 2);
 });
 STANDARD_PAGE_INDICES[TOC_SECTION_NAME] = -100; // Assign a distinct index for TOC

@@ -4,7 +4,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { FileText, Trash2, Edit3, ChevronDown, ChevronRight, PlusCircle, Projector, ImageIcon, Table as TableIcon, BookOpen } from 'lucide-react'; // Added more icons
+import { FileText, Trash2, Edit3, ChevronDown, ChevronRight, PlusCircle, Projector, ImageIcon as ImageIconLucide, Table as TableIcon, BookOpen, Brain } from 'lucide-react';
 import type { HierarchicalProjectSection, SectionIdentifier } from '@/types/project';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -13,14 +13,14 @@ export interface HierarchicalSectionItemProps {
     section: HierarchicalProjectSection;
     level: number;
     numbering: string;
-    activeSectionId: string | null; // ID of the currently selected item in the entire hierarchy
-    setActiveSectionId: (id: SectionIdentifier) => void; // Setter for the active item ID
-    // activeSubSectionId and setActiveSubSectionId are removed
+    activeSectionId: string | null;
+    setActiveSectionId: (id: SectionIdentifier) => void;
     onEditSectionName: (id: string, newName: string) => void;
     onDeleteSection: (id: string) => void;
-    onAddSubSection: (parentId: string) => void; // Handler to add a new sub-item under this section
-    isEditing: boolean; // Overall editing mode for the sidebar
+    onAddSubSection: (parentId: string) => void;
+    isEditing: boolean;
     onCloseSheet?: () => void;
+    children?: React.ReactNode; // To render nested items
 }
 
 export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = ({
@@ -34,14 +34,16 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
     onAddSubSection,
     isEditing,
     onCloseSheet,
+    children, // Used for nested rendering
 }) => {
     const isActive = section.id === activeSectionId;
-    const [isExpanded, setIsExpanded] = useState(true); // Default to expanded for better visibility of new structure
+    const [isExpanded, setIsExpanded] = useState(level < 2); // Auto-expand top levels
     const [isNameEditing, setIsNameEditing] = useState(false);
     const [tempName, setTempName] = useState(section.name);
     const { toast } = useToast();
-    const hasSubSections = section.subSections && section.subSections.length > 0;
     const inputRef = useRef<HTMLInputElement>(null);
+
+    const hasSubSections = section.subSections && section.subSections.length > 0;
 
     useEffect(() => {
         if (!isNameEditing) {
@@ -57,8 +59,11 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
     }, [isNameEditing]);
 
     const handleClick = (e: React.MouseEvent | React.KeyboardEvent) => {
-        if (isEditing || isNameEditing) return;
-        setActiveSectionId(section.id); // Set this item as active
+        if (isNameEditing || (e.target as HTMLElement).closest('button[aria-label*="Expand"], button[aria-label*="Collapse"]')) {
+            // Prevent selection if clicking expand/collapse or if name is being edited
+            return;
+        }
+        setActiveSectionId(section.id);
         onCloseSheet?.();
     };
 
@@ -81,7 +86,7 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
     const handleAddSubSectionClick = (e: React.MouseEvent) => {
         e.stopPropagation();
         onAddSubSection(section.id);
-        setIsExpanded(true); 
+        setIsExpanded(true);
     };
 
     const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -108,7 +113,7 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
             setIsNameEditing(false);
         }
     };
-    
+
     const handleNameBlur = () => {
         requestAnimationFrame(() => {
             if (document.activeElement !== inputRef.current) {
@@ -121,37 +126,33 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
             }
         });
     };
-    
+
     const nameLower = section.name.toLowerCase();
     const isDiagram = nameLower.startsWith("diagram:");
+    const isFlowchart = nameLower.startsWith("flowchart");
     const isFigure = nameLower.startsWith("figure ");
     const isTable = nameLower.startsWith("table:");
-    const isMainSection = level === 0; // Main sections are containers for sub-sections or specialized items
+    const isSpecialized = isDiagram || isFlowchart || isFigure || isTable;
 
     let IconComponent = FileText;
-    if (isDiagram) IconComponent = Projector;
-    else if (isFigure) IconComponent = ImageIcon;
+    if (isDiagram || isFlowchart) IconComponent = Projector;
+    else if (isFigure) IconComponent = ImageIconLucide;
     else if (isTable) IconComponent = TableIcon;
-    else if (isMainSection && !hasSubSections) IconComponent = FileText; // Main section that might become content leaf
-    else if (isMainSection && hasSubSections) IconComponent = BookOpen; // Main section as container
+    else if (hasSubSections) IconComponent = BookOpen;
 
-
-    // Main section (level 0) is a container and cannot be directly edited for content, only its sub-items.
-    // Its "content" field is not used for direct editing. It's a preview of its children.
-    // Sub-sections (level 1+) or specialized items (Diagrams, Figures, Tables at any level) are editable.
 
     return (
         <div className="group w-full">
             <div className={cn(
-                "flex group/item relative w-full items-center rounded-md transition-colors duration-150 pr-1",
-                 (isActive && !isNameEditing && !isEditing) ? "bg-primary/10" : "hover:bg-muted/50" // Simplified active state
+                "flex group/item relative w-full items-center rounded-md transition-colors duration-150 pr-1 text-left", // Ensure text-left
+                 (isActive && !isNameEditing && !isEditing) ? "bg-primary/10 text-primary" : "hover:bg-muted/50"
             )}>
                 <div
                     className={cn(
                         "flex flex-1 items-center min-w-0 h-8 cursor-pointer",
                         isEditing ? 'pr-[70px]' : ''
                     )}
-                    style={{ paddingLeft: `${level * 0.75}rem` }} // Adjusted padding for deeper nesting
+                    style={{ paddingLeft: `${level * 0.75}rem` }}
                     onClick={handleClick}
                     role="button"
                     tabIndex={0}
@@ -165,15 +166,15 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
                             onClick={handleToggleExpand}
                             className="h-6 w-6 mr-1 text-muted-foreground hover:bg-muted/60 flex-shrink-0"
                             aria-label={isExpanded ? "Collapse section" : "Expand section"}
-                            tabIndex={0} 
+                            tabIndex={0}
                         >
                             {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                         </Button>
                     ) : (
-                        <span className="w-6 mr-1 flex-shrink-0"></span> 
+                        <span className="w-6 mr-1 flex-shrink-0"></span>
                     )}
                     <IconComponent className="h-4 w-4 flex-shrink-0 mr-1.5 text-muted-foreground" />
-                    <span className="font-medium text-sm text-muted-foreground flex-shrink-0 mr-1.5">{numbering}</span>
+                    <span className={cn("font-medium text-sm flex-shrink-0 mr-1.5", isActive ? "text-primary/90" : "text-muted-foreground")}>{numbering}</span>
                     {isNameEditing ? (
                         <Input
                             ref={inputRef}
@@ -187,7 +188,7 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
                             aria-label={`Editing section name ${section.name}`}
                         />
                     ) : (
-                        <span className="flex-1 truncate text-left text-sm">{section.name}</span>
+                        <span className={cn("flex-1 truncate text-left text-sm", isActive ? "text-primary font-semibold" : "text-foreground")}>{section.name}</span>
                     )}
                 </div>
 
@@ -196,8 +197,6 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
                         <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={handleEditNameClick} aria-label={`Edit name for ${section.name}`} title="Edit name">
                             <Edit3 className="h-4 w-4" />
                         </Button>
-                        {/* Add sub-item button - only allow adding to non-leaf nodes based on max depth or type */}
-                        {/* Current logic: Add button is always shown in edit mode. Max depth handled by AI. */}
                         <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={handleAddSubSectionClick} aria-label={`Add sub-item to ${section.name}`} title="Add sub-item">
                             <PlusCircle className="h-4 w-4" />
                         </Button>
@@ -207,29 +206,7 @@ export const HierarchicalSectionItem: React.FC<HierarchicalSectionItemProps> = (
                     </div>
                 )}
             </div>
-
-            {hasSubSections && isExpanded && (
-                <div className="w-full border-l border-muted/50" style={{ marginLeft: `${level * 0.75 + 1.25}rem` }}>
-                    {section.subSections.map((sub, subIndex) => {
-                        const subNumbering = `${numbering}.${subIndex + 1}`;
-                        return (
-                            <HierarchicalSectionItem
-                                key={sub.id}
-                                section={sub}
-                                level={level + 1}
-                                numbering={subNumbering}
-                                activeSectionId={activeSectionId}
-                                setActiveSectionId={setActiveSectionId}
-                                onEditSectionName={onEditSectionName}
-                                onDeleteSection={onDeleteSection}
-                                onAddSubSection={onAddSubSection} // Pass down so sub-items can also add children
-                                isEditing={isEditing}
-                                onCloseSheet={onCloseSheet}
-                            />
-                        );
-                    })}
-                </div>
-            )}
+            {isExpanded && children /* Render children (nested items) here */}
         </div>
     );
 }

@@ -10,8 +10,9 @@
 
 import { ai } from '@/ai/ai-instance';
 import { z } from 'genkit';
+import { BaseAiInputSchema, getModel, getConfig, getMissingApiKeyError } from './common';
 
-const GenerateAcknowledgementInputSchema = z.object({
+const GenerateAcknowledgementInputSchemaInternal = z.object({
   projectTitle: z.string().describe('The full title of the project.'),
   guideName: z.string().describe('The name of the project guide.'),
   instituteName: z.string().describe('The name of the institute or college.'),
@@ -20,20 +21,32 @@ const GenerateAcknowledgementInputSchema = z.object({
   teamDetails: z.string().describe('Team member names and enrollment numbers (e.g., "John Doe - 12345\\nJane Smith - 67890"). Each member on a new line. Used to determine pronoun and for signature.'),
   additionalThanks: z.string().optional().describe('Any specific individuals, groups, or resources the student(s) want to thank additionally (e.g., "librarian for resources", "lab assistant for technical help", "parents for support", "friend Amit Sharma for constant supervision").'),
 });
+
+export const GenerateAcknowledgementInputSchema = GenerateAcknowledgementInputSchemaInternal.merge(BaseAiInputSchema);
 export type GenerateAcknowledgementInput = z.infer<typeof GenerateAcknowledgementInputSchema>;
 
 const GenerateAcknowledgementOutputSchema = z.object({
   acknowledgementMarkdown: z.string().describe('The generated HTML content for the acknowledgement section. Should be sincere and well-formatted.'),
+  error: z.string().optional(),
 });
 export type GenerateAcknowledgementOutput = z.infer<typeof GenerateAcknowledgementOutputSchema>;
 
 export async function generateAcknowledgement(input: GenerateAcknowledgementInput): Promise<GenerateAcknowledgementOutput> {
+   const apiKeyError = getMissingApiKeyError(
+    input.aiModel || 'gemini',
+    input.userApiKey,
+    !!process.env.GOOGLE_GENAI_API_KEY,
+    !!process.env.OPENAI_API_KEY
+  );
+  if (apiKeyError) {
+    return { acknowledgementMarkdown: '', error: apiKeyError };
+  }
   return generateAcknowledgementFlow(input);
 }
 
-const prompt = ai.definePrompt({
+const generateAcknowledgementPrompt = ai.definePrompt({
   name: 'generateAcknowledgementPrompt',
-  input: { schema: GenerateAcknowledgementInputSchema.extend({ teamDetailsLines: z.array(z.string()).optional(), pronoun: z.string().optional(), possessivePronoun: z.string().optional() }) },
+  input: { schema: GenerateAcknowledgementInputSchemaInternal.extend({ teamDetailsLines: z.array(z.string()).optional(), pronoun: z.string().optional(), possessivePronoun: z.string().optional() }) },
   output: { schema: GenerateAcknowledgementOutputSchema },
   prompt: `You are an AI assistant tasked with writing a heartfelt and professional acknowledgement section for a student project report. The output must be the HTML content for the acknowledgement, ready to be rendered.
 
@@ -124,9 +137,8 @@ const prompt = ai.definePrompt({
             if (verb === "am") return "are";
             return verb;
         }
-        // "I"
         if (verb === "am") return "am";
-        return verb; // "I owe", "I wish"
+        return verb;
     }
   }
 });
@@ -138,31 +150,40 @@ const generateAcknowledgementFlow = ai.defineFlow(
     outputSchema: GenerateAcknowledgementOutputSchema,
   },
   async (rawInput) => {
-     const input = {
-      projectTitle: rawInput.projectTitle?.trim() || "[Project Title Placeholder]",
-      guideName: rawInput.guideName?.trim() || "[Guide Name Placeholder]",
-      instituteName: rawInput.instituteName?.trim() || "[Institute Name Placeholder]",
-      branch: rawInput.branch?.trim() || "[Branch/Department Placeholder]",
-      hodName: rawInput.hodName?.trim() || undefined,
-      teamDetails: rawInput.teamDetails?.trim() || "[Team Member Name(s) & Enrollment Placeholder(s)]",
-      additionalThanks: rawInput.additionalThanks,
+     const { userApiKey, aiModel, ...promptData } = rawInput;
+     const model = getModel({ aiModel, userApiKey });
+     const config = getConfig({ aiModel, userApiKey });
+
+     const inputForTemplate = {
+      projectTitle: promptData.projectTitle?.trim() || "[Project Title Placeholder]",
+      guideName: promptData.guideName?.trim() || "[Guide Name Placeholder]",
+      instituteName: promptData.instituteName?.trim() || "[Institute Name Placeholder]",
+      branch: promptData.branch?.trim() || "[Branch/Department Placeholder]",
+      hodName: promptData.hodName?.trim() || undefined,
+      teamDetails: promptData.teamDetails?.trim() || "[Team Member Name(s) & Enrollment Placeholder(s)]",
+      additionalThanks: promptData.additionalThanks,
     };
 
-    const teamDetailsLines = input.teamDetails !== "[Team Member Name(s) & Enrollment Placeholder(s)]" 
-      ? input.teamDetails.split('\n').filter(line => line.trim() !== '') 
+    const teamDetailsLines = inputForTemplate.teamDetails !== "[Team Member Name(s) & Enrollment Placeholder(s)]"
+      ? inputForTemplate.teamDetails.split('\n').filter(line => line.trim() !== '')
       : [];
-    
-    const isPlural = teamDetailsLines.length > 1 || (teamDetailsLines.length === 0 && input.teamDetails.includes('\n'));
-    
-    const processedInput = {
-      ...input,
+
+    const isPlural = teamDetailsLines.length > 1 || (teamDetailsLines.length === 0 && inputForTemplate.teamDetails.includes('\n'));
+
+    const finalInput = {
+      ...inputForTemplate,
       teamDetailsLines: teamDetailsLines.length > 0 ? teamDetailsLines : undefined,
-      teamDetails: teamDetailsLines.length === 0 ? input.teamDetails : undefined,
+      teamDetails: teamDetailsLines.length === 0 ? inputForTemplate.teamDetails : undefined,
       pronoun: isPlural ? "We" : "I",
       possessivePronoun: isPlural ? "our" : "my",
     };
 
-    const { output } = await prompt(processedInput);
-    return output!;
+    try {
+      const { output } = await generateAcknowledgementPrompt(finalInput, { model, config });
+      return output!;
+    } catch (e: any) {
+      console.error("Error in generateAcknowledgementFlow:", e);
+      return { acknowledgementMarkdown: '', error: `AI generation failed: ${e.message || 'Unknown error'}` };
+    }
   }
 );

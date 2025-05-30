@@ -13,8 +13,10 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { useLocalStorage } from '@/hooks/use-local-storage';
-import { User, Mail, Bell, Palette, ShieldCheck, Activity, Edit3, Save, XCircle, Loader2, KeyRound, Eye, EyeOff, Briefcase, School, CalendarClock, GraduationCap, UploadCloud, Trash2 } from 'lucide-react';
+import { User, Mail, Bell, Palette, ShieldCheck, Activity, Edit3, Save, XCircle, Loader2, KeyRound, Eye, EyeOff, GraduationCap, UploadCloud, Trash2, Info, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+
 
 interface UserProfile {
     name: string;
@@ -29,7 +31,7 @@ interface UserProfile {
     submissionYear?: string;
 }
 
-const DEFAULT_AVATAR_PLACEHOLDER_TEXT = "U"; // User
+const DEFAULT_AVATAR_PLACEHOLDER_TEXT = "U";
 
 export default function ProfilePage() {
     const router = useRouter();
@@ -51,7 +53,7 @@ export default function ProfilePage() {
 
     const [geminiApiKey, setGeminiApiKey] = useLocalStorage<string>('geminiApiKey', '');
     const [openaiApiKey, setOpenaiApiKey] = useLocalStorage<string>('openaiApiKey', '');
-    
+
     const [isGeminiKeyEnabled, setIsGeminiKeyEnabled] = useLocalStorage<boolean>('isGeminiKeyEnabled', true);
     const [isOpenAiKeyEnabled, setIsOpenAiKeyEnabled] = useLocalStorage<boolean>('isOpenAiKeyEnabled', false);
 
@@ -129,10 +131,6 @@ export default function ProfilePage() {
         }, 1500);
     };
 
-    // Mock data - remove or replace with actual data fetching if applicable
-    const joinDate = new Date(Date.now() - 1000 * 60 * 60 * 24 * 90); 
-    const projectsCount = 5; 
-
     const currentAvatarSrc = imagePreview || `https://placehold.co/200x200.png?text=${getAvatarFallback(editForm.name || user.name)}`;
 
     return (
@@ -144,7 +142,7 @@ export default function ProfilePage() {
                             <Avatar className="w-20 h-20 sm:w-24 sm:h-24 md:w-32 md:h-32 border-4 border-background shadow-md hover:scale-105 transition-transform duration-300 cursor-pointer"
                                 onClick={() => isEditing && fileInputRef.current?.click()}
                             >
-                                <AvatarImage src={currentAvatarSrc} alt={editForm.name || user.name || "User Avatar"} data-ai-hint="professional person portrait" />
+                                <AvatarImage src={currentAvatarSrc} alt={editForm.name || "User Avatar"} data-ai-hint="professional person portrait" />
                                 <AvatarFallback className="text-3xl sm:text-4xl">
                                     {getAvatarFallback(editForm.name || user.name)}
                                 </AvatarFallback>
@@ -195,8 +193,6 @@ export default function ProfilePage() {
                                     />
                                 </div>
                             )}
-                            <p className="text-xs sm:text-sm text-muted-foreground mt-2">Joined {joinDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
-                            <p className="text-xs sm:text-sm text-muted-foreground">{projectsCount} Projects Created (Placeholder)</p>
                              {isEditing && imagePreview && (
                                 <Button variant="link" size="sm" onClick={handleRemoveImage} className="text-xs text-destructive p-0 h-auto mt-1">
                                     <Trash2 className="w-3 h-3 mr-1" /> Remove Photo
@@ -233,8 +229,6 @@ export default function ProfilePage() {
                          {!isEditing ? (
                             <div className="space-y-2 text-sm">
                                 <p><strong className="text-foreground">Username:</strong> {user.username || "Not set"}</p>
-                                {/* Placeholder for change password - non-functional without auth */}
-                                {/* <Button variant="link" className="p-0 h-auto text-primary hover:underline text-sm">Change Password</Button> */}
                             </div>
                          ) : (
                              <div className="space-y-3 text-sm">
@@ -249,7 +243,6 @@ export default function ProfilePage() {
                                         className="mt-1 focus-visible:glow-primary h-9"
                                      />
                                 </div>
-                                {/* <Button variant="link" className="p-0 h-auto text-primary hover:underline text-sm">Change Password</Button> */}
                              </div>
                          )}
 
@@ -266,12 +259,12 @@ export default function ProfilePage() {
                             </div>
                         ) : (
                             <div className="space-y-3 text-sm">
-                                <div><Label htmlFor="edit-degree">Degree</Label><Input id="edit-degree" name="degree" value={editForm.degree} onChange={handleInputChange} placeholder="Enter Degree" className="mt-1 focus-visible:glow-primary h-9"/></div>
-                                <div><Label htmlFor="edit-branch">Branch</Label><Input id="edit-branch" name="branch" value={editForm.branch} onChange={handleInputChange} placeholder="Enter Branch" className="mt-1 focus-visible:glow-primary h-9"/></div>
-                                <div><Label htmlFor="edit-instituteName">Institute Name</Label><Input id="edit-instituteName" name="instituteName" value={editForm.instituteName} onChange={handleInputChange} placeholder="Enter Institute Name" className="mt-1 focus-visible:glow-primary h-9"/></div>
-                                <div><Label htmlFor="edit-universityName">University Name</Label><Input id="edit-universityName" name="universityName" value={editForm.universityName} onChange={handleInputChange} placeholder="Enter University Name" className="mt-1 focus-visible:glow-primary h-9"/></div>
-                                <div><Label htmlFor="edit-semester">Current Semester</Label><Input id="edit-semester" name="semester" type="number" value={editForm.semester} onChange={handleInputChange} placeholder="Enter Semester" className="mt-1 focus-visible:glow-primary h-9"/></div>
-                                <div><Label htmlFor="edit-submissionYear">Academic/Graduation Year</Label><Input id="edit-submissionYear" name="submissionYear" value={editForm.submissionYear} onChange={handleInputChange} placeholder="e.g., 2024 or 2023-2024" className="mt-1 focus-visible:glow-primary h-9"/></div>
+                                <div><Label htmlFor="edit-degree">Degree</Label><Input id="edit-degree" name="degree" value={editForm.degree || ''} onChange={handleInputChange} placeholder="e.g., Bachelor of Engineering" className="mt-1 focus-visible:glow-primary h-9"/></div>
+                                <div><Label htmlFor="edit-branch">Branch</Label><Input id="edit-branch" name="branch" value={editForm.branch || ''} onChange={handleInputChange} placeholder="e.g., Computer Engineering" className="mt-1 focus-visible:glow-primary h-9"/></div>
+                                <div><Label htmlFor="edit-instituteName">Institute Name</Label><Input id="edit-instituteName" name="instituteName" value={editForm.instituteName || ''} onChange={handleInputChange} placeholder="e.g., XYZ College of Engineering" className="mt-1 focus-visible:glow-primary h-9"/></div>
+                                <div><Label htmlFor="edit-universityName">University Name</Label><Input id="edit-universityName" name="universityName" value={editForm.universityName || ''} onChange={handleInputChange} placeholder="e.g., ABC University" className="mt-1 focus-visible:glow-primary h-9"/></div>
+                                <div><Label htmlFor="edit-semester">Current Semester</Label><Input id="edit-semester" name="semester" type="number" value={editForm.semester || ''} onChange={handleInputChange} placeholder="e.g., 5" className="mt-1 focus-visible:glow-primary h-9"/></div>
+                                <div><Label htmlFor="edit-submissionYear">Academic/Graduation Year</Label><Input id="edit-submissionYear" name="submissionYear" value={editForm.submissionYear || ''} onChange={handleInputChange} placeholder="e.g., 2024 or 2023-2024" className="mt-1 focus-visible:glow-primary h-9"/></div>
                             </div>
                         )}
 
@@ -312,7 +305,6 @@ export default function ProfilePage() {
                                         {showGeminiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                     </Button>
                                 </div>
-                                <p className="text-xs text-muted-foreground mt-1">Optional. Used for AI features if enabled.</p>
                             </div>
                             <div className="space-y-2">
                                  <div className="flex items-center justify-between">
@@ -347,9 +339,34 @@ export default function ProfilePage() {
                                         {showOpenAiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                     </Button>
                                 </div>
-                                <p className="text-xs text-muted-foreground mt-1">Optional. Used for AI features if enabled.</p>
                             </div>
-                             <p className="text-xs text-destructive">Note: Keys are stored locally in your browser. Do not use on shared computers.</p>
+                             <Accordion type="single" collapsible className="w-full">
+                                <AccordionItem value="api-key-guide">
+                                    <AccordionTrigger className="text-xs text-muted-foreground hover:text-primary py-2">
+                                        <Info className="h-3.5 w-3.5 mr-1"/> How to get API Keys?
+                                    </AccordionTrigger>
+                                    <AccordionContent className="text-xs space-y-2 pt-2 pb-1 text-muted-foreground">
+                                        <p>API keys allow this application to use AI models on your behalf. You are responsible for any costs incurred.</p>
+                                        <div>
+                                            <strong className="text-foreground">Google Gemini:</strong>
+                                            <ol className="list-decimal list-inside pl-2 space-y-0.5">
+                                                <li>Go to <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Google AI Studio <ExternalLink className="inline h-3 w-3"/></a>.</li>
+                                                <li>Sign in and create a new API key.</li>
+                                                <li>Ensure the "Generative Language API" or "Vertex AI API" is enabled in your Google Cloud Project.</li>
+                                            </ol>
+                                        </div>
+                                        <div>
+                                            <strong className="text-foreground">OpenAI (for ChatGPT models):</strong>
+                                            <ol className="list-decimal list-inside pl-2 space-y-0.5">
+                                                <li>Go to <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">OpenAI API Keys page <ExternalLink className="inline h-3 w-3"/></a>.</li>
+                                                <li>Sign in and create a new secret key.</li>
+                                                <li>Set up billing if you plan to exceed free tier limits.</li>
+                                            </ol>
+                                        </div>
+                                        <p className="font-semibold text-destructive">Note: Keys are stored locally in your browser. Do not use on shared computers.</p>
+                                    </AccordionContent>
+                                </AccordionItem>
+                            </Accordion>
                         </div>
 
                     </div>
