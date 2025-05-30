@@ -11,22 +11,22 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Settings, ChevronLeft, Save, Loader2, Wand2, ScrollText, Download, Lightbulb, FileText, Cloud, CloudOff, Home, Menu, Undo, MessageSquareQuote, Sparkles, UploadCloud, XCircle, ShieldAlert, Eye, Projector, BrainCircuit, Plus, Minus, CheckCircle, Edit3, ChevronRight, BookOpen, HelpCircle, ImageIcon, Table as TableIcon, Eraser, FileUp, FileJson, Info } from 'lucide-react';
 import Link from 'next/link';
-import type { Project, HierarchicalProjectSection, GeneratedSectionOutline, SectionIdentifier, OutlineSection } from '@/types/project'; // Use hierarchical type
+import type { Project, HierarchicalProjectSection, GeneratedSectionOutline, SectionIdentifier, OutlineSection, ExplainConceptOutput } from '@/types/project'; // Use hierarchical type
 import { findSectionById, updateSectionById, deleteSectionById, STANDARD_REPORT_PAGES, STANDARD_PAGE_INDICES, TOC_SECTION_NAME, ensureDefaultSubSection, getSectionNumbering, addSubSectionById } from '@/lib/project-utils';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { useToast } from '@/hooks/use-toast';
-import { generateSectionAction, summarizeSectionAction, generateOutlineAction, suggestImprovementsAction, generateDiagramAction, generateImageForSlideAction, parseTextOutlineAction } from '@/app/actions';
+import { generateSectionAction, summarizeSectionAction, generateOutlineAction, suggestImprovementsAction, generateDiagramAction, generateImageForSlideAction, parseTextOutlineAction, explainConceptAction } from '@/app/actions';
 import type { GenerateDiagramMermaidInput } from '@/ai/flows/generate-diagram-mermaid';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Dialog, DialogClose, DialogContent as DialogModalContent, DialogDescription as DialogModalDescription, DialogFooter as DialogModalFooter, DialogHeader as DialogModalHeader, DialogTitle as DialogModalTitle, DialogTrigger as DialogModalTrigger } from "@/components/ui/dialog"; // Renamed imports
+import { Dialog, DialogClose, DialogContent as DialogModalContent, DialogDescription as DialogModalDescription, DialogFooter as DialogModalFooter, DialogHeader as DialogModalHeader, DialogTitle as DialogModalTitle, DialogTrigger as DialogModalTrigger } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { v4 as uuidv4 } from 'uuid';
 import AiDiagramGenerator from '@/components/ai-diagram-generator';
-import MermaidDiagram from '@/components/mermaid-diagram';
+import MermaidDiagram from './mermaid-diagram';
 import { ProjectSidebarContent } from '@/components/project-sidebar-content';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { updateProject as updateProjectHelper } from '@/lib/project-utils';
@@ -36,7 +36,7 @@ import { StandardPagePreview } from '@/components/standard-page-preview';
 import { MarkdownToolbar } from '@/components/markdown-toolbar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import Image from 'next/image';
-
+import { AdBanner } from '@/components/AdBanner'; // Import AdBanner
 
 // Recursive component to render the preview outline
 const OutlinePreviewItem: React.FC<{ item: OutlineSection; level: number }> = ({ item, level }) => {
@@ -262,6 +262,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [isGeneratingOutline, setIsGeneratingOutline] = useState(false);
+
   const [isProjectFound, setIsProjectFound] = useState<boolean | null>(null);
   const [isMobileSheetOpen, setIsMobileSheetOpen] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
@@ -1686,6 +1687,7 @@ export function ProjectEditor({ projectId }: ProjectEditorProps) {
 
           <ScrollArea className="flex-1 p-3 sm:p-4 md:p-6">
               {activeViewContent}
+              <AdBanner adUnitId="project-editor-banner-1" className="mt-8" />
           </ScrollArea>
         </div>
 
