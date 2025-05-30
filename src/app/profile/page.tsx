@@ -13,13 +13,13 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { useLocalStorage } from '@/hooks/use-local-storage';
-import { User, Mail, Bell, Palette, ShieldCheck, Activity, Edit3, LogOut, Save, XCircle, Loader2, KeyRound, Eye, EyeOff, Briefcase, School, CalendarClock, GraduationCap, UploadCloud, Trash2 } from 'lucide-react';
+import { User, Mail, Bell, Palette, ShieldCheck, Activity, Edit3, Save, XCircle, Loader2, KeyRound, Eye, EyeOff, Briefcase, School, CalendarClock, GraduationCap, UploadCloud, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface UserProfile {
     name: string;
     email: string;
-    avatarUrl?: string; // Made optional for clearer default handling
+    avatarUrl?: string;
     username: string;
     degree?: string;
     branch?: string;
@@ -29,7 +29,7 @@ interface UserProfile {
     submissionYear?: string;
 }
 
-const DEFAULT_AVATAR_PLACEHOLDER_TEXT = "P";
+const DEFAULT_AVATAR_PLACEHOLDER_TEXT = "U"; // User
 
 export default function ProfilePage() {
     const router = useRouter();
@@ -39,7 +39,7 @@ export default function ProfilePage() {
     const [user, setUser] = useLocalStorage<UserProfile>('userProfileData', {
         name: '',
         email: '',
-        avatarUrl: undefined, // Start with undefined, fallback will handle it
+        avatarUrl: undefined,
         username: '',
         degree: '',
         branch: '',
@@ -61,18 +61,19 @@ export default function ProfilePage() {
     const [isEditing, setIsEditing] = useState(false);
     const [editForm, setEditForm] = useState<UserProfile>(user);
     const [isSaving, setIsSaving] = useState(false);
-    const [imagePreview, setImagePreview] = useState<string | undefined>(user.avatarUrl); // For immediate preview
+    const [imagePreview, setImagePreview] = useState<string | undefined>(user.avatarUrl);
 
     useEffect(() => {
         if (!isEditing) {
             setEditForm(user);
-            setImagePreview(user.avatarUrl); // Sync preview when not editing
+            setImagePreview(user.avatarUrl);
         }
     }, [user, isEditing]);
 
     const getAvatarFallback = (name?: string) => {
         if (!name?.trim()) return DEFAULT_AVATAR_PLACEHOLDER_TEXT;
-        return name.split(' ').map(n => n[0]).join('').toUpperCase() || DEFAULT_AVATAR_PLACEHOLDER_TEXT;
+        const initials = name.split(' ').map(n => n[0]).join('').toUpperCase();
+        return initials.substring(0, 2) || DEFAULT_AVATAR_PLACEHOLDER_TEXT;
     }
 
     const handleEditToggle = () => {
@@ -102,8 +103,8 @@ export default function ProfilePage() {
             const reader = new FileReader();
             reader.onloadend = () => {
                 const result = reader.result as string;
-                setImagePreview(result); // Show preview
-                setEditForm(prev => ({ ...prev, avatarUrl: result })); // Update form state
+                setImagePreview(result);
+                setEditForm(prev => ({ ...prev, avatarUrl: result }));
             };
             reader.readAsDataURL(file);
         }
@@ -117,7 +118,6 @@ export default function ProfilePage() {
     const handleSave = () => {
         setIsSaving(true);
         setTimeout(() => {
-            // Ensure avatarUrl from editForm (which might be a new Data URI or undefined) is saved
             const profileToSave: UserProfile = { ...editForm, avatarUrl: imagePreview };
             setUser(profileToSave);
             setIsSaving(false);
@@ -129,14 +129,7 @@ export default function ProfilePage() {
         }, 1500);
     };
 
-    const handleLogout = () => {
-        toast({
-            title: 'Logged Out',
-            description: 'You have been successfully logged out.',
-        });
-        router.push('/login');
-    };
-
+    // Mock data - remove or replace with actual data fetching if applicable
     const joinDate = new Date(Date.now() - 1000 * 60 * 60 * 24 * 90); 
     const projectsCount = 5; 
 
@@ -176,9 +169,9 @@ export default function ProfilePage() {
                         <div className="flex-1">
                             {!isEditing ? (
                                 <>
-                                    <CardTitle className="text-2xl sm:text-3xl font-bold text-primary text-glow-primary">{user.name || "Enter Your Name"}</CardTitle>
+                                    <CardTitle className="text-2xl sm:text-3xl font-bold text-primary text-glow-primary">{user.name || "Enter Name"}</CardTitle>
                                     <CardDescription className="text-base sm:text-lg text-muted-foreground mt-1 flex items-center justify-center sm:justify-start gap-2">
-                                        <Mail className="w-4 h-4" /> {user.email || "your.email@example.com"}
+                                        <Mail className="w-4 h-4" /> {user.email || "Enter Email"}
                                     </CardDescription>
                                 </>
                             ) : (
@@ -188,7 +181,7 @@ export default function ProfilePage() {
                                         name="name"
                                         value={editForm.name}
                                         onChange={handleInputChange}
-                                        placeholder="Enter Your Full Name"
+                                        placeholder="Enter Full Name"
                                         className="text-2xl sm:text-3xl font-bold border-0 shadow-none focus-visible:ring-0 focus-visible:border-b focus-visible:border-primary p-0 h-auto"
                                     />
                                     <Input
@@ -197,7 +190,7 @@ export default function ProfilePage() {
                                         type="email"
                                         value={editForm.email}
                                         onChange={handleInputChange}
-                                        placeholder="Enter Your Email Address"
+                                        placeholder="Enter Email Address"
                                         className="text-base sm:text-lg border-0 shadow-none focus-visible:ring-0 focus-visible:border-b focus-visible:border-primary p-0 h-auto text-muted-foreground"
                                     />
                                 </div>
@@ -240,7 +233,8 @@ export default function ProfilePage() {
                          {!isEditing ? (
                             <div className="space-y-2 text-sm">
                                 <p><strong className="text-foreground">Username:</strong> {user.username || "Not set"}</p>
-                                <Button variant="link" className="p-0 h-auto text-primary hover:underline text-sm">Change Password</Button>
+                                {/* Placeholder for change password - non-functional without auth */}
+                                {/* <Button variant="link" className="p-0 h-auto text-primary hover:underline text-sm">Change Password</Button> */}
                             </div>
                          ) : (
                              <div className="space-y-3 text-sm">
@@ -255,7 +249,7 @@ export default function ProfilePage() {
                                         className="mt-1 focus-visible:glow-primary h-9"
                                      />
                                 </div>
-                                <Button variant="link" className="p-0 h-auto text-primary hover:underline text-sm">Change Password</Button>
+                                {/* <Button variant="link" className="p-0 h-auto text-primary hover:underline text-sm">Change Password</Button> */}
                              </div>
                          )}
 
@@ -358,10 +352,6 @@ export default function ProfilePage() {
                              <p className="text-xs text-destructive">Note: Keys are stored locally in your browser. Do not use on shared computers.</p>
                         </div>
 
-                         <Separator />
-                         <Button variant="destructive" className="w-full mt-3 sm:mt-4" onClick={handleLogout}>
-                            <LogOut className="mr-2 h-4 w-4" /> Log Out
-                         </Button>
                     </div>
 
                     <div className="space-y-4 md:space-y-6">
@@ -392,6 +382,3 @@ export default function ProfilePage() {
         </div>
     );
 }
-    
-
-    
