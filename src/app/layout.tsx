@@ -26,13 +26,13 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Placeholder for Adsterra main script - Replace with actual script from Adsterra */}
+        {/* Adsterra main script */}
         <Script
           strategy="afterInteractive" // Load after page becomes interactive
           id="adsterra-main-script" // Unique ID for the script
-          // src="https://placeholder.adsterradomain.com/main.js" // Replace with ACTUAL Adsterra script URL
-          // If Adsterra provides an inline script, use dangerouslySetInnerHTML (less common for main script)
-          // dangerouslySetInnerHTML={{ __html: `console.log("Adsterra Main Script Placeholder Loaded");` }}
+          src="//pl26788890.profitableratecpm.com/d40008e783e882e0b2cc3a06a41eac65/invoke.js"
+          async={true} // Corresponds to async="async"
+          data-cfasync="false" // Pass custom data attributes
         />
       </head>
       <body className={cn(
